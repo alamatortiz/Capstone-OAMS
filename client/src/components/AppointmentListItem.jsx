@@ -1,4 +1,4 @@
-import { Calendar, XCircle, CheckCircle2 } from "lucide-react";
+import { Calendar, XCircle, CheckCircle2, AlertCircle } from "lucide-react";
 import "./AppointmentListItem.css";
 
 const STATUS_META = {
@@ -22,6 +22,9 @@ export default function AppointmentListItem({
   showCompleteButton = false,
   onComplete,
   isCompleting = false,
+  showReportButton = false,
+  onReport,
+  isReporting = false,
 }) {
   const { label, cls } = STATUS_META[appointment.status] ?? {
     label: appointment.status,
@@ -29,6 +32,7 @@ export default function AppointmentListItem({
   };
   const canCancel = appointment.status === "pending" || appointment.status === "approved";
   const canComplete = appointment.status === "approved";
+  const canReportNotServed = appointment.status === "approved";
 
   return (
     <div
@@ -83,34 +87,56 @@ export default function AppointmentListItem({
         </div>
       )}
 
-      {showCancelButton && canCancel && (
-        <button
-          type="button"
-          className="apt-list-cancel-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            onCancel?.(appointment.id);
-          }}
-          disabled={isCancelling}
-        >
-          <XCircle style={{ width: "1.3rem", height: "1.3rem", color: "#ef4444", flexShrink: 0 }} />
-          {isCancelling ? "Cancelling…" : "Cancel"}
-        </button>
-      )}
+      {((showCancelButton && canCancel) || (showCompleteButton && canComplete) || (showReportButton && canReportNotServed)) && (
+        <div className="apt-list-btn-row">
+          {showCompleteButton && canComplete && (
+            <button
+              type="button"
+              className="apt-list-btn-sm apt-list-btn-sm-complete"
+              onClick={(e) => {
+                e.stopPropagation();
+                onComplete?.(appointment.id);
+              }}
+              disabled={isCompleting}
+              title="Mark Appointment as Completed"
+            >
+              <CheckCircle2 />
+              {isCompleting ? "Marking…" : "Complete"}
+            </button>
+          )}
 
-      {showCompleteButton && canComplete && (
-        <button
-          type="button"
-          className="apt-list-complete-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            onComplete?.(appointment.id);
-          }}
-          disabled={isCompleting}
-        >
-          <CheckCircle2 style={{ width: "1.3rem", height: "1.3rem", flexShrink: 0 }} />
-          {isCompleting ? "Marking…" : "Mark Appointment as Completed"}
-        </button>
+          {showCancelButton && canCancel && (
+            <button
+              type="button"
+              className="apt-list-btn-sm apt-list-btn-sm-cancel"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCancel?.(appointment.id);
+              }}
+              disabled={isCancelling}
+              title="Cancel Appointment"
+            >
+              <XCircle />
+              {isCancelling ? "Cancelling…" : "Cancel"}
+            </button>
+          )}
+
+          {showReportButton && canReportNotServed && (
+            <button
+              type="button"
+              className="apt-list-btn-sm apt-list-btn-sm-report"
+              onClick={(e) => {
+                e.stopPropagation();
+                onReport?.(appointment.id);
+              }}
+              disabled={isReporting}
+              title="Report as Not Served"
+            >
+              <AlertCircle />
+              {isReporting ? "Reporting…" : "Not Served"}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

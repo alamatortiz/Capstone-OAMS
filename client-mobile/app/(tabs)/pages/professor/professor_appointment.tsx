@@ -100,6 +100,8 @@ interface Appointment {
   requestedAtRaw: string | null;
   approvedAtRaw?: string | null;
   completedAtRaw?: string | null;
+  cancelledBy?: 'student' | 'faculty' | 'system' | 'system_expired' | 'student_no_show' | null;
+  cancelReason?: string | null;
 }
 
 interface NavItem {
@@ -585,6 +587,15 @@ export default function ProfessorAppointmentScreen() {
                         <View style={[styles.apptInfoField, styles.apptInfoFieldFull]}>
                           <Text style={styles.apptInfoLabel}>Course Code</Text>
                           <Text style={styles.apptInfoValue}>{apt.courseCode}</Text>
+                        </View>
+                      )}
+                      {apt.status === 'cancelled' && apt.cancelledBy === 'student_no_show' && (
+                        <View style={[styles.apptInfoField, styles.apptInfoFieldFull]}>
+                          <Text style={[styles.apptInfoLabel, { color: '#f59e0b' }]}>Reported Not Served</Text>
+                          <Text style={styles.apptNotesText}>
+                            The student reported that you did not serve this appointment.
+                            {apt.cancelReason ? ` Details: ${apt.cancelReason}` : ''}
+                          </Text>
                         </View>
                       )}
                     </View>

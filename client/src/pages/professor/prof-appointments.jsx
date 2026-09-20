@@ -27,6 +27,7 @@ import {
   Loader2,
   CalendarClock,
   MessageSquare,
+  AlertCircle,
 } from "lucide-react";
 
 // ── Appointment-specific icons ─────────────────────────────────────────────────
@@ -280,6 +281,43 @@ function AppointmentCard({
             )}
           </div>
           <CommentBlock appointment={appointment} onSaved={onCommentSaved} />
+          {appointment.status === "pending" && (
+            <div className="appt-header-btn-row">
+              <button
+                className="appt-btn-sm appt-btn-sm-approve"
+                onClick={() => onApprove(appointment.id)}
+                title="Approve"
+              >
+                <CheckCircle2Icon /> Approve
+              </button>
+              <button
+                className="appt-btn-sm appt-btn-sm-reject"
+                onClick={() => onReject(appointment.id)}
+                title="Reject"
+              >
+                <XCircleIcon /> Reject
+              </button>
+            </div>
+          )}
+          {appointment.status === "approved" && (
+            <div className="appt-header-btn-row">
+              <button
+                className="appt-btn-sm appt-btn-sm-complete"
+                onClick={() => onComplete(appointment.id)}
+                disabled={isFutureDate}
+                title={isFutureDate ? "This appointment hasn't happened yet" : "Mark Complete"}
+              >
+                <CheckCircle2Icon /> Complete
+              </button>
+              <button
+                className="appt-btn-sm appt-btn-sm-cancel"
+                onClick={() => onCancel(appointment.id)}
+                title="Cancel"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
           {(appointment.approvedAtRaw || appointment.completedAtRaw) && (
             <div className="appt-timeline-section">
               {appointment.approvedAtRaw && (
@@ -318,41 +356,15 @@ function AppointmentCard({
               )}
             </div>
           )}
-          {appointment.status === "pending" && (
-            <div className="appt-header-btn-row">
-              <button
-                className="appt-btn-sm appt-btn-sm-approve"
-                onClick={() => onApprove(appointment.id)}
-                title="Approve"
-              >
-                <CheckCircle2Icon /> Approve
-              </button>
-              <button
-                className="appt-btn-sm appt-btn-sm-reject"
-                onClick={() => onReject(appointment.id)}
-                title="Reject"
-              >
-                <XCircleIcon /> Reject
-              </button>
-            </div>
-          )}
-          {appointment.status === "approved" && (
-            <div className="appt-header-btn-row">
-              <button
-                className="appt-btn-sm appt-btn-sm-complete"
-                onClick={() => onComplete(appointment.id)}
-                disabled={isFutureDate}
-                title={isFutureDate ? "This appointment hasn't happened yet" : "Mark Complete"}
-              >
-                <CheckCircle2Icon /> Complete
-              </button>
-              <button
-                className="appt-btn-sm appt-btn-sm-cancel"
-                onClick={() => onCancel(appointment.id)}
-                title="Cancel"
-              >
-                Cancel
-              </button>
+          {appointment.status === "cancelled" && appointment.cancelledBy === "student_no_show" && (
+            <div className="appt-not-served-notice">
+              <AlertCircle style={{ width: "1.1rem", height: "1.1rem" }} />
+              <div>
+                <p>The student reported that you did not serve this appointment.</p>
+                {appointment.cancelReason && (
+                  <p className="appt-not-served-reason">Details: {appointment.cancelReason}</p>
+                )}
+              </div>
             </div>
           )}
         </div>

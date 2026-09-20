@@ -67,6 +67,7 @@ const CANCELLED_BY_LABELS = {
   faculty: "Faculty",
   system: "System (schedule change)",
   system_expired: "System (expired, no response)",
+  student_no_show: "Not Served (reported by student)",
 };
 
 // Detects a bare URL (e.g. a pasted Google Meet link) in a faculty note so it
@@ -479,6 +480,17 @@ export default function AdminAppointment() {
                           <span className="admin-appointment-modal-value">
                             {CANCELLED_BY_LABELS[selectedAppointment.cancelledBy] ??
                               selectedAppointment.cancelledBy}
+                          </span>
+                        </div>
+                      )}
+                    {selectedAppointment.status === "cancelled" &&
+                      selectedAppointment.cancelReason && (
+                        <div className="admin-appointment-modal-field admin-appointment-modal-field--full">
+                          <span className="admin-appointment-modal-label">
+                            Cancel Reason
+                          </span>
+                          <span className="admin-appointment-modal-value">
+                            {selectedAppointment.cancelReason}
                           </span>
                         </div>
                       )}

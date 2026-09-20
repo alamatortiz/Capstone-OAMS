@@ -371,6 +371,65 @@
   color: #14532d;
 }
 
+/* ─── Report-as-Not-Served card + button (mirrors complete/cancel, amber) ─── */
+.apst-report-card {
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  background-color: rgba(245, 158, 11, 0.05);
+}
+
+[data-theme="light"] .apst-report-card {
+  background-color: rgba(245, 158, 11, 0.03);
+}
+
+.apst-report-card .apst-card-header {
+  border-bottom-color: rgba(245, 158, 11, 0.15);
+}
+
+.apst-report-title,
+.apst-report-card .apst-card-title svg {
+  color: #f59e0b;
+}
+
+.apst-report-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 0.75rem;
+  color: #fcd34d;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.apst-report-btn:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.55);
+  color: #fbbf24;
+}
+
+.apst-report-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+[data-theme="light"] .apst-report-btn {
+  background: rgba(180, 83, 9, 0.08);
+  border-color: rgba(180, 83, 9, 0.25);
+  color: #92400e;
+}
+
+[data-theme="light"] .apst-report-btn:hover:not(:disabled) {
+  background: rgba(180, 83, 9, 0.15);
+  border-color: rgba(180, 83, 9, 0.4);
+  color: #78350f;
+}
+
 /* ─── Icon inside each tab button ────────────────────────────────────────── */
 .apst-tab-icon {
   width: 1rem;

@@ -25,6 +25,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import NotificationBell from '@/components/NotificationBell';
+import QueueReasonModal from '@/components/QueueReasonModal';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
@@ -130,6 +131,8 @@ interface Appointment {
   rejectionReason?: string;
   approvedAtRaw?: string | null;
   completedAtRaw?: string | null;
+  cancelledBy?: 'student' | 'faculty' | 'system' | 'system_expired' | 'student_no_show' | null;
+  cancelReason?: string | null;
 }
 
 const STATUS_LABELS: Record<BookingStatus, string> = {
@@ -227,6 +230,9 @@ export default function StudentAppointmentStatusScreen() {
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [completeConfirmId, setCompleteConfirmId] = useState<string | null>(null);
   const [completing, setCompleting] = useState<string | null>(null);
+  const [reportConfirmId, setReportConfirmId] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reporting, setReporting] = useState<string | null>(null);
   const router = useRouter();
   const { user, token, logout } = useAuth();
 
@@ -263,6 +269,8 @@ export default function StudentAppointmentStatusScreen() {
           rejectionReason: a.rejectionReason ?? undefined,
           approvedAtRaw: a.approvedAtRaw ?? null,
           completedAtRaw: a.completedAtRaw ?? null,
+          cancelledBy: a.cancelledBy ?? null,
+          cancelReason: a.cancelReason ?? null,
         })),
       );
       setError(null);
@@ -363,6 +371,23 @@ export default function StudentAppointmentStatusScreen() {
       Alert.alert('Error', err?.response?.data?.error ?? 'Failed to mark the appointment as completed.');
     } finally {
       setCompleting(null);
+    }
+  };
+
+  const doReportNotServed = async () => {
+    const id = reportConfirmId;
+    if (!id || reporting) return;
+    setReporting(id);
+    try {
+      await api.patch(`/student/appointments/${id}/report-not-served`, reportReason.trim() ? { reason: reportReason.trim() } : {});
+      setReportConfirmId(null);
+      setReportReason('');
+      await fetchAppointments();
+    } catch (err: any) {
+      console.error('Failed to report appointment as not served:', err);
+      Alert.alert('Error', err?.response?.data?.error ?? 'Failed to report the appointment as not served.');
+    } finally {
+      setReporting(null);
     }
   };
 
@@ -519,6 +544,23 @@ export default function StudentAppointmentStatusScreen() {
                 </View>
               </View>
 
+              {/* Not Served notice */}
+              {selectedAppt.status === 'cancelled' && selectedAppt.cancelledBy === 'student_no_show' && (
+                <View style={styles.infoCard}>
+                  <View style={styles.infoCardBody}>
+                    <View style={styles.rejectNotice}>
+                      <XCircle size={20} color="#ef4444" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.rejectNoticeTitle}>You reported that this appointment was not served.</Text>
+                        {selectedAppt.cancelReason ? (
+                          <Text style={styles.rejectNoticeReason}>Details: {selectedAppt.cancelReason}</Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              )}
+
               {/* Cancel */}
               {(selectedAppt.status === 'pending' || selectedAppt.status === 'approved') && (
                 <View style={[styles.infoCard, styles.cancelCard]}>
@@ -553,6 +595,25 @@ export default function StudentAppointmentStatusScreen() {
                     <Pressable style={styles.completeBtn} onPress={() => setCompleteConfirmId(selectedAppt.id)}>
                       <CheckCircle size={16} color="#22c55e" />
                       <Text style={styles.completeBtnText}>Mark Appointment as Completed</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+
+              {/* Report as Not Served */}
+              {selectedAppt.status === 'approved' && (
+                <View style={[styles.infoCard, styles.reportCard]}>
+                  <View style={[styles.infoCardHeader, styles.reportCardHeader]}>
+                    <AlertCircle size={18} color="#f59e0b" />
+                    <Text style={[styles.infoCardTitle, { color: '#f59e0b' }]}>Report as Not Served</Text>
+                  </View>
+                  <View style={styles.infoCardBody}>
+                    <Text style={styles.cancelDesc}>
+                      If the professor never actually saw you for this appointment, let them know. This cancels the appointment and notifies the professor.
+                    </Text>
+                    <Pressable style={styles.reportBtn} onPress={() => { setReportReason(''); setReportConfirmId(selectedAppt.id); }}>
+                      <AlertCircle size={16} color="#f59e0b" />
+                      <Text style={styles.reportBtnText}>Report as Not Served</Text>
                     </Pressable>
                   </View>
                 </View>
@@ -835,6 +896,41 @@ export default function StudentAppointmentStatusScreen() {
         </View>
       </Modal>
 
+      {/* Report as Not Served Reason Modal */}
+      <QueueReasonModal
+        visible={reportConfirmId !== null}
+        title="Report as Not Served?"
+        message={
+          selectedAppt
+            ? `Report that ${selectedAppt.person} did not serve you for your appointment on ${formatDate(selectedAppt.date)}? This will cancel the appointment and notify the professor.`
+            : 'Report this appointment as not served?'
+        }
+        confirmText={reporting === reportConfirmId ? 'Please wait…' : 'Report as Not Served'}
+        confirmColor="#f59e0b"
+        reason={reportReason}
+        onChangeReason={setReportReason}
+        onCancel={() => { setReportConfirmId(null); setReportReason(''); }}
+        onConfirm={doReportNotServed}
+        theme={theme}
+        required={false}
+        placeholder="Add details (optional)..."
+        styles={{
+          modalOverlay: styles.logoutOverlay,
+          confirmModalCard: styles.logoutModalCard,
+          confirmIconCircle: styles.logoutIconCircle,
+          confirmTitle: styles.logoutModalTitle,
+          confirmDescription: styles.logoutModalDescription,
+          reasonInput: styles.reasonInput,
+          confirmActionsRow: styles.logoutModalActions,
+          cancelBtn: styles.logoutCancelBtn,
+          cancelBtnText: styles.logoutCancelBtnText,
+          confirmBtn: styles.logoutConfirmBtn,
+          confirmBtnText: styles.logoutConfirmBtnText,
+          formSubmitBtnDisabled: styles.formSubmitBtnDisabled,
+        }}
+        submitting={reporting === reportConfirmId}
+      />
+
       {/* Confirm Logout Modal */}
       <Modal visible={logoutModalVisible} animationType="fade" transparent onRequestClose={() => setLogoutModalVisible(false)}>
         <View style={styles.logoutOverlay}>
@@ -1073,6 +1169,24 @@ function createStyles(theme: ThemePalette) {
       backgroundColor: 'rgba(34, 197, 94, 0.05)',
     },
     completeBtnText: { fontSize: 13, fontWeight: '700', color: '#22c55e' },
+    reportCard: { borderColor: 'rgba(245, 158, 11, 0.25)', backgroundColor: 'rgba(245, 158, 11, 0.04)' },
+    reportCardHeader: { borderBottomColor: 'rgba(245, 158, 11, 0.15)' },
+    reportBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+      paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: 'rgba(245, 158, 11, 0.35)',
+      backgroundColor: 'rgba(245, 158, 11, 0.05)',
+    },
+    reportBtnText: { fontSize: 13, fontWeight: '700', color: '#f59e0b' },
+    // Adapter styles for QueueReasonModal's fixed style-key contract, reusing
+    // the same visual chrome as the existing logout*/cancel*/complete*
+    // confirm modals rather than duplicating a whole second modal-chrome
+    // style set.
+    reasonInput: {
+      width: '100%', minHeight: 64, borderWidth: 1, borderColor: theme.border, borderRadius: 12,
+      padding: 12, fontSize: 13, color: theme.text, backgroundColor: theme.background,
+      textAlignVertical: 'top', marginBottom: 16,
+    },
+    formSubmitBtnDisabled: { opacity: 0.6 },
 
     // Nav drawer
     drawerOverlay: { flex: 1, flexDirection: 'row' },

@@ -116,6 +116,8 @@ interface TransactionRecord {
   date: string;
   approvedAtRaw?: string | null;
   completedAtRaw?: string | null;
+  cancelledBy?: string | null;
+  cancelReason?: string | null;
 }
 
 interface NavItem {
@@ -257,6 +259,8 @@ export default function ProfessorTransactionsScreen() {
           date: t.date,
           approvedAtRaw: t.approvedAtRaw ?? null,
           completedAtRaw: t.completedAtRaw ?? null,
+          cancelledBy: t.cancelledBy ?? null,
+          cancelReason: t.cancelReason ?? null,
         })),
       );
     } catch (err) {
@@ -612,6 +616,12 @@ export default function ProfessorTransactionsScreen() {
                     )}
 
                     {txn.details && <Text style={styles.txnDetails}>{txn.details}</Text>}
+
+                    {txn.type === 'appointment' && txn.cancelledBy === 'student_no_show' && (
+                      <Text style={styles.txnDetails}>
+                        Student reported not served{txn.cancelReason ? `: ${txn.cancelReason}` : ''}
+                      </Text>
+                    )}
 
                     {txn.type === 'appointment' && (txn.approvedAtRaw || txn.completedAtRaw) && (
                       <View style={styles.txnTimelineRow}>

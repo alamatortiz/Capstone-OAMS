@@ -6,7 +6,6 @@ const { formatTime12h: formatTime } = require("../utils/dateTime");
 const SWEEP_INTERVAL_MS = 15 * 60 * 1000;
 const REMINDER_LEAD_HOURS = 24;
 const COMPLETE_GRACE_HOURS = 3;
-const PENDING_NUDGE_HOURS = 48;
 // The T-10min "starts soon" reminder runs on its own faster tick -- 15 min is
 // too coarse for a 10-min lead. Mirrors queueNoShowSweeper's short interval.
 const IMMINENT_INTERVAL_MS = 60 * 1000;
@@ -72,7 +71,6 @@ async function sweepAppointmentReminders() {
     }
 
     await sweepStaleApproved();
-    await sweepStalePending();
     await sweepExpiredPending();
   } catch (error) {
     console.error("[appointmentReminderSweeper] Sweep failed:", error);
@@ -175,45 +173,12 @@ async function sweepStaleApproved() {
   }
 }
 
-// A 'pending' request nobody approved or rejected within PENDING_NUDGE_HOURS
-// nudges the faculty member who's blocking it -- pending_nudge_sent_at is a
-// dedicated flag (separate from reminder_sent_at, which tracks an unrelated
-// notification on the same row) so this fires exactly once per request, not
-// every 15 minutes for as long as it stays pending.
-async function sweepStalePending() {
-  const [stale] = await pool.query(
-    `SELECT appointment_id, faculty_id
-     FROM appointments
-     WHERE status = 'pending'
-       AND pending_nudge_sent_at IS NULL
-       AND created_at <= (NOW() - INTERVAL ? HOUR)`,
-    [PENDING_NUDGE_HOURS],
-  );
-
-  let nudgedCount = 0;
-  for (const row of stale) {
-    const [result] = await pool.query(
-      `UPDATE appointments SET pending_nudge_sent_at = NOW() WHERE appointment_id = ? AND pending_nudge_sent_at IS NULL`,
-      [row.appointment_id],
-    );
-    if (result.affectedRows === 0) continue;
-
-    createNotification(row.faculty_id, "You have a pending appointment request awaiting your response.", "appointment");
-    nudgedCount += 1;
-  }
-
-  if (nudgedCount > 0) {
-    console.log(`[appointmentReminderSweeper] Nudged faculty on ${nudgedCount} stale pending request${nudgedCount === 1 ? "" : "s"}`);
-  }
-}
-
 // A 'pending' request nobody approved/rejected before its own scheduled
 // date+time arrived and passed can't ever be honored -- there's no slot left
 // to serve it in -- so it's auto-REJECTED instead of sitting in 'pending'
-// forever. Distinct from sweepStalePending above (which only nudges faculty
-// while the appointment is still in the future) and from sweepStaleApproved
-// (which resolves an *approved* past-due appointment to 'completed', since
-// that one was actually confirmed to happen). Uses status 'rejected' + a
+// forever. Distinct from sweepStaleApproved above (which resolves an
+// *approved* past-due appointment to 'completed', since that one was
+// actually confirmed to happen). Uses status 'rejected' + a
 // rejection_reason so it reads as "Rejected" everywhere the same way a manual
 // faculty rejection does; cancelled_by stays NULL (matching a manual reject).
 // (Historical rows may still carry cancelled_by = 'system_expired' from before

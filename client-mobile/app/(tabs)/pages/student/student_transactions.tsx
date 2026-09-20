@@ -95,6 +95,8 @@ interface Transaction {
   details: string;
   approvedAtRaw?: string | null;
   completedAtRaw?: string | null;
+  cancelledBy?: string | null;
+  cancelReason?: string | null;
 }
 
 const TYPE_META: Record<TxType, { label: string; icon: LucideIconType; bg: string; border: string; color: string }> = {
@@ -659,6 +661,12 @@ export default function StudentTransactionsScreen() {
 
                     <Text style={styles.txCollege}>{t.college}</Text>
                     <Text style={styles.txDetails}>{t.details}</Text>
+
+                    {t.type === 'appointment' && t.cancelledBy === 'student_no_show' && (
+                      <Text style={styles.txDetails}>
+                        Reported not served{t.cancelReason ? `: ${t.cancelReason}` : ''}
+                      </Text>
+                    )}
 
                     {t.type === 'appointment' && (t.approvedAtRaw || t.completedAtRaw) && (
                       <View style={styles.txTimelineRow}>

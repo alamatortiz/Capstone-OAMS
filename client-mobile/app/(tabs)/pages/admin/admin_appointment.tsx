@@ -113,7 +113,8 @@ interface Appointment {
   requestedAt: string;
   requestedAtRaw: string | null;
   isToday: boolean;
-  cancelledBy: 'student' | 'faculty' | 'system' | 'system_expired' | null;
+  cancelledBy: 'student' | 'faculty' | 'system' | 'system_expired' | 'student_no_show' | null;
+  cancelReason?: string | null;
 }
 
 const CANCELLED_BY_LABELS: Record<string, string> = {
@@ -121,6 +122,7 @@ const CANCELLED_BY_LABELS: Record<string, string> = {
   faculty: 'Faculty',
   system: 'System (schedule change)',
   system_expired: 'System (expired, no response)',
+  student_no_show: 'Not Served (reported by student)',
 };
 
 type LucideIconType = typeof Clock;
@@ -820,6 +822,12 @@ function AppointmentDetailsModal({
                   <Text style={styles.detailsValue}>
                     {CANCELLED_BY_LABELS[appointment.cancelledBy] ?? appointment.cancelledBy}
                   </Text>
+                </View>
+              )}
+              {appointment.status === 'cancelled' && appointment.cancelReason && (
+                <View style={[styles.detailsField, styles.detailsFieldFull]}>
+                  <Text style={styles.detailsLabel}>Cancel Reason</Text>
+                  <Text style={styles.detailsValue}>{appointment.cancelReason}</Text>
                 </View>
               )}
             </View>

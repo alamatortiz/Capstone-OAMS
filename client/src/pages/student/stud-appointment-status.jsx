@@ -14,6 +14,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
+import QueueReasonModal from "../../components/QueueReasonModal";
 import { toast } from "sonner";
 import api from "../../utils/api";
 import { getCollegeLogo } from "../../data/collegeLogo";
@@ -85,12 +86,14 @@ function CommentCard({ appt }) {
 }
 
 // ─── Detail View ──────────────────────────────────────────────────────────────
-function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, completing, backLabel = "My Appointments" }) {
+function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, completing, onReportNotServed, reporting, backLabel = "My Appointments" }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+  const [showReportDialog, setShowReportDialog] = useState(false);
   const { label: statusLabel, cls: statusCls } = getStatusMeta(appt.status);
   const canCancel = appt.status === "pending" || appt.status === "approved";
   const canComplete = appt.status === "approved";
+  const canReportNotServed = appt.status === "approved";
 
   return (
     <div className="apst-status-container">
@@ -226,9 +229,47 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, com
                 </div>
               </div>
             )}
+            {appt.status === "cancelled" && appt.cancelledBy === "student_no_show" && (
+              <div className="apst-card-content">
+                <div className="apst-reject-notice">
+                  <AlertCircle style={{ width: "1.25rem", height: "1.25rem" }} />
+                  <div>
+                    <p>You reported that this appointment was not served.</p>
+                    {appt.cancelReason && (
+                      <p className="apst-reject-reason">Details: {appt.cancelReason}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <CommentCard appt={appt} />
+
+          {canComplete && (
+            <div className="apst-card apst-complete-card">
+              <div className="apst-card-header">
+                <h3 className="apst-card-title apst-complete-title">
+                  <CheckCircle2 style={{ width: "1.25rem", height: "1.25rem", color: "#22c55e" }} />
+                  Mark as Completed
+                </h3>
+              </div>
+              <div className="apst-card-content">
+                <p className="apst-cancel-desc">
+                  If your concern has already been addressed and the professor hasn't closed this
+                  out yet, you can mark it completed yourself.
+                </p>
+                <button
+                  className="apst-complete-btn"
+                  onClick={() => setShowCompleteDialog(true)}
+                  disabled={completing === appt.id}
+                >
+                  <CheckCircle2 style={{ width: "1rem", height: "1rem" }} />
+                  {completing === appt.id ? "Marking…" : "Mark Appointment as Completed"}
+                </button>
+              </div>
+            </div>
+          )}
 
           {canCancel && (
             <div className="apst-card apst-cancel-card">
@@ -254,26 +295,25 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, com
             </div>
           )}
 
-          {canComplete && (
-            <div className="apst-card apst-complete-card">
+          {canReportNotServed && (
+            <div className="apst-card apst-report-card">
               <div className="apst-card-header">
-                <h3 className="apst-card-title apst-complete-title">
-                  <CheckCircle2 style={{ width: "1.25rem", height: "1.25rem", color: "#22c55e" }} />
-                  Mark as Completed
+                <h3 className="apst-card-title apst-report-title">
+                  <AlertCircle style={{ width: "1.25rem", height: "1.25rem", color: "#f59e0b" }} />
+                  Report as Not Served
                 </h3>
               </div>
               <div className="apst-card-content">
                 <p className="apst-cancel-desc">
-                  If your concern has already been addressed and the professor hasn't closed this
-                  out yet, you can mark it completed yourself.
+                  If the professor never actually saw you for this appointment, let them know. This cancels the appointment and notifies the professor.
                 </p>
                 <button
-                  className="apst-complete-btn"
-                  onClick={() => setShowCompleteDialog(true)}
-                  disabled={completing === appt.id}
+                  className="apst-report-btn"
+                  onClick={() => setShowReportDialog(true)}
+                  disabled={reporting === appt.id}
                 >
-                  <CheckCircle2 style={{ width: "1rem", height: "1rem" }} />
-                  {completing === appt.id ? "Marking…" : "Mark Appointment as Completed"}
+                  <AlertCircle style={{ width: "1rem", height: "1rem" }} />
+                  {reporting === appt.id ? "Reporting…" : "Report as Not Served"}
                 </button>
               </div>
             </div>
@@ -314,6 +354,26 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, com
         cancelText="Not Yet"
         confirmText="Mark as Completed"
       />
+
+      <QueueReasonModal
+        show={showReportDialog}
+        variant="warning"
+        onCancel={() => setShowReportDialog(false)}
+        onConfirm={(reason) => { setShowReportDialog(false); onReportNotServed(appt.id, reason); }}
+        title="Report as Not Served?"
+        message={
+          <>
+            Report that <strong>{appt.person}</strong> did not serve you for your appointment on{" "}
+            <strong>{formatDate(appt.date)}</strong>? This will cancel the appointment and notify the professor.
+          </>
+        }
+        confirmText={reporting === appt.id ? "Please wait…" : "Report as Not Served"}
+        cancelText="Never Mind"
+        submitting={reporting === appt.id}
+        icon={<AlertCircle width={22} height={22} />}
+        required={false}
+        placeholder="Add details (optional)..."
+      />
     </div>
   );
 }
@@ -332,6 +392,7 @@ export default function AppointmentStatusPage() {
   const [selectedId, setSelectedId] = useState(navState.appointmentId ?? null);
   const [cancelling, setCancelling] = useState(null);
   const [completing, setCompleting] = useState(null);
+  const [reporting, setReporting] = useState(null);
   const [activeTab, setActiveTab] = useState("all");
   const [allRange, setAllRange] = useState("today");
 
@@ -434,6 +495,19 @@ export default function AppointmentStatusPage() {
     }
   };
 
+  const handleReportNotServed = async (id, reason) => {
+    setReporting(id);
+    try {
+      await api.patch(`/student/appointments/${id}/report-not-served`, reason ? { reason } : {});
+      toast.success("Appointment reported as not served.");
+      await fetchAppointments();
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? "Failed to report the appointment.");
+    } finally {
+      setReporting(null);
+    }
+  };
+
   // Defaults to "Today" across every tab -- the range control below lets a
   // student switch to "This Week"/"Next Week"/"All Time" to see everything
   // else.
@@ -484,6 +558,8 @@ export default function AppointmentStatusPage() {
             cancelling={cancelling}
             onComplete={handleComplete}
             completing={completing}
+            onReportNotServed={handleReportNotServed}
+            reporting={reporting}
           />
         ) : (
           <div className="apst-status-container">

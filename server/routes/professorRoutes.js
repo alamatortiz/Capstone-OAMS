@@ -371,6 +371,8 @@ function buildActivityTitle(row) {
       return `Appointment with ${row.student_name} auto-cancelled — you never responded`;
     if (row.cancelled_by === "faculty")
       return `You cancelled the appointment with ${row.student_name}`;
+    if (row.cancelled_by === "student_no_show")
+      return `${row.student_name} reported that you did not serve them`;
     return `Appointment cancelled by ${row.student_name}`;
   }
   const map = {
@@ -411,6 +413,7 @@ router.get(
         SELECT
           a.appointment_id, a.appointment_date, a.appointment_time,
           a.status, a.notes, a.created_at, a.approved_at, a.completed_at,
+          a.cancelled_by, a.cancel_reason,
           a.booking_year_program, a.course_code,
           a.shared_comment, a.comment_updated_by, a.comment_updated_at,
           s.first_name, s.last_name, s.student_number, s.course,
@@ -469,6 +472,8 @@ router.get(
           requestedAtRaw: r.created_at,
           approvedAtRaw: r.approved_at ?? null,
           completedAtRaw: r.completed_at ?? null,
+          cancelledBy: r.cancelled_by ?? null,
+          cancelReason: r.cancel_reason ?? null,
         })),
       );
     } catch (err) {
@@ -739,7 +744,8 @@ router.get(
             a.shared_comment AS sharedComment,
             a.comment_updated_by AS commentUpdatedBy,
             a.comment_updated_at AS commentUpdatedAt,
-            a.approved_at AS approvedAtRaw, a.completed_at AS completedAtRaw
+            a.approved_at AS approvedAtRaw, a.completed_at AS completedAtRaw,
+            a.cancelled_by AS cancelledBy, a.cancel_reason AS cancelReason
           FROM appointments a
           JOIN students s ON a.student_id = s.student_id
           LEFT JOIN appointment_services svc ON a.service_id = svc.service_id

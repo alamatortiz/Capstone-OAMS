@@ -602,6 +602,11 @@ export default function TransactionsPage() {
                         Reason: {transaction.adminReason}
                       </p>
                     )}
+                    {transaction.type === "appointment" && transaction.cancelledBy === "student_no_show" && (
+                      <p className="transaction-details">
+                        Reported not served{transaction.cancelReason ? `: ${transaction.cancelReason}` : ""}
+                      </p>
+                    )}
                     {transaction.type === "appointment" && transaction.sharedComment && (
                       <div className="transaction-comment">
                         <p className="transaction-comment-text">{transaction.sharedComment}</p>

@@ -38,6 +38,8 @@ export default function QueueReasonModal({
   theme,
   styles,
   submitting,
+  required = true,
+  placeholder,
 }: {
   visible: boolean;
   title: string;
@@ -51,8 +53,10 @@ export default function QueueReasonModal({
   theme: ReasonModalTheme;
   styles: ReasonModalStyles;
   submitting: boolean;
+  required?: boolean;
+  placeholder?: string;
 }) {
-  const canConfirm = !submitting && reason.trim().length > 0;
+  const canConfirm = !submitting && (!required || reason.trim().length > 0);
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onCancel}>
@@ -65,7 +69,7 @@ export default function QueueReasonModal({
           <Text style={styles.confirmDescription}>{message}</Text>
           <TextInput
             style={styles.reasonInput}
-            placeholder="Enter a reason (required)..."
+            placeholder={placeholder ?? "Enter a reason (required)..."}
             placeholderTextColor={theme.tertiary}
             value={reason}
             onChangeText={onChangeReason}

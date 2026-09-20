@@ -368,6 +368,8 @@ function buildAppointmentActivityTitle(row) {
       return `Appointment with ${row.professor_name} auto-cancelled — expired without a response`;
     if (row.cancelled_by === "faculty")
       return `Appointment cancelled by ${row.professor_name}`;
+    if (row.cancelled_by === "student_no_show")
+      return `You reported that ${row.professor_name} did not serve you`;
     return `You cancelled the appointment with ${row.professor_name}`;
   }
   const map = {
@@ -2322,6 +2324,8 @@ router.get(
            a.created_at,
            a.approved_at,
            a.completed_at,
+           a.cancelled_by,
+           a.cancel_reason,
            f.faculty_id,
            CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
            d.department_name                       AS college,
@@ -2367,6 +2371,8 @@ router.get(
         createdAt: row.created_at ? getManilaDateString(row.created_at) : null,
         approvedAtRaw: row.approved_at ?? null,
         completedAtRaw: row.completed_at ?? null,
+        cancelledBy: row.cancelled_by ?? null,
+        cancelReason: row.cancel_reason ?? null,
       }));
 
       res.json({ appointments: formatted });
@@ -2577,6 +2583,120 @@ router.patch(
   },
 );
 
+// PATCH /api/student/appointments/:appointmentId/report-not-served
+// Lets a student flag that the professor never actually served them on an
+// APPROVED appointment (no-show / never followed up). Separate, additional
+// action from the plain DELETE /appointments/:appointmentId cancel above --
+// that route is untouched. approved -> cancelled only, writing a distinct
+// cancelled_by='student_no_show' (+ optional cancel_reason) so the activity
+// feed/admin view can tell this apart from an ordinary student cancel.
+// Mirrors PATCH /appointments/:appointmentId/complete's transaction/locking/
+// date-gating shape, since both are student-authored, approved-only,
+// not-future-dated self-service actions.
+router.patch(
+  "/appointments/:appointmentId/report-not-served",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const appointmentId = parseInt(req.params.appointmentId, 10);
+    const trimmedReason =
+      typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
+
+    if (!appointmentId || isNaN(appointmentId)) {
+      return res.status(400).json({ error: "Invalid appointmentId" });
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const [[appt]] = await conn.query(
+        `SELECT a.appointment_id, a.student_id, a.status, a.faculty_id, a.department_id,
+                a.appointment_date, a.appointment_time, s.first_name, s.last_name,
+                sv.service_name
+         FROM appointments a
+         JOIN students s ON a.student_id = s.student_id
+         LEFT JOIN appointment_services sv ON a.service_id = sv.service_id
+         WHERE a.appointment_id = ? FOR UPDATE`,
+        [appointmentId],
+      );
+
+      if (!appt) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      if (appt.student_id !== studentId) {
+        await conn.rollback();
+        return res
+          .status(403)
+          .json({ error: "You can only report your own appointments" });
+      }
+      // Only 'approved' -- not 'pending' (you can't claim a no-show for a
+      // request that was never even approved), and not any terminal status.
+      if (appt.status !== "approved") {
+        await conn.rollback();
+        return res.status(409).json({
+          error: `Only an approved appointment can be reported as not served (this one is ${appt.status}).`,
+        });
+      }
+      const apptDate =
+        appt.appointment_date instanceof Date
+          ? getManilaDateString(appt.appointment_date)
+          : String(appt.appointment_date).split("T")[0];
+      if (apptDate > getManilaDateString()) {
+        await conn.rollback();
+        return res.status(409).json({
+          error:
+            "This appointment hasn't happened yet — you can only report a past or same-day appointment as not served.",
+        });
+      }
+
+      const [result] = await conn.query(
+        `UPDATE appointments
+         SET status = 'cancelled', cancelled_by = 'student_no_show', cancel_reason = ?
+         WHERE appointment_id = ? AND status = 'approved'`,
+        [trimmedReason || null, appointmentId],
+      );
+      if (result.affectedRows === 0) {
+        await conn.rollback();
+        return res.status(409).json({
+          error:
+            "This appointment was just updated elsewhere. Please refresh and try again.",
+        });
+      }
+
+      await conn.commit();
+
+      emitToDept(appt.department_id, "appointment:status-updated", {
+        appointmentId,
+        status: "cancelled",
+      });
+      emitToUser(appt.faculty_id, "appointment:status-updated", {
+        appointmentId,
+        status: "cancelled",
+      });
+      const reportServicePart = appt.service_name ? ` ${appt.service_name}` : "";
+      const reasonSuffix = trimmedReason ? ` They added: "${trimmedReason}"` : "";
+      createNotification(
+        appt.faculty_id,
+        `${appt.first_name} ${appt.last_name} reported that you did not serve them for their${reportServicePart} appointment on ${getManilaDateString(appt.appointment_date)} at ${formatTime12h(appt.appointment_time)}.${reasonSuffix}`,
+        "appointment",
+      );
+
+      res.json({
+        message: "Appointment reported as not served",
+        appointmentId,
+      });
+    } catch (error) {
+      await conn.rollback();
+      sendServerError(res, error, "Report appointment not served error");
+    } finally {
+      conn.release();
+    }
+  },
+);
+
 // ─────────────────────────────────────────────────────────────
 // PROFESSOR SCHEDULE ENDPOINTS
 // ─────────────────────────────────────────────────────────────
@@ -2755,6 +2875,8 @@ router.get(
           CAST(NULL AS DATETIME) AS commentUpdatedAt,
           CAST(NULL AS DATETIME) AS approvedAt,
           CAST(NULL AS DATETIME) AS completedAt,
+          CAST(NULL AS CHAR(20) CHARACTER SET utf8mb4) AS cancelledBy,
+          CAST(NULL AS CHAR(1000) CHARACTER SET utf8mb4) AS cancelReason,
           q.updated_at AS event_time
         FROM queues q
         JOIN services s ON q.service_id = s.service_id
@@ -2777,6 +2899,8 @@ router.get(
           a.comment_updated_at AS commentUpdatedAt,
           a.approved_at AS approvedAt,
           a.completed_at AS completedAt,
+          a.cancelled_by AS cancelledBy,
+          a.cancel_reason AS cancelReason,
           a.updated_at AS event_time
         FROM appointments a
         JOIN faculty f ON a.faculty_id = f.faculty_id
@@ -2799,6 +2923,8 @@ router.get(
           CAST(NULL AS DATETIME) AS commentUpdatedAt,
           CAST(NULL AS DATETIME) AS approvedAt,
           CAST(NULL AS DATETIME) AS completedAt,
+          CAST(NULL AS CHAR(20) CHARACTER SET utf8mb4) AS cancelledBy,
+          CAST(NULL AS CHAR(1000) CHARACTER SET utf8mb4) AS cancelReason,
           dr.updated_at AS event_time
         FROM document_requests dr
         JOIN document_services s ON dr.service_id = s.service_id
@@ -2821,6 +2947,8 @@ router.get(
           CAST(NULL AS DATETIME) AS commentUpdatedAt,
           CAST(NULL AS DATETIME) AS approvedAt,
           CAST(NULL AS DATETIME) AS completedAt,
+          CAST(NULL AS CHAR(20) CHARACTER SET utf8mb4) AS cancelledBy,
+          CAST(NULL AS CHAR(1000) CHARACTER SET utf8mb4) AS cancelReason,
           ds.updated_at AS event_time
         FROM document_submissions ds
         JOIN departments d ON ds.department_id = d.department_id
@@ -2918,6 +3046,8 @@ router.get(
           commentUpdatedAt: row.commentUpdatedAt || null,
           approvedAtRaw: row.approvedAt || null,
           completedAtRaw: row.completedAt || null,
+          cancelledBy: row.cancelledBy || null,
+          cancelReason: row.cancelReason || null,
         };
       });
 

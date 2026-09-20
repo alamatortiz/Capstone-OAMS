@@ -468,6 +468,11 @@ export default function ProfessorTransactionsPage() {
                         )}
                       </div>
                     )}
+                    {txn.type === "appointment" && txn.cancelledBy === "student_no_show" && (
+                      <p className="txn-item-comment-text">
+                        Student reported not served{txn.cancelReason ? `: ${txn.cancelReason}` : ""}
+                      </p>
+                    )}
                     {txn.type === "appointment" && txn.sharedComment && (
                       <div className="txn-item-comment">
                         <p className="txn-item-comment-text">{txn.sharedComment}</p>

@@ -419,8 +419,8 @@ CREATE TABLE appointments (
     -- sweeper specifically this is "when the sweeper noticed", not a
     -- backdated reconstruction of the appointment window's end time (see
     -- db.js's timezone comment) -- consistent with reminder_sent_at/
-    -- imminent_reminder_sent_at/pending_nudge_sent_at below, which are all
-    -- stamped the same "when noticed" way.
+    -- imminent_reminder_sent_at below, which are stamped the same
+    -- "when noticed" way.
     completed_at        TIMESTAMP    NULL DEFAULT NULL,
     -- 'system' = auto-cancelled because the availability slot it was booked
     -- against got edited/deleted out from under it.
@@ -428,12 +428,23 @@ CREATE TABLE appointments (
     -- unanswered is now auto-*rejected* (status='rejected' + rejection_reason)
     -- by appointmentReminderSweeper.js, not cancelled -- this value only exists
     -- for rows written before that change.
-    cancelled_by        ENUM('student','faculty','system','system_expired') NULL, -- who/what triggered a 'cancelled' status, for activity-feed attribution
+    -- 'student_no_show' = the student self-reported, via PATCH
+    -- /student/appointments/:id/report-not-served, that the professor never
+    -- actually served them on an approved appointment -- a student-triggered
+    -- cancellation like plain 'student', but distinguished for activity-feed/
+    -- admin display. See cancel_reason below for its optional free-text note.
+    cancelled_by        ENUM('student','faculty','system','system_expired','student_no_show') NULL, -- who/what triggered a 'cancelled' status, for activity-feed attribution
     -- Separate from `notes` below (which is the student's own booking
     -- purpose, set once at creation and never a good place to also store
     -- the faculty member's rejection reason -- unlike document_requests.notes,
     -- this column has no such dual-purpose precedent).
     rejection_reason    TEXT         NULL,
+    -- Optional free-text the STUDENT provides when self-reporting a no-show
+    -- (cancelled_by = 'student_no_show') via PATCH
+    -- /student/appointments/:id/report-not-served. A deliberately separate
+    -- column from rejection_reason above, not a reuse of it -- see that
+    -- column's own comment for why.
+    cancel_reason        TEXT         NULL,
     notes               TEXT,
     -- Booking-time context the student types in themselves (not pulled from
     -- students.year_level/course, which may be stale or unset) so the
@@ -461,12 +472,6 @@ CREATE TABLE appointments (
     -- appointment_date/time keeps matching the sweep's "within N hours"
     -- window on every tick until the appointment passes).
     reminder_sent_at    TIMESTAMP    NULL DEFAULT NULL,
-    -- Set by appointmentReminderSweeper.js once it has nudged the faculty
-    -- member that a 'pending' request has sat unanswered for 48+ hours --
-    -- a separate flag from reminder_sent_at since they track two unrelated
-    -- notifications on the same row (one to the student pre-appointment,
-    -- one to faculty while still awaiting approval).
-    pending_nudge_sent_at TIMESTAMP  NULL DEFAULT NULL,
     -- Set by appointmentReminderSweeper.js's imminent pass once the T-10min
     -- "your appointment starts soon" reminder has gone out (to BOTH the
     -- student and the professor). Separate from reminder_sent_at, which is

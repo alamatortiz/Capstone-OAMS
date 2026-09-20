@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
+import QueueReasonModal from "../../components/QueueReasonModal";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import StudentPageShell from "../../components/StudentPageShell";
 import FilterSelect from "../../components/FilterSelect";
@@ -14,7 +15,7 @@ import CalendarGrid from "../../components/CalendarGrid";
 import { useAuth } from "../../context/AuthContext";
 import { formatCollegeLabel } from "../../utils/formatCollege";
 import { connectSocket } from "../../utils/socket";
-import { ChevronDown, ChevronLeft, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle, CheckCircle2, StickyNote, GraduationCap as LucideGraduationCap } from "lucide-react";
+import { ChevronDown, ChevronLeft, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle, CheckCircle2, AlertCircle, StickyNote, GraduationCap as LucideGraduationCap } from "lucide-react";
 
 // ─── Content Icons ────────────────────────────────────────────────────────────
 const CloseIcon = () => (
@@ -112,6 +113,8 @@ export default function AppointmentsPage() {
   const [cancelConfirmId, setCancelConfirmId] = useState(null);
   const [completingId, setCompletingId] = useState(null);
   const [completeConfirmId, setCompleteConfirmId] = useState(null);
+  const [reportingId, setReportingId] = useState(null);
+  const [reportConfirmId, setReportConfirmId] = useState(null);
   const [selectedApptType, setSelectedApptType] = useState("");
   const [yearProgram, setYearProgram] = useState("");
   const [courseCode, setCourseCode] = useState("");
@@ -341,6 +344,7 @@ export default function AppointmentsPage() {
 
   const cancelTarget = myBookings.find((b) => b.id === cancelConfirmId) ?? null;
   const completeTarget = myBookings.find((b) => b.id === completeConfirmId) ?? null;
+  const reportTarget = myBookings.find((b) => b.id === reportConfirmId) ?? null;
 
   // Mirrors the server-side dup guard in POST /appointments/book-slot, which
   // blocks rebooking the same (availabilityId, date) pair unless the prior
@@ -470,6 +474,24 @@ export default function AppointmentsPage() {
     } catch (err) {
       toast.error(err?.response?.data?.error ?? "Failed to mark the appointment as completed.");
     } finally { setCompletingId(null); }
+  };
+
+  const doReportNotServed = async (reason) => {
+    const appointmentId = reportConfirmId;
+    if (!appointmentId) return;
+    if (reportingId) {
+      toast.info("Please wait for the current report to finish.");
+      return;
+    }
+    setReportConfirmId(null);
+    setReportingId(appointmentId);
+    try {
+      await api.patch(`/student/appointments/${appointmentId}/report-not-served`, reason ? { reason } : {});
+      toast.success("Appointment reported as not served.");
+      await fetchMyBookings();
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? "Failed to report the appointment.");
+    } finally { setReportingId(null); }
   };
 
   const formatDate = (dateString) => formatManilaDate(`${dateString}T00:00:00+08:00`, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
@@ -632,6 +654,26 @@ export default function AppointmentsPage() {
             cancelText="Not Yet"
             confirmText={completingId !== null ? "Marking…" : "Mark as Completed"}
             confirmDisabled={completingId !== null}
+          />
+
+          <QueueReasonModal
+            show={reportConfirmId !== null}
+            variant="warning"
+            onCancel={() => setReportConfirmId(null)}
+            onConfirm={doReportNotServed}
+            title="Report as Not Served?"
+            message={
+              <>
+                Report that <strong>{reportTarget?.person}</strong> did not serve you for your appointment on{" "}
+                <strong>{reportTarget ? formatDate(reportTarget.date) : ""}</strong>? This will cancel the appointment and notify the professor.
+              </>
+            }
+            confirmText={reportingId !== null ? "Please wait…" : "Report as Not Served"}
+            cancelText="Never Mind"
+            submitting={reportingId !== null}
+            icon={<AlertCircle width={22} height={22} />}
+            required={false}
+            placeholder="Add details (optional)..."
           />
         </>
       }
@@ -810,6 +852,9 @@ export default function AppointmentsPage() {
                       showCompleteButton
                       onComplete={(id) => setCompleteConfirmId(id)}
                       isCompleting={completingId === booking.id}
+                      showReportButton
+                      onReport={(id) => setReportConfirmId(id)}
+                      isReporting={reportingId === booking.id}
                     />
                   ))}
                 </div>
