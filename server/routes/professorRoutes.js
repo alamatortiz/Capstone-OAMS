@@ -369,6 +369,8 @@ function buildActivityTitle(row) {
       return `Appointment with ${row.student_name} auto-cancelled — schedule changed`;
     if (row.cancelled_by === "system_expired")
       return `Appointment with ${row.student_name} auto-cancelled — you never responded`;
+    if (row.cancelled_by === "system_not_entertained")
+      return `Appointment with ${row.student_name} auto-cancelled — not entertained in time`;
     if (row.cancelled_by === "faculty")
       return `You cancelled the appointment with ${row.student_name}`;
     if (row.cancelled_by === "student_no_show")
@@ -637,10 +639,12 @@ router.patch(
 );
 
 // PATCH /api/professor/appointments/:id/comment
-// Writes/overwrites the one shared comment field on an appointment -- read
-// and editable by both the professor and the student (see the mirrored
-// PATCH /student/appointments/:appointmentId/comment). Only while the
-// appointment is still pending/approved, same guard as the student side.
+// Writes/overwrites the one shared "actions taken" field on an appointment
+// (stored as shared_comment). Professor-authored only -- students view it
+// read-only (see the read-only mirror in stud-appointment-status.jsx; there
+// is no student-side write route for this field). Only editable once the
+// appointment is approved, so a professor can't record actions taken before
+// actually seeing the student.
 router.patch(
   "/appointments/:id/comment",
   authenticateToken,
@@ -664,9 +668,9 @@ router.patch(
       if (!appt) {
         return res.status(404).json({ error: "Appointment not found" });
       }
-      if (!["pending", "approved"].includes(appt.status)) {
+      if (appt.status !== "approved") {
         return res.status(409).json({
-          error: "Comments can no longer be edited on this appointment",
+          error: "Actions taken can only be edited on an approved appointment",
         });
       }
 
@@ -685,12 +689,12 @@ router.patch(
       });
       createNotification(
         appt.student_id,
-        `The professor left a comment on your appointment for ${getManilaDateString(appt.appointment_date)}.`,
+        `The professor added actions taken for your appointment on ${getManilaDateString(appt.appointment_date)}.`,
         "appointment",
       );
 
       res.json({
-        message: "Comment saved",
+        message: "Actions taken saved",
         sharedComment: trimmed || null,
         commentUpdatedBy: "faculty",
       });

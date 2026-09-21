@@ -809,14 +809,6 @@ export default function QueueStatusPage() {
                                   <p className="qsl-stat-value-sm">{queue.joinedAt}</p>
                                 </div>
                               </div>
-                              <QueueProgressBars
-                                occupancyCurrent={queue.totalInQueue ?? 0}
-                                occupancyTotal={queue.maxCapacity ?? 0}
-                                occupancyPercent={queue.queueOccupancyPercent ?? 0}
-                                servicedCurrent={queue.servicedCount ?? 0}
-                                servicedTotal={queue.totalInQueue ?? 0}
-                                servicedPercent={queue.servicedPercent ?? 0}
-                              />
                             </div>
                           </div>
                         </div>

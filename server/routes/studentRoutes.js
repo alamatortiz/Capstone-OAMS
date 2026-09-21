@@ -366,6 +366,8 @@ function buildAppointmentActivityTitle(row) {
       return `Appointment with ${row.professor_name} auto-cancelled — schedule changed`;
     if (row.cancelled_by === "system_expired")
       return `Appointment with ${row.professor_name} auto-cancelled — expired without a response`;
+    if (row.cancelled_by === "system_not_entertained")
+      return `Appointment with ${row.professor_name} auto-cancelled — you were not entertained in time`;
     if (row.cancelled_by === "faculty")
       return `Appointment cancelled by ${row.professor_name}`;
     if (row.cancelled_by === "student_no_show")
@@ -2613,7 +2615,7 @@ router.patch(
 
       const [[appt]] = await conn.query(
         `SELECT a.appointment_id, a.student_id, a.status, a.faculty_id, a.department_id,
-                a.appointment_date, a.appointment_time, s.first_name, s.last_name,
+                a.appointment_date, a.appointment_time, a.shared_comment, s.first_name, s.last_name,
                 sv.service_name
          FROM appointments a
          JOIN students s ON a.student_id = s.student_id
@@ -2638,6 +2640,19 @@ router.patch(
         await conn.rollback();
         return res.status(409).json({
           error: `Only an approved appointment can be reported as not served (this one is ${appt.status}).`,
+        });
+      }
+      // Once the professor has recorded actions taken, the appointment was
+      // clearly served -- a report-not-served claim no longer makes sense
+      // and the UI hides this action once shared_comment is set (see
+      // AppointmentDetail's canReportNotServed / AppointmentListItem's own
+      // copy of the same gate). Enforced here too since this route doesn't
+      // otherwise stop a direct API call.
+      if (appt.shared_comment && appt.shared_comment.trim()) {
+        await conn.rollback();
+        return res.status(409).json({
+          error:
+            "This appointment can't be reported as not served — the professor has already recorded actions taken.",
         });
       }
       const apptDate =

@@ -792,7 +792,6 @@ export default function ProfessorScheduleManagerScreen() {
                   onChangeText={setAddMaxStudents}
                   editable={!modalLocked}
                 />
-                <Text style={styles.fieldHint}>Students are assigned slots in order of booking (first come, first served).</Text>
                 {editingId && editingCurrentMaxBooked > 0 && (
                   <Text style={styles.fieldHintWarning}>
                     {editingCurrentMaxBooked} student{editingCurrentMaxBooked === 1 ? '' : 's'} already booked on a future date — max can&apos;t go below this.

@@ -112,17 +112,17 @@ const CONFIRM_META = {
   }),
 };
 
-// One shared, overwritable comment either party can read -- see the
-// read-only mirror in stud-appointment-status.jsx; this professor-side
-// route is the field's only writer. Only editable while the appointment is
-// still pending/approved (server-enforced too). Editing happens in a popup
-// instead of inline, so this renders as its own dedicated section rather
-// than a small inline field.
+// One shared, overwritable note either party can read -- see the read-only
+// mirror in stud-appointment-status.jsx; this professor-side route is the
+// field's only writer. Only editable once the appointment is approved (not
+// while still pending -- server-enforced too), and stays editable without
+// needing to also flag the appointment as completed. Editing happens in a
+// popup instead of inline, so this renders as its own dedicated section
+// rather than a small inline field.
 function CommentBlock({ appointment, onSaved }) {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
-  const canEdit =
-    appointment.status === "pending" || appointment.status === "approved";
+  const canEdit = appointment.status === "approved";
 
   const save = async (draft) => {
     setSaving(true);
@@ -130,11 +130,11 @@ function CommentBlock({ appointment, onSaved }) {
       await api.patch(`/professor/appointments/${appointment.id}/comment`, {
         comment: draft,
       });
-      toast.success("Comment saved.");
+      toast.success("Actions taken saved.");
       setShowModal(false);
       onSaved?.();
     } catch (err) {
-      toast.error(err?.response?.data?.error ?? "Failed to save comment.");
+      toast.error(err?.response?.data?.error ?? "Failed to save actions taken.");
     } finally {
       setSaving(false);
     }
@@ -145,11 +145,11 @@ function CommentBlock({ appointment, onSaved }) {
       <div className="appt-comment-section-header">
         <h4 className="appt-comment-section-title">
           <MessageSquare style={{ width: "1.1rem", height: "1.1rem" }} />
-          Comments
+          Actions Taken
         </h4>
         {canEdit && (
           <button type="button" className="appt-comment-edit-link" onClick={() => setShowModal(true)}>
-            {appointment.sharedComment ? "Edit Comment" : "Add Comment"}
+            {appointment.sharedComment ? "Edit Actions Taken" : "Add Actions Taken"}
           </button>
         )}
       </div>
@@ -164,21 +164,22 @@ function CommentBlock({ appointment, onSaved }) {
           )}
         </>
       ) : (
-        <p className="appt-comment-empty">No comment yet.</p>
+        <p className="appt-comment-empty">No actions taken recorded yet.</p>
       )}
       <QueueReasonModal
         show={showModal}
         onCancel={() => setShowModal(false)}
         onConfirm={save}
-        title="Edit Comment"
-        message={<>Leave a note for <strong>{appointment.studentName}</strong> about this appointment.</>}
-        confirmText={saving ? "Saving…" : "Save Comment"}
+        title="Edit Actions Taken"
+        message={<>Describe the actions taken for <strong>{appointment.studentName}</strong>'s appointment.</>}
+        confirmText={saving ? "Saving…" : "Save Actions Taken"}
         submitting={saving}
         icon={<MessageSquare style={{ width: 22, height: 22 }} />}
-        variant="neutral"
+        variant="primary"
+        accentTheme="purple"
         required={false}
         initialValue={appointment.sharedComment ?? ""}
-        placeholder="Leave a note for the student…"
+        placeholder="Describe the actions taken for this appointment…"
       />
     </div>
   );
@@ -211,12 +212,13 @@ function AppointmentCard({
   return (
     <div className="appt-card">
       {/* Header: icon + name/type/status, then Date/Time, Location, Purpose,
-          the action buttons, and finally Comments, all stacked on the left --
-          Purpose and the buttons sit near the BOTTOM of that stack
+          the action buttons, and finally Actions Taken, all stacked on the
+          left -- Purpose and the buttons sit near the BOTTOM of that stack
           deliberately, so a professor's eye crosses the purpose before
           reaching Approve/Reject instead of the buttons being one of the
-          first things seen; Comments comes last as its own section below the
-          actions. The right column stays lightweight: just Requested-at. */}
+          first things seen; Actions Taken comes last as its own section
+          below the actions. The right column stays lightweight: just
+          Requested-at. */}
       <div className="appt-card-header-row">
         <div className="appt-card-icon-wrap">
           <Calendar style={{ width: "1.5rem", height: "1.5rem" }} />
@@ -361,6 +363,17 @@ function AppointmentCard({
               <AlertCircle style={{ width: "1.1rem", height: "1.1rem" }} />
               <div>
                 <p>The student reported that you did not serve this appointment.</p>
+                {appointment.cancelReason && (
+                  <p className="appt-not-served-reason">Details: {appointment.cancelReason}</p>
+                )}
+              </div>
+            </div>
+          )}
+          {appointment.status === "cancelled" && appointment.cancelledBy === "system_not_entertained" && (
+            <div className="appt-not-served-notice">
+              <AlertCircle style={{ width: "1.1rem", height: "1.1rem" }} />
+              <div>
+                <p>This appointment was automatically cancelled — no actions taken were recorded before the scheduled time passed.</p>
                 {appointment.cancelReason && (
                   <p className="appt-not-served-reason">Details: {appointment.cancelReason}</p>
                 )}

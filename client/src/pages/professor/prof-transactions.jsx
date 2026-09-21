@@ -473,6 +473,11 @@ export default function ProfessorTransactionsPage() {
                         Student reported not served{txn.cancelReason ? `: ${txn.cancelReason}` : ""}
                       </p>
                     )}
+                    {txn.type === "appointment" && txn.cancelledBy === "system_not_entertained" && (
+                      <p className="txn-item-comment-text">
+                        Automatically cancelled — no actions taken recorded{txn.cancelReason ? `: ${txn.cancelReason}` : ""}
+                      </p>
+                    )}
                     {txn.type === "appointment" && txn.sharedComment && (
                       <div className="txn-item-comment">
                         <p className="txn-item-comment-text">{txn.sharedComment}</p>

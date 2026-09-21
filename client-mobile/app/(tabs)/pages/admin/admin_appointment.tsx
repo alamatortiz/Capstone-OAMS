@@ -113,7 +113,7 @@ interface Appointment {
   requestedAt: string;
   requestedAtRaw: string | null;
   isToday: boolean;
-  cancelledBy: 'student' | 'faculty' | 'system' | 'system_expired' | 'student_no_show' | null;
+  cancelledBy: 'student' | 'faculty' | 'system' | 'system_expired' | 'student_no_show' | 'system_not_entertained' | null;
   cancelReason?: string | null;
 }
 
@@ -122,6 +122,7 @@ const CANCELLED_BY_LABELS: Record<string, string> = {
   faculty: 'Faculty',
   system: 'System (schedule change)',
   system_expired: 'System (expired, no response)',
+  system_not_entertained: 'System (student not entertained)',
   student_no_show: 'Not Served (reported by student)',
 };
 

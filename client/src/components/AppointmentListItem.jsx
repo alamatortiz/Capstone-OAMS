@@ -1,4 +1,4 @@
-import { Calendar, XCircle, CheckCircle2, AlertCircle } from "lucide-react";
+import { Calendar, XCircle, CheckCircle2, AlertCircle, MapPin, Clock } from "lucide-react";
 import "./AppointmentListItem.css";
 
 const STATUS_META = {
@@ -32,7 +32,7 @@ export default function AppointmentListItem({
   };
   const canCancel = appointment.status === "pending" || appointment.status === "approved";
   const canComplete = appointment.status === "approved";
-  const canReportNotServed = appointment.status === "approved";
+  const canReportNotServed = appointment.status === "approved" && !appointment.sharedComment;
 
   return (
     <div
@@ -55,34 +55,32 @@ export default function AppointmentListItem({
         <span className={`apt-badge ${cls}`}>{label}</span>
       </div>
 
-      <div className="apt-list-card-grid">
-        <div className="apt-list-card-field">
-          <label>Date</label>
-          <p>{formatDate(appointment.date)}</p>
-        </div>
-        <div className="apt-list-card-field">
-          <label>Time Slot</label>
-          <p>
-            {appointment.windowStart && appointment.windowEnd
-              ? `${appointment.windowStart} – ${appointment.windowEnd}`
-              : "—"}
-          </p>
-        </div>
-        <div className="apt-list-card-field">
-          <label>Location</label>
-          <p>{appointment.location}</p>
-        </div>
-        {appointment.purpose && (
+      <div className="apt-list-datetime-row">
+        <span className="apt-list-quick-meta-item">
+          <MapPin style={{ width: "1rem", height: "1rem" }} /> {appointment.location}
+        </span>
+        <span className="apt-list-quick-meta-item">
+          <Calendar style={{ width: "1rem", height: "1rem" }} /> {formatDate(appointment.date)}
+        </span>
+        <span className="apt-list-quick-meta-item">
+          <Clock style={{ width: "1rem", height: "1rem" }} />
+          {appointment.windowStart && appointment.windowEnd
+            ? `${appointment.windowStart} – ${appointment.windowEnd}`
+            : "—"}
+        </span>
+      </div>
+      {appointment.purpose && (
+        <div className="apt-list-card-grid">
           <div className="apt-list-card-field-full">
             <label>Purpose</label>
             <p>{appointment.purpose}</p>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {appointment.sharedComment && (
         <div className="apt-list-comment-box">
-          <p className="apt-list-comment-header">Comments</p>
+          <p className="apt-list-comment-header">Actions Taken</p>
           <p className="apt-list-comment-text">{appointment.sharedComment}</p>
         </div>
       )}

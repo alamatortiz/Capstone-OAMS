@@ -698,6 +698,7 @@
   align-items: flex-start;
   gap: 0.6rem;
   padding: 0.85rem 1rem;
+  margin-top: 0.75rem;
   background: rgba(239, 68, 68, 0.08);
   border: 1px solid rgba(239, 68, 68, 0.25);
   border-radius: 0.75rem;
@@ -731,6 +732,64 @@
   padding: 0.75rem 0;
   border-bottom: 1px solid rgba(168, 85, 247, 0.1);
   transition: border-color 0.3s ease;
+}
+
+/* The last visible row in a card's detail list shouldn't carry a trailing
+   border -- which row that is varies per appointment (Note/Purpose are
+   conditional), so this is handled generically here instead of chasing
+   inline overrides on whichever field happens to render last. */
+.apst-detail-row:last-child,
+.apst-datetime-row:last-child {
+  border-bottom: none;
+}
+
+/* ─── Compact meta row -- a line of small icon/label-prefixed values.
+   Used on the Timeline card for the Approved/Completed time pair -- Approved
+   pinned to the left edge, Completed to the right, so the two don't crowd
+   each other when both are present. ──────────────────────────────────────── */
+.apst-datetime-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(168, 85, 247, 0.1);
+  transition: border-color 0.3s ease;
+}
+
+.apst-quick-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #a855f7;
+}
+
+[data-theme="light"] .apst-quick-meta-item {
+  color: #9333ea;
+}
+
+.apst-quick-meta-item svg {
+  flex-shrink: 0;
+}
+
+/* ─── Timeline card's minimized date line -- smaller/quieter than a normal
+   apst-detail-row since the card title already establishes the context. ── */
+.apst-timeline-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  margin: 0;
+  padding: 0.75rem 0;
+}
+
+.apst-timeline-date svg {
+  flex-shrink: 0;
 }
 
 .apst-detail-label {

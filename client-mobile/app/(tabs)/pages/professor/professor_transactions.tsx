@@ -121,6 +121,9 @@ interface TransactionRecord {
   completedAtRaw?: string | null;
   cancelledBy?: string | null;
   cancelReason?: string | null;
+  sharedComment?: string | null;
+  commentUpdatedBy?: string | null;
+  commentUpdatedAt?: string | null;
 }
 
 interface NavItem {
@@ -274,6 +277,9 @@ export default function ProfessorTransactionsScreen() {
           completedAtRaw: t.completedAtRaw ?? null,
           cancelledBy: t.cancelledBy ?? null,
           cancelReason: t.cancelReason ?? null,
+          sharedComment: t.sharedComment ?? null,
+          commentUpdatedBy: t.commentUpdatedBy ?? null,
+          commentUpdatedAt: t.commentUpdatedAt ?? null,
         })),
       );
     } catch (err) {
@@ -634,6 +640,24 @@ export default function ProfessorTransactionsScreen() {
                       <Text style={styles.txnDetails}>
                         Student reported not served{txn.cancelReason ? `: ${txn.cancelReason}` : ''}
                       </Text>
+                    )}
+
+                    {txn.type === 'appointment' && txn.cancelledBy === 'system_not_entertained' && (
+                      <Text style={styles.txnDetails}>
+                        Automatically cancelled — no actions taken recorded{txn.cancelReason ? `: ${txn.cancelReason}` : ''}
+                      </Text>
+                    )}
+
+                    {txn.type === 'appointment' && txn.sharedComment && (
+                      <View style={styles.txnItemComment}>
+                        <Text style={styles.txnItemCommentText}>{txn.sharedComment}</Text>
+                        {txn.commentUpdatedAt && (
+                          <Text style={styles.txnMetaText}>
+                            — last updated by {txn.commentUpdatedBy === 'faculty' ? 'you' : 'student'} on{' '}
+                            {formatManilaDate(txn.commentUpdatedAt, { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </Text>
+                        )}
+                      </View>
                     )}
 
                     {txn.type === 'appointment' && (txn.approvedAtRaw || txn.completedAtRaw) && (
@@ -1038,6 +1062,15 @@ function createStyles(theme: ThemePalette) {
     txnMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     txnMetaText: { fontSize: 10.5, color: theme.tertiary, fontWeight: '600' },
     txnTimelineRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 },
+    txnItemComment: {
+      backgroundColor: 'rgba(168, 85, 247, 0.08)',
+      borderWidth: 1,
+      borderColor: 'rgba(168, 85, 247, 0.25)',
+      borderRadius: 10,
+      padding: 10,
+      gap: 4,
+    },
+    txnItemCommentText: { fontSize: 12, fontWeight: '600', color: '#a855f7', lineHeight: 16 },
 
     // Empty state
     emptyCard: {

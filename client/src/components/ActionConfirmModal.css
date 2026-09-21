@@ -121,6 +121,12 @@
   color: var(--blue, #3b82f6);
 }
 
+.acm-cancel--hover-purple:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.08);
+  border-color: rgba(168, 85, 247, 0.35);
+  color: #a855f7;
+}
+
 .acm-cancel:disabled {
   opacity: 0.5;
   cursor: not-allowed;

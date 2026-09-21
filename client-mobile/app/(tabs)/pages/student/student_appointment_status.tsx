@@ -136,7 +136,7 @@ interface Appointment {
   commentUpdatedAt?: string | null;
   approvedAtRaw?: string | null;
   completedAtRaw?: string | null;
-  cancelledBy?: 'student' | 'faculty' | 'system' | 'system_expired' | 'student_no_show' | null;
+  cancelledBy?: 'student' | 'faculty' | 'system' | 'system_expired' | 'student_no_show' | 'system_not_entertained' | null;
   cancelReason?: string | null;
 }
 
@@ -315,7 +315,7 @@ export default function StudentAppointmentStatusScreen() {
     // refresh -- this makes it show up immediately while this screen is open.
     const onAppointmentCommentUpdated = () => {
       fetchAppointments();
-      notify('New comment', 'Your professor left a new comment on an appointment.');
+      notify('Actions taken added', 'Your professor added actions taken for an appointment.');
     };
     socket.on('appointment:comment-updated', onAppointmentCommentUpdated);
 
@@ -579,6 +579,23 @@ export default function StudentAppointmentStatusScreen() {
                 </View>
               )}
 
+              {/* Auto-cancelled notice */}
+              {selectedAppt.status === 'cancelled' && selectedAppt.cancelledBy === 'system_not_entertained' && (
+                <View style={styles.infoCard}>
+                  <View style={styles.infoCardBody}>
+                    <View style={styles.rejectNotice}>
+                      <XCircle size={20} color="#ef4444" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.rejectNoticeTitle}>This appointment was automatically cancelled because it wasn't marked as served in time.</Text>
+                        {selectedAppt.cancelReason ? (
+                          <Text style={styles.rejectNoticeReason}>Details: {selectedAppt.cancelReason}</Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              )}
+
               {/* Cancel */}
               {(selectedAppt.status === 'pending' || selectedAppt.status === 'approved') && (
                 <View style={[styles.infoCard, styles.cancelCard]}>
@@ -803,7 +820,7 @@ export default function StudentAppointmentStatusScreen() {
                         <View style={styles.commentSection}>
                           <View style={styles.commentHeaderRow}>
                             <Ionicons name="chatbubble-outline" size={14} color={theme.tertiary} />
-                            <Text style={styles.commentHeaderTitle}>Comments</Text>
+                            <Text style={styles.commentHeaderTitle}>Actions Taken</Text>
                           </View>
                           {appt.sharedComment ? (
                             <>
@@ -816,7 +833,7 @@ export default function StudentAppointmentStatusScreen() {
                               )}
                             </>
                           ) : (
-                            <Text style={styles.commentEmpty}>No comment yet.</Text>
+                            <Text style={styles.commentEmpty}>No actions taken recorded yet.</Text>
                           )}
                         </View>
                       </Pressable>

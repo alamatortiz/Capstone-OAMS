@@ -1227,6 +1227,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
   font-size: 0.95rem;
   font-weight: 600;
@@ -1240,14 +1241,30 @@ body {
   font-weight: 500;
 }
 
+.queue-serving-name-group,
+.queue-serving-id-group {
+  display: inline-flex;
+  align-items: center;
+}
+
+.queue-serving-id-group {
+  margin-left: 0.5rem;
+}
+
+.queue-serving-label {
+  color: var(--text-tertiary);
+  font-weight: 500;
+  margin-right: 0.4rem;
+}
+
 .queue-serving-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin-top: 0.75rem;
 }
 .queue-serving-actions .queue-action-btn {
   flex: 1 1 auto;
+  padding: 0.5rem 1rem;
 }
 
 /* Shared blue "ID" pill for a student's name — Currently Serving and Queue

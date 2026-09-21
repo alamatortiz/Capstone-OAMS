@@ -639,9 +639,15 @@ export default function AdminQueue() {
               <div className="queue-detail-content">
                 {monitoringQueue.currentlyServingStudentNumber ? (
                   <p className="queue-serving-name">
-                    {monitoringQueue.currentlyServingStudentName || "Student"}
-                    <span className="queue-serving-id-badge">
-                      {monitoringQueue.currentlyServingStudentNumber}
+                    <span className="queue-serving-name-group">
+                      <span className="queue-serving-label">Name:</span>
+                      {monitoringQueue.currentlyServingStudentName || "Student"}
+                    </span>
+                    <span className="queue-serving-id-group">
+                      <span className="queue-serving-label">Student Number:</span>
+                      <span className="queue-serving-id-badge">
+                        {monitoringQueue.currentlyServingStudentNumber}
+                      </span>
                     </span>
                   </p>
                 ) : (

@@ -220,12 +220,12 @@ export default function TransactionsPage() {
   // rather than plumbing a raise-the-cap/paginated-export path for it. Both
   // formats share this one fetch so a future column change only has to be
   // made once. ──────────────────────────────────────────────────────────
-  // Appointment-only exports get a "Comment" column (the shared
-  // student/faculty comment) instead of the plain columns above, since
+  // Appointment-only exports get an "Actions Taken" column (the shared,
+  // professor-authored comment) instead of the plain columns above, since
   // that's the thing actually worth recalling for a past appointment.
   const isAppointmentOnlyExport = filterType === "appointment";
   const header = isAppointmentOnlyExport
-    ? ["Type", "Title", "Details", "Status", "College", "Comment", "Date", "Time"]
+    ? ["Type", "Title", "Details", "Status", "College", "Actions Taken", "Date", "Time"]
     : ["Type", "Title", "Details", "Status", "College", "Date", "Time"];
   const csvEscape = (value) => {
     const str = String(value ?? "");
@@ -605,6 +605,11 @@ export default function TransactionsPage() {
                     {transaction.type === "appointment" && transaction.cancelledBy === "student_no_show" && (
                       <p className="transaction-details">
                         Reported not served{transaction.cancelReason ? `: ${transaction.cancelReason}` : ""}
+                      </p>
+                    )}
+                    {transaction.type === "appointment" && transaction.cancelledBy === "system_not_entertained" && (
+                      <p className="transaction-details">
+                        Automatically cancelled — not marked as served in time{transaction.cancelReason ? `: ${transaction.cancelReason}` : ""}
                       </p>
                     )}
                     {transaction.type === "appointment" && transaction.sharedComment && (

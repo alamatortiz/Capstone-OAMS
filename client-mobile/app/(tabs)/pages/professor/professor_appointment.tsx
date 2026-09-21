@@ -102,7 +102,7 @@ interface Appointment {
   requestedAtRaw: string | null;
   approvedAtRaw?: string | null;
   completedAtRaw?: string | null;
-  cancelledBy?: 'student' | 'faculty' | 'system' | 'system_expired' | 'student_no_show' | null;
+  cancelledBy?: 'student' | 'faculty' | 'system' | 'system_expired' | 'student_no_show' | 'system_not_entertained' | null;
   cancelReason?: string | null;
   slotNote?: string | null;
   sharedComment?: string | null;
@@ -643,17 +643,26 @@ export default function ProfessorAppointmentScreen() {
                           </Text>
                         </View>
                       )}
+                      {apt.status === 'cancelled' && apt.cancelledBy === 'system_not_entertained' && (
+                        <View style={[styles.apptInfoField, styles.apptInfoFieldFull]}>
+                          <Text style={[styles.apptInfoLabel, { color: '#f59e0b' }]}>Automatically Cancelled</Text>
+                          <Text style={styles.apptNotesText}>
+                            No actions taken were recorded before the scheduled time passed.
+                            {apt.cancelReason ? ` Details: ${apt.cancelReason}` : ''}
+                          </Text>
+                        </View>
+                      )}
                     </View>
 
                     <View style={styles.commentSection}>
                       <View style={styles.commentHeaderRow}>
                         <View style={styles.commentHeaderTitleRow}>
                           <Ionicons name="chatbubble-outline" size={14} color={theme.tertiary} />
-                          <Text style={styles.commentHeaderTitle}>Comments</Text>
+                          <Text style={styles.commentHeaderTitle}>Actions Taken</Text>
                         </View>
-                        {(apt.status === 'pending' || apt.status === 'approved') && (
+                        {apt.status === 'approved' && (
                           <Pressable onPress={() => openCommentModal(apt)} hitSlop={8}>
-                            <Text style={styles.commentEditLink}>{apt.sharedComment ? 'Edit Comment' : 'Add Comment'}</Text>
+                            <Text style={styles.commentEditLink}>{apt.sharedComment ? 'Edit Actions Taken' : 'Add Actions Taken'}</Text>
                           </Pressable>
                         )}
                       </View>
@@ -668,7 +677,7 @@ export default function ProfessorAppointmentScreen() {
                           )}
                         </>
                       ) : (
-                        <Text style={styles.commentEmpty}>No comment yet.</Text>
+                        <Text style={styles.commentEmpty}>No actions taken recorded yet.</Text>
                       )}
                     </View>
 
@@ -816,10 +825,10 @@ export default function ProfessorAppointmentScreen() {
 
       <QueueReasonModal
         visible={!!commentTarget}
-        title="Edit Comment"
-        message={`Leave a note for ${commentTarget?.studentName ?? 'this student'} about this appointment.`}
-        confirmText={commentSubmitting ? 'Saving…' : 'Save Comment'}
-        confirmColor="#16a34a"
+        title="Edit Actions Taken"
+        message={`Describe the actions taken for ${commentTarget?.studentName ?? 'this student'}'s appointment.`}
+        confirmText={commentSubmitting ? 'Saving…' : 'Save Actions Taken'}
+        confirmColor="#a855f7"
         reason={commentText}
         onChangeReason={setCommentText}
         onCancel={() => { setCommentTarget(null); setCommentText(''); }}
@@ -828,7 +837,7 @@ export default function ProfessorAppointmentScreen() {
         styles={styles}
         submitting={commentSubmitting}
         required={false}
-        placeholder="Leave a note for the student…"
+        placeholder="Describe the actions taken for this appointment…"
       />
 
       <QueueReasonModal

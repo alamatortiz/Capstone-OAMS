@@ -66,7 +66,7 @@ export default function QueueReasonModal({
         <h3 className="acm-title">{title}</h3>
         {message && <div className="acm-message">{message}</div>}
         <textarea
-          className={`qrm-textarea${accentTheme === "blue" ? " qrm-textarea--blue" : ""}`}
+          className={`qrm-textarea${accentTheme === "blue" ? " qrm-textarea--blue" : ""}${accentTheme === "purple" ? " qrm-textarea--purple" : ""}`}
           placeholder={placeholder}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
@@ -76,7 +76,7 @@ export default function QueueReasonModal({
         />
         <div className="acm-actions" style={{ marginTop: "1rem" }}>
           <button
-            className={`acm-cancel${accentTheme === "blue" ? " acm-cancel--hover-blue" : ""}`}
+            className={`acm-cancel${accentTheme === "blue" ? " acm-cancel--hover-blue" : ""}${accentTheme === "purple" ? " acm-cancel--hover-purple" : ""}`}
             onClick={handleCancel}
             disabled={submitting}
           >

@@ -845,7 +845,6 @@ export default function ProfessorScheduleManager() {
                   onChange={(e) => setAddMaxStudents(e.target.value)}
                   disabled={modalLocked}
                 />
-                <p className="sa-field-hint">Students are assigned slots in order of booking (first come, first served).</p>
                 {editingId && editingCurrentMaxBooked > 0 && (
                   <p className="sa-field-hint sa-field-hint--warning">
                     {editingCurrentMaxBooked} student{editingCurrentMaxBooked === 1 ? "" : "s"} already booked on a future date — max can't go below this.

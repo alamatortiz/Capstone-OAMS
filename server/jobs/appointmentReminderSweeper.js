@@ -128,11 +128,16 @@ async function sweepImminentAppointmentReminders() {
 // An 'approved' appointment whose date/time passed COMPLETE_GRACE_HOURS ago
 // with nobody marking it otherwise (completed/cancelled) would otherwise sit
 // in 'approved' forever -- there's no check-in mechanism for appointments
-// the way queues have one, so this can't detect a genuine no-show, but
-// auto-resolving stale approved appointments to 'completed' avoids the
-// alternative of a permanently-stuck, obviously-past-due record. Mirrors the
-// exact notify+emit shape of the manual status-update route in
-// professorRoutes.js so a transaction feed can't tell the two apart.
+// the way queues have one, so this can't detect a genuine no-show on its
+// own, but the professor's "actions taken" field (shared_comment) doubles as
+// that signal: if it's been filled in, the appointment happened and gets
+// auto-completed same as before; if it's still empty once the grace period
+// passes, nobody can now claim the student was actually seen, so it's
+// auto-cancelled instead with cancelled_by='system_not_entertained' (a
+// distinct value from plain 'system', which already means something else --
+// see the comment on that ENUM value in oams_db.sql). Mirrors the exact
+// notify+emit shape of the manual status-update route in professorRoutes.js
+// so a transaction feed can't tell the automatic case from a manual one.
 async function sweepStaleApproved() {
   const [stale] = await pool.query(
     // Manila-now comparison -- see the note in sweepAppointmentReminders above.
@@ -140,9 +145,12 @@ async function sweepStaleApproved() {
     // template, then to appointment_time as a last resort), not its start --
     // appointment_time is always the window's *start* time (see book-slot in
     // studentRoutes.js), so anchoring the grace period there would force-
-    // complete an approved appointment while the professor's window (which
-    // can span many hours) is still legitimately open.
-    `SELECT a.appointment_id, a.student_id, a.department_id
+    // resolve an approved appointment while the professor's window (which
+    // can span many hours) is still legitimately open. Both outcomes below
+    // share this one grace period rather than the cancel branch firing
+    // sooner -- that's deliberate, so a professor has the full window to add
+    // actions taken before the two outcomes are decided.
+    `SELECT a.appointment_id, a.student_id, a.faculty_id, a.department_id, a.shared_comment
      FROM appointments a
      LEFT JOIN faculty_availability fda ON a.availability_id = fda.availability_id
      WHERE a.status = 'approved'
@@ -152,24 +160,49 @@ async function sweepStaleApproved() {
   );
 
   let completedCount = 0;
+  let notEntertainedCount = 0;
   for (const row of stale) {
-    const [result] = await pool.query(
-      `UPDATE appointments
-       SET status = 'completed',
-           completed_at = CASE WHEN completed_at IS NULL THEN NOW() ELSE completed_at END
-       WHERE appointment_id = ? AND status = 'approved'`,
-      [row.appointment_id],
-    );
-    if (result.affectedRows === 0) continue;
+    const hasActionsTaken = !!(row.shared_comment && row.shared_comment.trim());
 
-    emitToUser(row.student_id, "appointment:status-updated", { appointmentId: row.appointment_id, status: "completed" });
-    emitToDept(row.department_id, "appointment:status-updated", { appointmentId: row.appointment_id, status: "completed" });
-    createNotification(row.student_id, "Your appointment has been marked as completed.", "appointment");
-    completedCount += 1;
+    if (hasActionsTaken) {
+      const [result] = await pool.query(
+        `UPDATE appointments
+         SET status = 'completed',
+             completed_at = CASE WHEN completed_at IS NULL THEN NOW() ELSE completed_at END
+         WHERE appointment_id = ? AND status = 'approved'`,
+        [row.appointment_id],
+      );
+      if (result.affectedRows === 0) continue;
+
+      emitToUser(row.student_id, "appointment:status-updated", { appointmentId: row.appointment_id, status: "completed" });
+      emitToDept(row.department_id, "appointment:status-updated", { appointmentId: row.appointment_id, status: "completed" });
+      createNotification(row.student_id, "Your appointment has been marked as completed.", "appointment");
+      completedCount += 1;
+    } else {
+      const [result] = await pool.query(
+        `UPDATE appointments
+         SET status = 'cancelled',
+             cancelled_by = 'system_not_entertained',
+             cancel_reason = 'The student has not been entertained.'
+         WHERE appointment_id = ? AND status = 'approved'`,
+        [row.appointment_id],
+      );
+      if (result.affectedRows === 0) continue;
+
+      emitToUser(row.student_id, "appointment:status-updated", { appointmentId: row.appointment_id, status: "cancelled" });
+      emitToUser(row.faculty_id, "appointment:status-updated", { appointmentId: row.appointment_id, status: "cancelled" });
+      emitToDept(row.department_id, "appointment:status-updated", { appointmentId: row.appointment_id, status: "cancelled" });
+      createNotification(row.student_id, "Your appointment was automatically cancelled because you were not entertained within the scheduled time.", "appointment");
+      createNotification(row.faculty_id, "An approved appointment expired with no actions taken recorded and was automatically cancelled.", "appointment");
+      notEntertainedCount += 1;
+    }
   }
 
   if (completedCount > 0) {
     console.log(`[appointmentReminderSweeper] Auto-completed ${completedCount} past-due appointment${completedCount === 1 ? "" : "s"}`);
+  }
+  if (notEntertainedCount > 0) {
+    console.log(`[appointmentReminderSweeper] Auto-cancelled ${notEntertainedCount} past-due appointment${notEntertainedCount === 1 ? "" : "s"} with no actions taken recorded`);
   }
 }
 

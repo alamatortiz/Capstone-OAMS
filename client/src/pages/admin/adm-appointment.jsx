@@ -67,6 +67,7 @@ const CANCELLED_BY_LABELS = {
   faculty: "Faculty",
   system: "System (schedule change)",
   system_expired: "System (expired, no response)",
+  system_not_entertained: "System (student not entertained)",
   student_no_show: "Not Served (reported by student)",
 };
 

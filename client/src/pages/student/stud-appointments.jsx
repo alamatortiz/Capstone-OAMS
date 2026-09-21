@@ -256,7 +256,7 @@ export default function AppointmentsPage() {
     if (!socket) return;
 
     const handleCommentUpdate = (payload) => {
-      toast.message("Your professor left a new comment on an appointment.", {
+      toast.message("Your professor added actions taken for an appointment.", {
         id: `appt-comment-${payload?.appointmentId}`,
       });
       fetchMyBookings();
@@ -575,9 +575,9 @@ export default function AppointmentsPage() {
                   <div className="slot-summary">
                     <h4>{selectedSlot.professorName}</h4>
                     <div className="summary-details">
+                      <div className="summary-item"><MapPinIcon /><span>{selectedSlot.location}</span></div>
                       <div className="summary-item"><CalendarIcon /><span>{formatDate(selectedSlot.date)}</span></div>
                       <div className="summary-item"><ClockIcon /><span>{formatTime(selectedSlot.windowStart)} – {formatTime(selectedSlot.windowEnd)}</span></div>
-                      <div className="summary-item"><MapPinIcon /><span>{selectedSlot.location}</span></div>
                     </div>
                   </div>
                   {selectedSlot.slotNote && <NoteLine note={selectedSlot.slotNote} />}

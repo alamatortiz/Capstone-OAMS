@@ -433,7 +433,14 @@ CREATE TABLE appointments (
     -- actually served them on an approved appointment -- a student-triggered
     -- cancellation like plain 'student', but distinguished for activity-feed/
     -- admin display. See cancel_reason below for its optional free-text note.
-    cancelled_by        ENUM('student','faculty','system','system_expired','student_no_show') NULL, -- who/what triggered a 'cancelled' status, for activity-feed attribution
+    -- 'system_not_entertained' = the opposite direction of the same idea:
+    -- appointmentReminderSweeper.js's sweepStaleApproved() auto-cancels an
+    -- approved appointment (instead of auto-completing it) once its window
+    -- has passed with no "actions taken" (shared_comment) ever recorded --
+    -- distinct from plain 'system', which already means "auto-cancelled
+    -- because the schedule template changed" and is asserted by two
+    -- hardcoded activity-feed strings (professorRoutes.js/studentRoutes.js).
+    cancelled_by        ENUM('student','faculty','system','system_expired','student_no_show','system_not_entertained') NULL, -- who/what triggered a 'cancelled' status, for activity-feed attribution
     -- Separate from `notes` below (which is the student's own booking
     -- purpose, set once at creation and never a good place to also store
     -- the faculty member's rejection reason -- unlike document_requests.notes,

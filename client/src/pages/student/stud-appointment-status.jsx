@@ -21,7 +21,7 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
 import AppointmentListItem from "../../components/AppointmentListItem";
-import { formatManilaDate, formatManilaDateTime } from "../../utils/dateTime";
+import { formatManilaDate, formatManilaTime } from "../../utils/dateTime";
 import { filterByRange } from "../../utils/dateRange";
 import { connectSocket } from "../../utils/socket";
 import { useAuth } from "../../context/AuthContext";
@@ -63,7 +63,7 @@ function CommentCard({ appt }) {
       <div className="apst-card-header">
         <h3 className="apst-card-title apst-comment-title">
           <MessageSquare style={{ width: "1.25rem", height: "1.25rem", color: "#3b82f6" }} />
-          Comments
+          Actions Taken
         </h3>
       </div>
       <div className="apst-card-content">
@@ -78,7 +78,7 @@ function CommentCard({ appt }) {
             )}
           </>
         ) : (
-          <p className="apst-comment-empty">No comment yet.</p>
+          <p className="apst-comment-empty">No actions taken recorded yet.</p>
         )}
       </div>
     </div>
@@ -93,7 +93,7 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, com
   const { label: statusLabel, cls: statusCls } = getStatusMeta(appt.status);
   const canCancel = appt.status === "pending" || appt.status === "approved";
   const canComplete = appt.status === "approved";
-  const canReportNotServed = appt.status === "approved";
+  const canReportNotServed = appt.status === "approved" && !appt.sharedComment;
 
   return (
     <div className="apst-status-container">
@@ -141,6 +141,7 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, com
                 <Calendar style={{ width: "1.25rem", height: "1.25rem" }} />
                 Appointment Details
               </h3>
+              <span className={`apst-badge ${statusCls}`}>{statusLabel}</span>
             </div>
             <div className="apst-card-content">
               <div className="apst-detail-row">
@@ -153,10 +154,6 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, com
                   <p className="apst-detail-value">{appt.appointmentType}</p>
                 </div>
               )}
-              <div className="apst-detail-row">
-                <p className="apst-detail-label">College / Department</p>
-                <p className="apst-detail-value">{appt.college}</p>
-              </div>
               <div className="apst-detail-row">
                 <p className="apst-detail-label">Date</p>
                 <p className="apst-detail-value">{formatDate(appt.date)}</p>
@@ -187,39 +184,7 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, com
                   <p className="apst-detail-value">{appt.purpose}</p>
                 </div>
               )}
-              {appt.createdAt && (
-                <div className="apst-detail-row" style={(!appt.approvedAtRaw && !appt.completedAtRaw) ? { borderBottom: "none" } : undefined}>
-                  <p className="apst-detail-label">Booked On</p>
-                  <p className="apst-detail-value">{formatDateShort(appt.createdAt)}</p>
-                </div>
-              )}
-              {appt.approvedAtRaw && (
-                <div className="apst-detail-row" style={!appt.completedAtRaw ? { borderBottom: "none" } : undefined}>
-                  <p className="apst-detail-label">Approved On</p>
-                  <p className="apst-detail-value">{formatManilaDateTime(appt.approvedAtRaw)}</p>
-                </div>
-              )}
-              {appt.completedAtRaw && (
-                <div className="apst-detail-row" style={{ borderBottom: "none" }}>
-                  <p className="apst-detail-label">Completed On</p>
-                  <p className="apst-detail-value">{formatManilaDateTime(appt.completedAtRaw)}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="apst-detail-sidebar">
-          <div className="apst-card">
-            <div className="apst-card-header">
-              <h3 className="apst-card-title">
-                <AlertCircle style={{ width: "1.25rem", height: "1.25rem" }} />
-                Status
-              </h3>
-              <span className={`apst-badge ${statusCls}`}>{statusLabel}</span>
-            </div>
-            {appt.status === "rejected" && appt.rejectionReason && (
-              <div className="apst-card-content">
+              {appt.status === "rejected" && appt.rejectionReason && (
                 <div className="apst-reject-notice">
                   <XCircle style={{ width: "1.25rem", height: "1.25rem" }} />
                   <div>
@@ -227,10 +192,8 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, com
                     <p className="apst-reject-reason">Reason: {appt.rejectionReason}</p>
                   </div>
                 </div>
-              </div>
-            )}
-            {appt.status === "cancelled" && appt.cancelledBy === "student_no_show" && (
-              <div className="apst-card-content">
+              )}
+              {appt.status === "cancelled" && appt.cancelledBy === "student_no_show" && (
                 <div className="apst-reject-notice">
                   <AlertCircle style={{ width: "1.25rem", height: "1.25rem" }} />
                   <div>
@@ -240,11 +203,48 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, com
                     )}
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+              {appt.status === "cancelled" && appt.cancelledBy === "system_not_entertained" && (
+                <div className="apst-reject-notice">
+                  <AlertCircle style={{ width: "1.25rem", height: "1.25rem" }} />
+                  <div>
+                    <p>This appointment was automatically cancelled because it wasn't marked as served in time.</p>
+                    {appt.cancelReason && (
+                      <p className="apst-reject-reason">Details: {appt.cancelReason}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <CommentCard appt={appt} />
+        </div>
+
+        <div className="apst-detail-sidebar">
+          <div className="apst-card apst-timeline-card">
+            <div className="apst-card-header">
+              <h3 className="apst-card-title">
+                <Clock style={{ width: "1.25rem", height: "1.25rem" }} />
+                Timeline
+              </h3>
+            </div>
+            <div className="apst-card-content">
+              <p className="apst-timeline-date">
+                <Calendar style={{ width: "0.9rem", height: "0.9rem" }} /> {formatDate(appt.date)}
+              </p>
+              {(appt.approvedAtRaw || appt.completedAtRaw) && (
+                <div className="apst-datetime-row">
+                  {appt.approvedAtRaw && (
+                    <span className="apst-quick-meta-item">Approved: {formatManilaTime(appt.approvedAtRaw)}</span>
+                  )}
+                  {appt.completedAtRaw && (
+                    <span className="apst-quick-meta-item">Completed: {formatManilaTime(appt.completedAtRaw)}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
 
           {canComplete && (
             <div className="apst-card apst-complete-card">
@@ -444,7 +444,7 @@ export default function AppointmentStatusPage() {
     // poll below -- this makes it show up immediately for a student who
     // already has this page open.
     const handleCommentUpdate = (payload) => {
-      toast.message("Your professor left a new comment on an appointment.", {
+      toast.message("Your professor added actions taken for an appointment.", {
         id: `appt-comment-${payload?.appointmentId}`,
       });
       fetchAppointments();

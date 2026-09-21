@@ -7,7 +7,6 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import QueueConcernModal from "../../components/QueueConcernModal";
 import StudentPageShell from "../../components/StudentPageShell";
-import QueueProgressBars from "../../components/QueueProgressBars";
 import FilterSelect from "../../components/FilterSelect";
 import PageHeader from "../../components/PageHeader";
 import { QueueIconNav } from "../../components/StudentSidebar";
@@ -687,14 +686,6 @@ export default function QueuePage() {
                                   <p className="qp-stat-value-sm">{queue.joinedAt}</p>
                                 </div>
                               </div>
-                              <QueueProgressBars
-                                occupancyCurrent={queue.totalInQueue ?? 0}
-                                occupancyTotal={queue.maxCapacity ?? 0}
-                                occupancyPercent={queue.queueOccupancyPercent ?? 0}
-                                servicedCurrent={queue.servicedCount ?? 0}
-                                servicedTotal={queue.totalInQueue ?? 0}
-                                servicedPercent={queue.servicedPercent ?? 0}
-                              />
                               <button
                                 className="queue-leave-btn"
                                 onClick={(e) => { e.stopPropagation(); setLeaveConfirmQueue({ queueId: queue.queueId, serviceName: queue.serviceName, status: queue.status, arrivedAt: queue.arrivedAt }); }}

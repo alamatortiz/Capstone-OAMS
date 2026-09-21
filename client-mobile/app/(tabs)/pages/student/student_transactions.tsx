@@ -97,6 +97,9 @@ interface Transaction {
   completedAtRaw?: string | null;
   cancelledBy?: string | null;
   cancelReason?: string | null;
+  sharedComment?: string | null;
+  commentUpdatedBy?: string | null;
+  commentUpdatedAt?: string | null;
 }
 
 const TYPE_META: Record<TxType, { label: string; icon: LucideIconType; bg: string; border: string; color: string }> = {
@@ -668,6 +671,24 @@ export default function StudentTransactionsScreen() {
                       </Text>
                     )}
 
+                    {t.type === 'appointment' && t.cancelledBy === 'system_not_entertained' && (
+                      <Text style={styles.txDetails}>
+                        Automatically cancelled — not marked as served in time{t.cancelReason ? `: ${t.cancelReason}` : ''}
+                      </Text>
+                    )}
+
+                    {t.type === 'appointment' && t.sharedComment && (
+                      <View style={styles.txComment}>
+                        <Text style={styles.txCommentText}>{t.sharedComment}</Text>
+                        {t.commentUpdatedAt && (
+                          <Text style={styles.txCommentMeta}>
+                            — last updated by {t.commentUpdatedBy === 'student' ? 'you' : 'faculty'} on{' '}
+                            {formatManilaDate(t.commentUpdatedAt)}
+                          </Text>
+                        )}
+                      </View>
+                    )}
+
                     {t.type === 'appointment' && (t.approvedAtRaw || t.completedAtRaw) && (
                       <View style={styles.txTimelineRow}>
                         {t.approvedAtRaw && (
@@ -1082,6 +1103,16 @@ function createStyles(theme: ThemePalette) {
     },
     txCollege: { fontSize: 11, color: theme.tertiary },
     txDetails: { fontSize: 12, color: theme.subtext, lineHeight: 16 },
+    txComment: {
+      backgroundColor: 'rgba(168, 85, 247, 0.08)',
+      borderWidth: 1,
+      borderColor: 'rgba(168, 85, 247, 0.25)',
+      borderRadius: 10,
+      padding: 10,
+      gap: 4,
+    },
+    txCommentText: { fontSize: 12, fontWeight: '600', color: '#a855f7', lineHeight: 16 },
+    txCommentMeta: { fontSize: 10.5, color: theme.tertiary },
     txMetaRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',

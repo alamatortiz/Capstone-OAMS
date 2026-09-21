@@ -30,3 +30,12 @@
   border-color: rgba(59, 130, 246, 0.6);
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
 }
+
+.qrm-textarea--purple {
+  border-color: rgba(168, 85, 247, 0.25);
+}
+
+.qrm-textarea--purple:focus {
+  border-color: rgba(168, 85, 247, 0.6);
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.15);
+}

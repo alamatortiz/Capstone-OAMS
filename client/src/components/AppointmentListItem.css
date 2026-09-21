@@ -108,11 +108,39 @@
   border-color: rgba(147, 51, 234, 0.25);
 }
 
-/* ─── Date/Time/Location/Purpose grid ─────────────────────────────────────── */
+/* ─── Combined Location/Date/Time row -- one compact line of icon-prefixed
+   values instead of three separate stacked fields, matching the pattern
+   used on the professor's appointment cards. ──────────────────────────── */
+.apt-list-datetime-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 1rem;
+}
+
+.apt-list-quick-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #a855f7;
+}
+
+[data-theme="light"] .apt-list-quick-meta-item {
+  color: #9333ea;
+}
+
+.apt-list-quick-meta-item svg {
+  flex-shrink: 0;
+}
+
+/* ─── Purpose grid (only field left using this layout now) ────────────────── */
 .apt-list-card-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.7rem;
+  margin-top: 0.7rem;
 }
 
 .apt-list-card-field {
