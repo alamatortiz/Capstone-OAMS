@@ -91,7 +91,13 @@ function OamsLogo({
   );
 }
 
-type QueueStatus = 'waiting' | 'serving' | 'completed' | 'cancelled' | 'no_show';
+// GET /student/queues/active (the sole data source for this screen, via
+// QueueContext) only ever returns 'waiting'/'serving' rows -- a completed
+// entry drops off that list immediately server-side, with no grace window
+// (see studentRoutes.js's own comment on that route). 'cancelled'/'no_show'
+// are kept in the union defensively even though the same is true of them,
+// since narrowing further wasn't part of this pass's verified scope.
+type QueueStatus = 'waiting' | 'serving' | 'cancelled' | 'no_show';
 type SlotStatus = 'open' | 'paused' | 'full' | 'expired';
 
 interface QueueRecord {
@@ -119,7 +125,6 @@ interface QueueRecord {
   endTime: string;
   notes: string;
   arrivedAt?: string | null;
-  completedAt?: string | null;
 }
 
 interface ServiceRequirement {
@@ -167,7 +172,6 @@ const navItems: NavItem[] = [
 const STATUS_META: Record<QueueStatus, { label: string; bg: string; border: string; color: string }> = {
   waiting: { label: 'Waiting', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6' },
   serving: { label: "It's Your Turn!", bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.3)', color: '#22c55e' },
-  completed: { label: 'Completed', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
   cancelled: { label: 'Cancelled', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', color: '#ef4444' },
   no_show: { label: 'Marked as No-Show', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', color: '#ef4444' },
 };
@@ -394,11 +398,7 @@ export default function StudentQueueStatusScreen() {
                           <View style={styles.statBox}>
                             <Text style={styles.statLabel}>Your Position</Text>
                             <Text style={styles.statValuePrimary}>
-                              {queue.status === 'completed'
-                                ? 'Completed'
-                                : queue.status === 'serving'
-                                  ? (queue.arrivedAt ? 'Being Served' : 'Called')
-                                  : queue.position}
+                              {queue.status === 'serving' ? (queue.arrivedAt ? 'Being Served' : 'Called') : queue.position}
                             </Text>
                           </View>
                           <View style={styles.statBox}>
@@ -406,8 +406,8 @@ export default function StudentQueueStatusScreen() {
                             <Text style={styles.statValue}>{queue.totalWaiting}</Text>
                           </View>
                           <View style={styles.statBox}>
-                            <Text style={styles.statLabel}>{queue.status === 'completed' ? 'Completed At' : 'Est. Wait Time'}</Text>
-                            <Text style={styles.statValueSm}>{queue.status === 'completed' ? (queue.completedAt || 'Done') : queue.estimatedWait}</Text>
+                            <Text style={styles.statLabel}>Est. Wait Time</Text>
+                            <Text style={styles.statValueSm}>{queue.estimatedWait}</Text>
                           </View>
                           <View style={styles.statBox}>
                             <Text style={styles.statLabel}>Joined At</Text>
@@ -782,28 +782,22 @@ function QueueDetail({
 
         <View style={styles.positionCenter}>
           <Text style={styles.positionLabel}>
-            {queue.status === 'serving' || queue.status === 'completed' ? 'Status' : 'Number in Line'}
+            {queue.status === 'serving' ? 'Status' : 'Number in Line'}
           </Text>
           <Text style={styles.positionNumber}>
-            {queue.status === 'completed'
-              ? 'Completed'
-              : queue.status === 'serving'
-                ? (queue.arrivedAt ? 'Being Served' : 'Called')
-                : queue.position}
+            {queue.status === 'serving' ? (queue.arrivedAt ? 'Being Served' : 'Called') : queue.position}
           </Text>
-          {queue.status !== 'serving' && queue.status !== 'completed' && (
+          {queue.status !== 'serving' && (
             <Text style={styles.positionTotal}>of {queue.totalWaiting} waiting</Text>
           )}
           <Text style={styles.positionMessage}>
-            {queue.status === 'completed'
-              ? "You've been served. Thank you!"
-              : queue.status === 'serving'
-                ? queue.arrivedAt
-                  ? "You're being served now!"
-                  : "You've been called — please proceed!"
-                : queue.position === 1
-                  ? "You're next!"
-                  : `${peopleAhead} ${peopleAhead === 1 ? 'person' : 'people'} ahead of you`}
+            {queue.status === 'serving'
+              ? queue.arrivedAt
+                ? "You're being served now!"
+                : "You've been called — please proceed!"
+              : queue.position === 1
+                ? "You're next!"
+                : `${peopleAhead} ${peopleAhead === 1 ? 'person' : 'people'} ahead of you`}
           </Text>
         </View>
 
@@ -817,7 +811,7 @@ function QueueDetail({
           <View style={styles.cardTitleRow}>
             <Clock size={18} color={theme.blue} />
             <Text style={styles.cardTitleText}>
-              {queue.status === 'completed' ? 'Service Completed' : queue.status === 'serving' ? 'Next Steps' : 'Estimated Wait'}
+              {queue.status === 'serving' ? 'Next Steps' : 'Estimated Wait'}
             </Text>
           </View>
         </View>
@@ -825,7 +819,7 @@ function QueueDetail({
           <View style={styles.waitTimeIcon}>
             <Clock size={26} color={theme.blue} />
           </View>
-          <Text style={styles.waitTimeValue}>{queue.status === 'completed' ? (queue.completedAt || 'Done') : queue.estimatedWait}</Text>
+          <Text style={styles.waitTimeValue}>{queue.estimatedWait}</Text>
           <Text style={styles.waitTimeJoined}>Joined at {queue.joinedAt}</Text>
         </View>
       </View>

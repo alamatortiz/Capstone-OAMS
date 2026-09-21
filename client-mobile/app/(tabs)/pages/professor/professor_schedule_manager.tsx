@@ -23,6 +23,9 @@ import { useTheme } from '@/context/ThemeContext';
 import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import NotificationBell from '@/components/NotificationBell';
+import QueueReasonModal from '@/components/QueueReasonModal';
+import ProfessorAvailabilityToggle from '@/components/ProfessorAvailabilityToggle';
+import { useProfessorAvailability } from '@/hooks/useProfessorAvailability';
 import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
@@ -91,6 +94,7 @@ interface AvailabilitySlot {
   start_time: string; // "HH:MM" or "HH:MM:SS" from server
   end_time: string;
   location: string;
+  slot_note?: string | null;
   max_students: number;
   appointmentTypes: AppointmentType[];
   // Highest number of students booked on any single future date for this
@@ -183,6 +187,16 @@ export default function ProfessorScheduleManagerScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const {
+    isAvailable,
+    unavailableReasonModalOpen,
+    unavailableReasonText,
+    unavailableReasonSubmitting,
+    setUnavailableReasonText,
+    toggleAvailability,
+    confirmMarkUnavailable,
+    cancelUnavailableModal,
+  } = useProfessorAvailability();
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -200,6 +214,8 @@ export default function ProfessorScheduleManagerScreen() {
   const [endCustomPickerOpen, setEndCustomPickerOpen] = useState(false);
   const [addLocation, setAddLocation] = useState('');
   const [showOtherLocation, setShowOtherLocation] = useState(false);
+  // Optional, e.g. a Google Meet link -- shown to students on this slot.
+  const [addSlotNote, setAddSlotNote] = useState('');
   const [addMaxStudents, setAddMaxStudents] = useState('');
   // Students already booked (future dates) for the slot being edited.
   const [editingCurrentMaxBooked, setEditingCurrentMaxBooked] = useState(0);
@@ -287,6 +303,7 @@ export default function ProfessorScheduleManagerScreen() {
     setEndCustom(false);
     setAddLocation('');
     setShowOtherLocation(false);
+    setAddSlotNote('');
     setAddMaxStudents('');
     setEditingCurrentMaxBooked(0);
     setAddApptTypes([]);
@@ -302,6 +319,7 @@ export default function ProfessorScheduleManagerScreen() {
     setEndCustom(false);
     setAddLocation(slot.location);
     setShowOtherLocation(!!slot.location && !locations.some((loc) => loc.name === slot.location));
+    setAddSlotNote(slot.slot_note ?? '');
     setAddMaxStudents(String(slot.max_students));
     setEditingCurrentMaxBooked(slot.currentMaxBooked ?? 0);
     setAddApptTypes(slot.appointmentTypes.map((t) => t.name));
@@ -413,6 +431,7 @@ export default function ProfessorScheduleManagerScreen() {
           start_time: addStart,
           end_time: addEnd,
           location: trimmedLocation,
+          slotNote: addSlotNote.trim(),
           max_students: maxStu,
           appointmentTypes: addApptTypes,
         });
@@ -427,6 +446,7 @@ export default function ProfessorScheduleManagerScreen() {
               start_time: addStart,
               end_time: addEnd,
               location: trimmedLocation,
+              slotNote: addSlotNote.trim(),
               max_students: maxStu,
               appointmentTypes: addApptTypes,
             }),
@@ -748,6 +768,20 @@ export default function ProfessorScheduleManagerScreen() {
               </View>
 
               <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Note (optional)</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. a Google Meet link, room change, or reminder for students"
+                  placeholderTextColor={theme.tertiary}
+                  value={addSlotNote}
+                  onChangeText={setAddSlotNote}
+                  maxLength={500}
+                  editable={!modalLocked}
+                />
+                <Text style={styles.fieldHint}>Shown to students on this slot. Doesn&apos;t send a notification.</Text>
+              </View>
+
+              <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Max Students</Text>
                 <TextInput
                   style={styles.textInput}
@@ -1001,6 +1035,23 @@ export default function ProfessorScheduleManagerScreen() {
         styles={styles}
         userName={user?.name ?? 'Faculty'}
         userDept={user?.departmentName ?? ''}
+        isAvailable={isAvailable}
+        onToggleAvailability={toggleAvailability}
+      />
+
+      <QueueReasonModal
+        visible={unavailableReasonModalOpen}
+        title="Mark Yourself Unavailable"
+        message="Let students and admins know why you're unavailable right now. This reason will be shown wherever your schedule is visible."
+        confirmText={unavailableReasonSubmitting ? 'Submitting...' : 'Confirm'}
+        confirmColor="#ef4444"
+        reason={unavailableReasonText}
+        onChangeReason={setUnavailableReasonText}
+        onCancel={cancelUnavailableModal}
+        onConfirm={() => confirmMarkUnavailable(unavailableReasonText)}
+        theme={theme}
+        styles={styles}
+        submitting={unavailableReasonSubmitting}
       />
 
       <LogoutModal
@@ -1096,6 +1147,8 @@ function NavDrawer({
   styles,
   userName,
   userDept,
+  isAvailable,
+  onToggleAvailability,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -1105,6 +1158,8 @@ function NavDrawer({
   styles: ReturnType<typeof createStyles>;
   userName: string;
   userDept: string;
+  isAvailable: boolean;
+  onToggleAvailability: (value: boolean) => void;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -1122,6 +1177,8 @@ function NavDrawer({
             </View>
             <Text style={styles.drawerCollege}>{userDept}</Text>
           </View>
+
+          <ProfessorAvailabilityToggle isAvailable={isAvailable} onToggle={onToggleAvailability} styles={styles} />
 
           <View style={styles.drawerNav}>
             {navItems.map((item) => {
@@ -1570,6 +1627,30 @@ function createStyles(theme: ThemePalette) {
       paddingVertical: 12,
       borderRadius: 12,
     },
+    // Availability-reason modal (QueueReasonModal) -- confirmBtn is its own
+    // name, distinct from confirmActionBtn above (this file's generic
+    // confirm dialog).
+    confirmBtn: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderRadius: 12,
+    },
+    reasonInput: {
+      width: '100%',
+      minHeight: 64,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      padding: 12,
+      fontSize: 13,
+      color: theme.text,
+      backgroundColor: theme.background,
+      textAlignVertical: 'top',
+      marginBottom: 16,
+    },
+    formSubmitBtnDisabled: { opacity: 0.6 },
     logoutConfirmBtn: {
       flex: 1,
       flexDirection: 'row',
@@ -1617,6 +1698,19 @@ function createStyles(theme: ThemePalette) {
     drawerRoleBadge: { backgroundColor: 'rgba(22, 163, 74, 0.18)', borderRadius: 999, paddingVertical: 3, paddingHorizontal: 10 },
     drawerRoleBadgeText: { fontSize: 11, fontWeight: '700', color: theme.primary },
     drawerCollege: { fontSize: 12, fontWeight: '500', color: theme.subtext },
+    availabilityRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 14,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+    },
+    availabilityLabel: { fontSize: 14, fontWeight: '700', color: theme.text },
     drawerNav: { flex: 1, marginTop: 28, gap: 4 },
     drawerNavItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 12, borderRadius: 10 },
     drawerNavItemActive: { backgroundColor: theme.primary },

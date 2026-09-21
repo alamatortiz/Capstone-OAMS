@@ -5,6 +5,7 @@ import {
   Animated,
   Easing,
   Image,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -19,7 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import {
   Calendar, CalendarDays, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, ClipboardList,
-  Clock, FileText, GraduationCap, Home as HomeIcon, Loader2, MapPin, Megaphone, Users, X, XCircle,
+  Clock, FileText, GraduationCap, Home as HomeIcon, Loader2, MapPin, Megaphone, StickyNote, Users, X, XCircle,
 } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
@@ -120,6 +121,7 @@ interface Slot {
   isPast?: boolean;
   isFull?: boolean;
   appointmentTypes?: AppointmentType[];
+  slotNote?: string | null;
 }
 
 type BookingStatus = 'pending' | 'approved' | 'completed' | 'rejected' | 'cancelled';
@@ -281,6 +283,7 @@ export default function StudentAppointmentsScreen() {
           isFull: !!s.isFull,
           professorAvailabilityStatus: s.professorAvailabilityStatus,
           appointmentTypes: (s.appointmentTypes ?? []).map((t: any) => ({ id: String(t.id), name: t.name })),
+          slotNote: s.slotNote ?? null,
         })),
       );
       setSlotsError(null);
@@ -628,6 +631,7 @@ export default function StudentAppointmentsScreen() {
                     </Text>
                   </View>
                 </View>
+                {slot.slotNote && <SlotNoteBox note={slot.slotNote} theme={theme} styles={styles} />}
                 {isPast ? (
                   <View style={[styles.bookBtn, styles.bookBtnDisabled]}>
                     <Text style={styles.bookBtnTextDisabled}>No Longer Available</Text>
@@ -1036,6 +1040,7 @@ export default function StudentAppointmentsScreen() {
                         <Text style={styles.slotDetailText}>{selectedSlot.location}</Text>
                       </View>
                     </View>
+                    {selectedSlot.slotNote && <SlotNoteBox note={selectedSlot.slotNote} theme={theme} styles={styles} />}
                   </View>
 
                   <View style={styles.formGroup}>
@@ -1289,6 +1294,37 @@ function MiniCalendar({
   );
 }
 
+// A professor-authored note on a recurring slot (e.g. a meeting link),
+// shown while browsing/booking -- mirrors web's NoteLine/slot-note-box.
+function SlotNoteBox({
+  note,
+  theme,
+  styles,
+}: {
+  note: string;
+  theme: ThemePalette;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  const trimmed = note.trim();
+  if (!trimmed) return null;
+  const isLink = /^https?:\/\/\S+$/i.test(trimmed);
+  return (
+    <View style={styles.slotNoteBox}>
+      <View style={styles.slotNoteHeader}>
+        <StickyNote size={13} color={theme.purple} />
+        <Text style={styles.slotNoteHeaderText}>Notes</Text>
+      </View>
+      {isLink ? (
+        <Pressable onPress={() => Linking.openURL(trimmed)}>
+          <Text style={[styles.slotNoteText, { color: '#3b82f6', textDecorationLine: 'underline' }]}>{trimmed}</Text>
+        </Pressable>
+      ) : (
+        <Text style={styles.slotNoteText}>{trimmed}</Text>
+      )}
+    </View>
+  );
+}
+
 type ThemePalette = {
   background: string;
   card: string;
@@ -1510,6 +1546,18 @@ function createStyles(theme: ThemePalette) {
     slotDetails: { gap: 5 },
     slotDetailRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     slotDetailText: { fontSize: 11, color: theme.subtext, flex: 1 },
+    slotNoteBox: {
+      marginTop: 8,
+      padding: 10,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.background,
+      gap: 4,
+    },
+    slotNoteHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    slotNoteHeaderText: { fontSize: 10.5, fontWeight: '700', color: theme.purple, textTransform: 'uppercase', letterSpacing: 0.4 },
+    slotNoteText: { fontSize: 12, color: theme.text, lineHeight: 16 },
 
     bookBtn: {
       alignItems: 'center', justifyContent: 'center', paddingVertical: 11,

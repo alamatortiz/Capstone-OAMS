@@ -10,7 +10,6 @@ import {
   ScrollView,
   StatusBar,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from 'react-native';
@@ -26,6 +25,8 @@ import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
 import QueueReasonModal from '@/components/QueueReasonModal';
+import ProfessorAvailabilityToggle from '@/components/ProfessorAvailabilityToggle';
+import { useProfessorAvailability } from '@/hooks/useProfessorAvailability';
 import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
@@ -229,10 +230,16 @@ export default function ProfessorDashboardScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [isAvailable, setIsAvailable] = useState(true);
-  const [unavailableReasonModalOpen, setUnavailableReasonModalOpen] = useState(false);
-  const [unavailableReasonText, setUnavailableReasonText] = useState('');
-  const [unavailableReasonSubmitting, setUnavailableReasonSubmitting] = useState(false);
+  const {
+    isAvailable,
+    unavailableReasonModalOpen,
+    unavailableReasonText,
+    unavailableReasonSubmitting,
+    setUnavailableReasonText,
+    toggleAvailability,
+    confirmMarkUnavailable,
+    cancelUnavailableModal,
+  } = useProfessorAvailability();
   const router = useRouter();
   const { user, logout, token } = useAuth();
 
@@ -263,7 +270,6 @@ export default function ProfessorDashboardScreen() {
       const { data } = await api.get('/professor/dashboard-stats');
       if (requestId !== requestIdRef.current) return;
       setDashData(data);
-      setIsAvailable((data.availabilityStatus ?? 'available') === 'available');
     } catch (err) {
       if (requestId !== requestIdRef.current) return;
       console.error('Fetch dashboard stats error:', err);
@@ -382,43 +388,6 @@ export default function ProfessorDashboardScreen() {
 
   const comingSoon = () =>
     Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
-
-  // Going Available needs no reason and fires immediately. Going Unavailable
-  // requires one -- the server 400s otherwise (professorRoutes.js) -- so that
-  // path just opens the reason modal instead; the actual PATCH happens in
-  // confirmMarkUnavailable() once the professor submits a reason.
-  const toggleAvailability = async (value: boolean) => {
-    if (!value) {
-      setUnavailableReasonText('');
-      setUnavailableReasonModalOpen(true);
-      return;
-    }
-    const prev = isAvailable;
-    setIsAvailable(true);
-    try {
-      await api.patch('/professor/availability-status', { status: 'available' });
-    } catch (err) {
-      console.error('Update availability error:', err);
-      setIsAvailable(prev);
-      Alert.alert('Error', 'Could not update availability status.');
-    }
-  };
-
-  const confirmMarkUnavailable = async (reason: string) => {
-    if (!reason.trim() || unavailableReasonSubmitting) return;
-    setUnavailableReasonSubmitting(true);
-    try {
-      await api.patch('/professor/availability-status', { status: 'unavailable', reason: reason.trim() });
-      setIsAvailable(false);
-      setUnavailableReasonModalOpen(false);
-      setUnavailableReasonText('');
-    } catch (err) {
-      console.error('Update availability error:', err);
-      Alert.alert('Error', 'Could not update availability status.');
-    } finally {
-      setUnavailableReasonSubmitting(false);
-    }
-  };
 
   const handleStatPress = (key: string) => {
     if (key === 'appointments') {
@@ -884,15 +853,7 @@ export default function ProfessorDashboardScreen() {
               <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
-            <View style={styles.availabilityRow}>
-              <Text style={styles.availabilityLabel}>{isAvailable ? 'Available' : 'Unavailable'}</Text>
-              <Switch
-                value={isAvailable}
-                onValueChange={toggleAvailability}
-                trackColor={{ false: '#3f3f46', true: '#22c55e' }}
-                thumbColor="#ffffff"
-              />
-            </View>
+            <ProfessorAvailabilityToggle isAvailable={isAvailable} onToggle={toggleAvailability} styles={styles} />
 
             <View style={styles.drawerNav}>
               {navItems.map((item) => {
@@ -961,10 +922,7 @@ export default function ProfessorDashboardScreen() {
         confirmColor="#ef4444"
         reason={unavailableReasonText}
         onChangeReason={setUnavailableReasonText}
-        onCancel={() => {
-          setUnavailableReasonModalOpen(false);
-          setUnavailableReasonText('');
-        }}
+        onCancel={cancelUnavailableModal}
         onConfirm={() => confirmMarkUnavailable(unavailableReasonText)}
         theme={theme}
         styles={styles}

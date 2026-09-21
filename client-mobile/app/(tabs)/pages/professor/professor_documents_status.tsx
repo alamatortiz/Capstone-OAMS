@@ -27,6 +27,9 @@ import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
 import NotificationBell from '@/components/NotificationBell';
+import QueueReasonModal from '@/components/QueueReasonModal';
+import ProfessorAvailabilityToggle from '@/components/ProfessorAvailabilityToggle';
+import { useProfessorAvailability } from '@/hooks/useProfessorAvailability';
 import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import { DocStatus, getDetailStatusMeta, normalizeDocStatus } from '@/utils/documentStatus';
 import { formatManilaDate } from '@/utils/date';
@@ -133,6 +136,7 @@ interface DocumentRecord {
   notes?: string;
   estimatedCompletion?: string;
   neededBy?: string;
+  claimBy?: string;
   releasedDate?: string;
   claimedDate?: string;
   facultyFiles?: DocumentAttachment[];
@@ -210,6 +214,16 @@ export default function ProfessorDocumentsStatusScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const {
+    isAvailable,
+    unavailableReasonModalOpen,
+    unavailableReasonText,
+    unavailableReasonSubmitting,
+    setUnavailableReasonText,
+    toggleAvailability,
+    confirmMarkUnavailable,
+    cancelUnavailableModal,
+  } = useProfessorAvailability();
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(params.docId ?? null);
@@ -256,6 +270,7 @@ export default function ProfessorDocumentsStatusScreen() {
           notes: r.notes || undefined,
           estimatedCompletion: r.estimated_completion || undefined,
           neededBy: r.needed_by || undefined,
+          claimBy: r.claim_by || undefined,
           releasedDate: r.released_at || undefined,
           claimedDate: r.claimed_at || undefined,
           facultyFiles: r.faculty_files || undefined,
@@ -607,6 +622,8 @@ export default function ProfessorDocumentsStatusScreen() {
               <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
+            <ProfessorAvailabilityToggle isAvailable={isAvailable} onToggle={toggleAvailability} styles={styles} />
+
             <View style={styles.drawerNav}>
               {navItems.map((item) => {
                 // Not highlighted here — the sidebar's "Documents" destination is
@@ -711,6 +728,34 @@ export default function ProfessorDocumentsStatusScreen() {
           </View>
         </View>
       </Modal>
+
+      <QueueReasonModal
+        visible={unavailableReasonModalOpen}
+        title="Mark Yourself Unavailable"
+        message="Let students and admins know why you're unavailable right now. This reason will be shown wherever your schedule is visible."
+        confirmText={unavailableReasonSubmitting ? 'Submitting...' : 'Confirm'}
+        confirmColor="#ef4444"
+        reason={unavailableReasonText}
+        onChangeReason={setUnavailableReasonText}
+        onCancel={cancelUnavailableModal}
+        onConfirm={() => confirmMarkUnavailable(unavailableReasonText)}
+        theme={theme}
+        styles={{
+          modalOverlay: styles.availModalOverlay,
+          confirmModalCard: styles.availConfirmModalCard,
+          confirmIconCircle: styles.availConfirmIconCircle,
+          confirmTitle: styles.availConfirmTitle,
+          confirmDescription: styles.availConfirmDescription,
+          reasonInput: styles.availReasonInput,
+          confirmActionsRow: styles.availConfirmActionsRow,
+          cancelBtn: styles.availCancelBtn,
+          cancelBtnText: styles.availCancelBtnText,
+          confirmBtn: styles.availConfirmBtn,
+          confirmBtnText: styles.availConfirmBtnText,
+          formSubmitBtnDisabled: styles.availFormSubmitBtnDisabled,
+        }}
+        submitting={unavailableReasonSubmitting}
+      />
     </View>
   );
 }
@@ -894,7 +939,8 @@ function DocumentDetail({
         <View style={styles.readyBanner}>
           <Ionicons name="checkmark-circle" size={22} color="#ffffff" />
           <Text style={styles.readyBannerText}>
-            Your document is ready for pickup — please proceed to the designated location
+            Your document is ready for pickup — please proceed to the designated location.
+            {doc.claimBy ? ` Please collect it by ${formatDate(doc.claimBy)}.` : ''}
           </Text>
         </View>
       )}
@@ -945,6 +991,12 @@ function DocumentDetail({
             {doc.neededBy ? formatDate(doc.neededBy) : 'No date requested for the document to be claimable.'}
           </Text>
         </View>
+        {doc.claimBy && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Claim By</Text>
+            <Text style={styles.detailValue}>{formatDate(doc.claimBy)}</Text>
+          </View>
+        )}
         {doc.status === 'claimed' && doc.claimedDate && (
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Date and Time Claimed</Text>
@@ -1415,6 +1467,70 @@ function createStyles(theme: ThemePalette) {
     drawerRoleBadge: { backgroundColor: 'rgba(22, 163, 74, 0.18)', borderRadius: 999, paddingVertical: 3, paddingHorizontal: 10 },
     drawerRoleBadgeText: { fontSize: 11, fontWeight: '700', color: theme.primary },
     drawerCollege: { fontSize: 12, fontWeight: '500', color: theme.subtext },
+    availabilityRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 14,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+    },
+    availabilityLabel: { fontSize: 14, fontWeight: '700', color: theme.text },
+    // Namespaced (not `modalOverlay`/`cancelBtn`/etc.) -- this file's own
+    // `cancelBtn`/`cancelBtnText` are already the red "Cancel Request" button
+    // on the document-cancel card, a different shape/color than
+    // QueueReasonModal needs, so these avoid stepping on that.
+    availModalOverlay: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      padding: 24,
+    },
+    availConfirmModalCard: {
+      width: '100%',
+      maxWidth: 340,
+      alignItems: 'center',
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 20,
+      padding: 24,
+    },
+    availConfirmIconCircle: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+    availConfirmTitle: { fontSize: 18, fontWeight: '800', color: theme.text, marginBottom: 8, textAlign: 'center' },
+    availConfirmDescription: { fontSize: 13, color: theme.subtext, textAlign: 'center', lineHeight: 19, marginBottom: 16 },
+    availReasonInput: {
+      width: '100%',
+      minHeight: 64,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      padding: 12,
+      fontSize: 13,
+      color: theme.text,
+      backgroundColor: theme.background,
+      textAlignVertical: 'top',
+      marginBottom: 16,
+    },
+    availConfirmActionsRow: { flexDirection: 'row', gap: 12, width: '100%' },
+    availCancelBtn: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+    },
+    availCancelBtnText: { fontSize: 14, fontWeight: '700', color: theme.text },
+    availConfirmBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12 },
+    availConfirmBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+    availFormSubmitBtnDisabled: { opacity: 0.6 },
     drawerNav: { flex: 1, marginTop: 28, gap: 4 },
     drawerNavItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 12, borderRadius: 10 },
     drawerNavItemActive: { backgroundColor: theme.primary },

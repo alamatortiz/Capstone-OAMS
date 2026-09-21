@@ -334,7 +334,12 @@ export default function AdminQueueScreen() {
     router.replace('/login');
   };
 
-  const activeQueueDetails = queueDetails.filter((q: any) => ACTIVE_STATUSES.includes(q.status));
+  // GET /admin/queue-hosting (shared with admin_queue_hosting.tsx) returns a
+  // 3-day window (today + 2 back) so a carried-over queue stays reachable --
+  // but this monitoring screen's "active" totals should only ever reflect
+  // today, matching web's adm-queue.jsx, or a stale carried-over slot that
+  // hasn't been touched since would inflate these numbers.
+  const activeQueueDetails = queueDetails.filter((q: any) => q.isToday && ACTIVE_STATUSES.includes(q.status));
   const serviceTypes = [...new Set(activeQueueDetails.map((q: any) => q.queueType))].sort();
   const filteredQueueDetails =
     serviceTypeFilter === 'all'

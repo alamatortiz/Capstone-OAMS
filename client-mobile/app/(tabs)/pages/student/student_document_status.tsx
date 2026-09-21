@@ -140,6 +140,7 @@ interface DocumentRecord {
   notes?: string;
   estimatedCompletion?: string;
   neededBy?: string;
+  claimBy?: string;
   claimedDate?: string;
   releasedDate?: string;
   studentFiles?: DocumentAttachment[];
@@ -853,6 +854,7 @@ function DocumentDetail({
           <CheckCircle size={22} color="#ffffff" />
           <Text style={styles.readyBannerText}>
             Your document is ready for pickup — please proceed to the designated location.
+            {doc.claimBy ? ` Please collect it by ${formatDateLong(doc.claimBy)}.` : ''}
           </Text>
         </LinearGradient>
       )}
@@ -903,6 +905,12 @@ function DocumentDetail({
             {doc.neededBy ? formatDateLong(doc.neededBy) : 'No date requested for the document to be claimable.'}
           </Text>
         </View>
+        {doc.claimBy && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Claim By</Text>
+            <Text style={styles.detailValue}>{formatDateLong(doc.claimBy)}</Text>
+          </View>
+        )}
         {doc.status === 'claimed' && doc.claimedDate ? (
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Date and Time Claimed</Text>

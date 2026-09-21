@@ -35,6 +35,8 @@ import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { toLocalYMD, fromLocalYMD, getManilaDateString } from '@/utils/date';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
@@ -163,6 +165,7 @@ interface DocumentRequest {
   claimedDate: string | null;
   requiresCoding?: boolean;
   officialCode?: string | null;
+  claimBy?: string | null;
   studentFiles?: DocumentAttachment[];
   adminFiles?: DocumentAttachment[];
   isDigitalDelivery?: boolean;
@@ -234,6 +237,8 @@ export default function AdminDocumentProcessingScreen() {
   const [selectedDocument, setSelectedDocument] = useState<DocumentRequest | null>(null);
   const [processingNotes, setProcessingNotes] = useState('');
   const [officialCode, setOfficialCode] = useState('');
+  const [claimByDate, setClaimByDate] = useState('');
+  const [showClaimByPicker, setShowClaimByPicker] = useState(false);
   const [confirmStatus, setConfirmStatus] = useState<ConfirmStatus | null>(null);
   const [updating, setUpdating] = useState(false);
   const [returnFiles, setReturnFiles] = useState<DocumentPicker.DocumentPickerAsset[]>([]);
@@ -413,6 +418,7 @@ export default function AdminDocumentProcessingScreen() {
     setSelectedDocument(doc);
     setProcessingNotes(doc.notes);
     setOfficialCode(doc.officialCode || '');
+    setClaimByDate(doc.claimBy || '');
     setReturnFiles([]);
   };
 
@@ -420,6 +426,7 @@ export default function AdminDocumentProcessingScreen() {
     setSelectedDocument(null);
     setProcessingNotes('');
     setOfficialCode('');
+    setClaimByDate('');
     setReturnFiles([]);
   };
 
@@ -494,12 +501,17 @@ export default function AdminDocumentProcessingScreen() {
         ? `/admin/faculty-document-processing/${rawId}/status`
         : `/admin/document-processing/${rawId}/status`;
     const needsCode = newStatus === 'ready' && selectedDocument.requiresCoding;
+    // Optional office-set deadline -- only meaningful (and only accepted by
+    // the server) on the ready transition, same rule as officialCode above.
+    const trimmedClaimBy = claimByDate.trim();
+    const setsClaimBy = newStatus === 'ready' && trimmedClaimBy !== '';
     setUpdating(true);
     try {
       if (isSubmission) {
         const body = new FormData();
         body.append('status', newStatus);
         body.append('notes', processingNotes);
+        if (setsClaimBy) body.append('claimBy', trimmedClaimBy);
         returnFiles.forEach((asset) => {
           body.append('returnFiles', {
             uri: asset.uri,
@@ -514,6 +526,7 @@ export default function AdminDocumentProcessingScreen() {
         body.append('status', newStatus);
         body.append('notes', processingNotes);
         if (needsCode) body.append('officialCode', officialCode);
+        if (setsClaimBy) body.append('claimBy', trimmedClaimBy);
         returnFiles.forEach((asset) => {
           body.append('attachmentFiles', {
             uri: asset.uri,
@@ -527,6 +540,7 @@ export default function AdminDocumentProcessingScreen() {
           status: newStatus,
           notes: processingNotes,
           ...(needsCode ? { officialCode } : {}),
+          ...(setsClaimBy ? { claimBy: trimmedClaimBy } : {}),
         });
       }
       setDocuments((prev) =>
@@ -538,6 +552,7 @@ export default function AdminDocumentProcessingScreen() {
                 notes: processingNotes,
                 claimedDate: newStatus === 'claimed' ? todayStr : d.claimedDate,
                 officialCode: needsCode ? officialCode : d.officialCode,
+                claimBy: setsClaimBy ? trimmedClaimBy : d.claimBy,
               }
             : d,
         ),
@@ -777,6 +792,7 @@ export default function AdminDocumentProcessingScreen() {
                   const StatusIcon = getStatusIcon(doc.status);
                   const isOverdue = !!doc.neededBy && !DONE_STATUSES.includes(doc.status) && doc.neededBy < weekDates.todayStr;
                   const label = deadlineLabel(doc.neededBy);
+                  const isClaimOverdue = !!doc.claimBy && doc.status === 'ready' && doc.claimBy < weekDates.todayStr;
                   return (
                     <View key={doc.id} style={styles.docCard}>
                       <View style={styles.docCardHeaderRow}>
@@ -816,6 +832,14 @@ export default function AdminDocumentProcessingScreen() {
                             <Text style={[styles.docDetailValue, isOverdue && { color: '#ef4444' }]}>
                               {formatDisplayDate(doc.neededBy)}
                               {label ? ` (${label})` : ''}
+                            </Text>
+                          </View>
+                        )}
+                        {doc.claimBy && doc.status === 'ready' && (
+                          <View style={styles.docDetailItem}>
+                            <Text style={styles.docDetailLabel}>{isClaimOverdue ? 'Claim Overdue' : 'Claim By'}</Text>
+                            <Text style={[styles.docDetailValue, isClaimOverdue && { color: '#ef4444' }]}>
+                              {formatDisplayDate(doc.claimBy)}
                             </Text>
                           </View>
                         )}
@@ -955,6 +979,19 @@ export default function AdminDocumentProcessingScreen() {
                       <Text style={styles.detailsValue}>{selectedDocument.officialCode}</Text>
                     </View>
                   )}
+                  {selectedDocument.claimBy && selectedDocument.status !== 'processing' && (
+                    <View style={styles.detailsField}>
+                      <Text style={styles.detailsLabel}>Claim By</Text>
+                      <Text
+                        style={[
+                          styles.detailsValue,
+                          selectedDocument.status === 'ready' && selectedDocument.claimBy < weekDates.todayStr && { color: '#ef4444' },
+                        ]}
+                      >
+                        {formatDisplayDate(selectedDocument.claimBy)}
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 {(() => {
@@ -1047,6 +1084,37 @@ export default function AdminDocumentProcessingScreen() {
                       value={officialCode}
                       onChangeText={setOfficialCode}
                     />
+                  </View>
+                )}
+
+                {selectedDocument.status === 'processing' && (
+                  <View style={styles.notesWrap}>
+                    <Text style={styles.detailsLabel}>Claim By (optional)</Text>
+                    <Pressable style={styles.filterSelect} onPress={() => setShowClaimByPicker(true)}>
+                      <Calendar size={14} color={theme.tertiary} />
+                      <Text style={claimByDate ? styles.filterSelectText : styles.filterSelectPlaceholder}>
+                        {claimByDate ? formatDisplayDate(claimByDate) : 'Set a claim-by deadline'}
+                      </Text>
+                      {claimByDate && (
+                        <Pressable onPress={() => setClaimByDate('')} hitSlop={8}>
+                          <X size={14} color={theme.tertiary} />
+                        </Pressable>
+                      )}
+                    </Pressable>
+                    <Text style={styles.formHint}>
+                      Only applies once this document is marked Ready -- the requester sees it as a pickup deadline.
+                    </Text>
+                    {showClaimByPicker && (
+                      <DateTimePicker
+                        value={claimByDate ? fromLocalYMD(claimByDate) : fromLocalYMD(getManilaDateString())}
+                        mode="date"
+                        minimumDate={fromLocalYMD(getManilaDateString())}
+                        onChange={(event, selectedDate) => {
+                          setShowClaimByPicker(false);
+                          if (event.type === 'set' && selectedDate) setClaimByDate(toLocalYMD(selectedDate));
+                        }}
+                      />
+                    )}
                   </View>
                 )}
 
@@ -1432,6 +1500,8 @@ function createStyles(theme: ThemePalette) {
       borderColor: theme.border,
     },
     filterSelectText: { fontSize: 12.5, fontWeight: '600', color: theme.text },
+    filterSelectPlaceholder: { fontSize: 12.5, fontWeight: '600', color: theme.tertiary },
+    formHint: { fontSize: 11, color: theme.tertiary, marginTop: 6, lineHeight: 15 },
 
     // Tabs
     tabsScroll: { flexGrow: 0 },

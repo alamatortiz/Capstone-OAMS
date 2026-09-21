@@ -524,11 +524,7 @@ export default function StudentQueueScreen() {
                       <View style={styles.statBox}>
                         <Text style={styles.statLabel}>Your Position</Text>
                         <Text style={styles.statValuePrimary}>
-                          {queue.status === 'completed'
-                            ? 'Completed'
-                            : queue.status === 'serving'
-                              ? (queue.arrivedAt ? 'Being Served' : 'Called')
-                              : queue.position}
+                          {queue.status === 'serving' ? (queue.arrivedAt ? 'Being Served' : 'Called') : queue.position}
                         </Text>
                       </View>
                       <View style={styles.statBox}>
@@ -536,8 +532,8 @@ export default function StudentQueueScreen() {
                         <Text style={styles.statValue}>{queue.totalWaiting}</Text>
                       </View>
                       <View style={styles.statBox}>
-                        <Text style={styles.statLabel}>{queue.status === 'completed' ? 'Completed At' : 'Est. Wait Time'}</Text>
-                        <Text style={styles.statValueSm}>{queue.status === 'completed' ? (queue.completedAt || '—') : queue.estimatedWait}</Text>
+                        <Text style={styles.statLabel}>Est. Wait Time</Text>
+                        <Text style={styles.statValueSm}>{queue.estimatedWait}</Text>
                       </View>
                       <View style={styles.statBox}>
                         <Text style={styles.statLabel}>Joined At</Text>
@@ -564,18 +560,16 @@ export default function StudentQueueScreen() {
                       </View>
                     </View>
 
-                    {queue.status !== 'completed' && (
-                      <Pressable
-                        style={styles.leaveBtn}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          setLeaveTarget(queue);
-                        }}
-                      >
-                        <XCircle size={16} color="#ef4444" />
-                        <Text style={styles.leaveBtnText}>Leave Queue</Text>
-                      </Pressable>
-                    )}
+                    <Pressable
+                      style={styles.leaveBtn}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        setLeaveTarget(queue);
+                      }}
+                    >
+                      <XCircle size={16} color="#ef4444" />
+                      <Text style={styles.leaveBtnText}>Leave Queue</Text>
+                    </Pressable>
                   </Pressable>
                 );
               })}

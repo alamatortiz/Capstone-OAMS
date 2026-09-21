@@ -41,6 +41,7 @@ import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/
 import { useAdminQueueHosting } from '@/hooks/useAdminQueueHosting';
 import QueueReasonModal from '@/components/QueueReasonModal';
 import api from '@/utils/api';
+import { formatManilaDate, formatManilaTime } from '@/utils/date';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -448,6 +449,19 @@ export default function AdminQueueHostingScreen() {
   const closedQueues = filteredQueues.filter((q) => q.status === 'closed');
   const hasActiveFilters = searchQuery.trim() !== '' || statusFilter !== 'all' || typeFilter !== 'all';
 
+  // GET /admin/queue-hosting now returns a 3-day window (today + 2 back) so
+  // a carried-over queue stays reachable/reopenable through a weekend --
+  // the lists above deliberately still include those rows for that reason.
+  // The summary tiles below, however, should only ever count today's
+  // queues, matching web's adm-queue-hosting.jsx (todayActiveCount etc.) --
+  // otherwise "Active Queues: 3" could silently include queues from two
+  // days ago that just haven't been touched since.
+  const todayActiveCount = activeQueues.filter((q) => q.isToday).length;
+  const todayPausedCount = pausedQueues.filter((q) => q.isToday).length;
+  const todayStillServingCount = stillServingQueues.filter((q) => q.isToday).length;
+  const todayCompletedCount = completedQueues.filter((q) => q.isToday).length;
+  const todayClosedCount = closedQueues.filter((q) => q.isToday).length;
+
   const clearFilters = () => {
     setSearchQuery('');
     setStatusFilter('all');
@@ -535,11 +549,11 @@ export default function AdminQueueHostingScreen() {
           <View style={styles.statsGrid}>
             {(
               [
-                { key: 'active', label: 'Active Queues', value: activeQueues.length },
-                { key: 'paused', label: 'Paused Queues', value: pausedQueues.length },
-                { key: 'stillServing', label: 'Still Serving', value: stillServingQueues.length },
-                { key: 'completed', label: 'Completed Queues', value: completedQueues.length },
-                { key: 'closed', label: 'Manually Closed', value: closedQueues.length },
+                { key: 'active', label: 'Active Queues', value: todayActiveCount },
+                { key: 'paused', label: 'Paused Queues', value: todayPausedCount },
+                { key: 'stillServing', label: 'Still Serving', value: todayStillServingCount },
+                { key: 'completed', label: 'Completed Queues', value: todayCompletedCount },
+                { key: 'closed', label: 'Manually Closed', value: todayClosedCount },
               ] as const
             ).map((stat) => {
               const tint = STAT_TINTS[stat.key];
@@ -828,7 +842,7 @@ export default function AdminQueueHostingScreen() {
           {/* Completed Queue Lines */}
           {completedQueues.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Completed Queue Lines (Today)</Text>
+              <Text style={styles.sectionTitle}>Completed Queue Lines</Text>
               <View style={styles.queueList}>
                 {completedQueues.map((queue) => (
                   <Pressable
@@ -871,6 +885,11 @@ export default function AdminQueueHostingScreen() {
                     <Text style={styles.closedMeta}>
                       Served {queue.servedCount} student(s), capacity {queue.maxCapacity}
                     </Text>
+                    {!queue.isToday && queue.createdAt && (
+                      <Text style={styles.closedMeta}>
+                        Opened {formatManilaDate(queue.createdAt, { year: 'numeric', month: 'numeric', day: 'numeric' })} at {formatManilaTime(queue.createdAt)}
+                      </Text>
+                    )}
                   </Pressable>
                 ))}
               </View>
@@ -880,7 +899,7 @@ export default function AdminQueueHostingScreen() {
           {/* Manually Closed Queue Lines */}
           {closedQueues.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Manually Closed Queue Lines (Today)</Text>
+              <Text style={styles.sectionTitle}>Manually Closed Queue Lines</Text>
               <View style={styles.queueList}>
                 {closedQueues.map((queue) => (
                   <Pressable
@@ -921,6 +940,11 @@ export default function AdminQueueHostingScreen() {
                     <Text style={styles.closedMeta}>
                       Served {queue.servedCount} student(s), capacity {queue.maxCapacity}
                     </Text>
+                    {!queue.isToday && queue.createdAt && (
+                      <Text style={styles.closedMeta}>
+                        Opened {formatManilaDate(queue.createdAt, { year: 'numeric', month: 'numeric', day: 'numeric' })} at {formatManilaTime(queue.createdAt)}
+                      </Text>
+                    )}
                   </Pressable>
                 ))}
               </View>

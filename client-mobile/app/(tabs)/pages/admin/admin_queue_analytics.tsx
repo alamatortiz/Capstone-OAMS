@@ -30,6 +30,8 @@ import {
   UserX,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { toLocalYMD, fromLocalYMD, getManilaDateString } from '@/utils/date';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
@@ -86,13 +88,14 @@ function OamsLogo({
 
 // GET /api/admin/queue-analytics/summary (adminRoutes.js) is scoped strictly
 // to the signed-in admin's own department -- it aggregates queues for that
-// one department only, filtered by range/service, and returns
+// one department only, filtered by startDate/endDate/service (both dates
+// default to today when neither is supplied), and returns
 // totals/byService/serviceTypes pre-computed. Mirrors web's current
-// adm-queue-analytics.jsx exactly (web replaced its older, richer
-// performance/trends/insights view with this simpler operational-metrics
-// one; the older /admin/queue-analytics endpoint this screen used to call
-// still exists server-side for backward compat, but neither web nor this
-// screen use it anymore).
+// adm-queue-analytics.jsx exactly. The old range=today|all param this screen
+// used to send is gone server-side as of a1fe7df5 -- the whole legacy
+// /admin/queue-analytics endpoint (period=Today/This Week/etc.) was removed
+// outright, not just deprecated, so a startDate/endDate picker is the only
+// way to query anything other than today.
 interface Totals {
   accomplishedQueues: number;
   overtimeQueues: number;
@@ -117,13 +120,7 @@ interface ByServiceRow {
   avgWaitMinutes: number;
 }
 
-const RANGE_OPTIONS = [
-  { value: 'today', label: 'Today' },
-  { value: 'all', label: 'All Time' },
-] as const;
-type RangeValue = (typeof RANGE_OPTIONS)[number]['value'];
-
-type SelectField = 'range' | 'service' | null;
+type SelectField = 'service' | null;
 
 type LucideIconType = typeof Clock;
 
@@ -146,7 +143,10 @@ export default function AdminQueueAnalyticsScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [range, setRange] = useState<RangeValue>('today');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
   const [serviceType, setServiceType] = useState('All Services');
   const [selectField, setSelectField] = useState<SelectField>(null);
   const router = useRouter();
@@ -167,7 +167,7 @@ export default function AdminQueueAnalyticsScreen() {
     try {
       setLoadError(null);
       const res = await api.get('/admin/queue-analytics/summary', {
-        params: { range, service: serviceType },
+        params: { startDate: startDate || undefined, endDate: endDate || undefined, service: serviceType },
       });
       if (requestId !== requestIdRef.current) return;
       setTotals(res.data.totals ?? DEFAULT_TOTALS);
@@ -180,7 +180,7 @@ export default function AdminQueueAnalyticsScreen() {
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [range, serviceType]);
+  }, [startDate, endDate, serviceType]);
 
   const handleExportReport = async () => {
     try {
@@ -192,7 +192,7 @@ export default function AdminQueueAnalyticsScreen() {
           noShows: r.noShows,
           avgWaitMinutes: r.avgWaitMinutes,
         })),
-        `queue-analytics-${range}.csv`,
+        `queue-analytics-${startDate || getManilaDateString()}_${endDate || getManilaDateString()}.csv`,
       );
     } catch (error: any) {
       Alert.alert('Export failed', error?.message ?? 'Could not export the report.');
@@ -268,16 +268,14 @@ export default function AdminQueueAnalyticsScreen() {
     router.replace('/login');
   };
 
-  const rangeLabel = RANGE_OPTIONS.find((r) => r.value === range)?.label ?? 'Today';
+  const rangeLabel = startDate || endDate ? `${startDate || '…'} to ${endDate || '…'}` : 'Today';
 
-  const selectOptions: { value: string; label: string }[] =
-    selectField === 'range' ? [...RANGE_OPTIONS] : serviceTypes.map((s) => ({ value: s, label: s }));
-  const selectTitle = selectField === 'range' ? 'Select Time Range' : 'Select Service Type';
-  const selectCurrentValue = selectField === 'range' ? range : serviceType;
+  const selectOptions: { value: string; label: string }[] = serviceTypes.map((s) => ({ value: s, label: s }));
+  const selectTitle = 'Select Service Type';
+  const selectCurrentValue = serviceType;
 
   const chooseOption = (value: string) => {
-    if (selectField === 'range') setRange(value as RangeValue);
-    else if (selectField === 'service') setServiceType(value);
+    setServiceType(value);
     setSelectField(null);
   };
 
@@ -406,12 +404,54 @@ export default function AdminQueueAnalyticsScreen() {
               </Pressable>
             </View>
 
-            <View style={styles.filterField}>
-              <Text style={styles.filterLabel}>Time Range</Text>
-              <Pressable style={styles.filterSelect} onPress={() => setSelectField('range')}>
-                <Text style={styles.filterSelectText} numberOfLines={1}>{rangeLabel}</Text>
-                <ChevronDown size={16} color={theme.text} />
-              </Pressable>
+            <View style={[styles.filterField, styles.dateSection]}>
+              <Text style={styles.filterLabel}>Date Range</Text>
+              <View style={styles.filterRow}>
+                <Pressable style={[styles.filterSelect, styles.filterSelectHalf]} onPress={() => setShowStartPicker(true)}>
+                  <Text style={startDate ? styles.filterSelectText : styles.filterSelectPlaceholder} numberOfLines={1}>
+                    {startDate || 'From'}
+                  </Text>
+                  <Calendar size={16} color={theme.text} />
+                </Pressable>
+                <Pressable style={[styles.filterSelect, styles.filterSelectHalf]} onPress={() => setShowEndPicker(true)}>
+                  <Text style={endDate ? styles.filterSelectText : styles.filterSelectPlaceholder} numberOfLines={1}>
+                    {endDate || 'To'}
+                  </Text>
+                  <Calendar size={16} color={theme.text} />
+                </Pressable>
+                {(startDate || endDate) && (
+                  <Pressable
+                    style={styles.dateClearBtn}
+                    onPress={() => { setStartDate(''); setEndDate(''); }}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="close" size={16} color={theme.tertiary} />
+                  </Pressable>
+                )}
+              </View>
+              {showStartPicker && (
+                <DateTimePicker
+                  value={startDate ? new Date(startDate) : new Date()}
+                  mode="date"
+                  maximumDate={fromLocalYMD(endDate || getManilaDateString())}
+                  onChange={(event, selectedDate) => {
+                    setShowStartPicker(false);
+                    if (event.type === 'set' && selectedDate) setStartDate(toLocalYMD(selectedDate));
+                  }}
+                />
+              )}
+              {showEndPicker && (
+                <DateTimePicker
+                  value={endDate ? new Date(endDate) : new Date()}
+                  mode="date"
+                  minimumDate={startDate ? fromLocalYMD(startDate) : undefined}
+                  maximumDate={fromLocalYMD(getManilaDateString())}
+                  onChange={(event, selectedDate) => {
+                    setShowEndPicker(false);
+                    if (event.type === 'set' && selectedDate) setEndDate(toLocalYMD(selectedDate));
+                  }}
+                />
+              )}
             </View>
 
             <View style={styles.filterField}>
@@ -754,6 +794,24 @@ function createStyles(theme: ThemePalette) {
       backgroundColor: theme.background,
     },
     filterSelectText: { fontSize: 13, color: theme.text, flex: 1, marginRight: 8 },
+    filterSelectPlaceholder: { fontSize: 13, color: theme.tertiary, flex: 1, marginRight: 8 },
+    filterRow: { flexDirection: 'row', gap: 10 },
+    filterSelectHalf: { flex: 1 },
+    dateClearBtn: {
+      width: 38,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.background,
+    },
+    dateSection: {
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      marginTop: 4,
+      paddingTop: 14,
+    },
 
     // Stats
     statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },

@@ -25,6 +25,8 @@ import { formatManilaDate, formatManilaTime } from '@/utils/date';
 import { filterByRange } from '@/utils/dateRange';
 import NotificationBell from '@/components/NotificationBell';
 import QueueReasonModal from '@/components/QueueReasonModal';
+import ProfessorAvailabilityToggle from '@/components/ProfessorAvailabilityToggle';
+import { useProfessorAvailability } from '@/hooks/useProfessorAvailability';
 import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
@@ -102,6 +104,10 @@ interface Appointment {
   completedAtRaw?: string | null;
   cancelledBy?: 'student' | 'faculty' | 'system' | 'system_expired' | 'student_no_show' | null;
   cancelReason?: string | null;
+  slotNote?: string | null;
+  sharedComment?: string | null;
+  commentUpdatedBy?: 'student' | 'faculty' | null;
+  commentUpdatedAt?: string | null;
 }
 
 interface NavItem {
@@ -206,6 +212,16 @@ export default function ProfessorAppointmentScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const {
+    isAvailable,
+    unavailableReasonModalOpen,
+    unavailableReasonText,
+    unavailableReasonSubmitting,
+    setUnavailableReasonText,
+    toggleAvailability,
+    confirmMarkUnavailable,
+    cancelUnavailableModal,
+  } = useProfessorAvailability();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>('all');
@@ -220,6 +236,14 @@ export default function ProfessorAppointmentScreen() {
   const [rejectTarget, setRejectTarget] = useState<Appointment | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
+  // Shared appointment comment -- professor-authored, student-readable (see
+  // PATCH /professor/appointments/:id/comment). Reuses QueueReasonModal with
+  // required={false} so a blank save can clear a previous comment, mirroring
+  // web's prof-appointments.jsx CommentBlock, which reuses the same shared
+  // modal component for the identical reason.
+  const [commentTarget, setCommentTarget] = useState<Appointment | null>(null);
+  const [commentText, setCommentText] = useState('');
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
   const router = useRouter();
   const { user, logout, token } = useAuth();
 
@@ -255,7 +279,7 @@ export default function ProfessorAppointmentScreen() {
     const socket = connectSocket(token);
     if (!socket) return;
     const refetch = () => fetchAppointments();
-    const events = ['appointment:slot-updated', 'appointment:status-updated'];
+    const events = ['appointment:slot-updated', 'appointment:status-updated', 'appointment:comment-updated'];
     events.forEach((event) => socket.on(event, refetch));
 
     const onStatusUpdated = () => {
@@ -369,6 +393,27 @@ export default function ProfessorAppointmentScreen() {
       Alert.alert('Error', err?.response?.data?.error ?? 'Could not reject the appointment.');
     } finally {
       setRejectSubmitting(false);
+    }
+  };
+
+  const openCommentModal = (apt: Appointment) => {
+    setCommentText(apt.sharedComment ?? '');
+    setCommentTarget(apt);
+  };
+
+  const saveComment = async (text: string) => {
+    if (!commentTarget || commentSubmitting) return;
+    setCommentSubmitting(true);
+    try {
+      await api.patch(`/professor/appointments/${commentTarget.id}/comment`, { comment: text.trim() });
+      await fetchAppointments();
+      setCommentTarget(null);
+      setCommentText('');
+    } catch (err: any) {
+      console.error('Save comment error:', err);
+      Alert.alert('Error', err?.response?.data?.error ?? 'Failed to save comment.');
+    } finally {
+      setCommentSubmitting(false);
     }
   };
 
@@ -600,6 +645,33 @@ export default function ProfessorAppointmentScreen() {
                       )}
                     </View>
 
+                    <View style={styles.commentSection}>
+                      <View style={styles.commentHeaderRow}>
+                        <View style={styles.commentHeaderTitleRow}>
+                          <Ionicons name="chatbubble-outline" size={14} color={theme.tertiary} />
+                          <Text style={styles.commentHeaderTitle}>Comments</Text>
+                        </View>
+                        {(apt.status === 'pending' || apt.status === 'approved') && (
+                          <Pressable onPress={() => openCommentModal(apt)} hitSlop={8}>
+                            <Text style={styles.commentEditLink}>{apt.sharedComment ? 'Edit Comment' : 'Add Comment'}</Text>
+                          </Pressable>
+                        )}
+                      </View>
+                      {apt.sharedComment ? (
+                        <>
+                          <Text style={styles.commentText}>{apt.sharedComment}</Text>
+                          {apt.commentUpdatedAt && (
+                            <Text style={styles.commentMeta}>
+                              Last updated by {apt.commentUpdatedBy === 'student' ? 'the student' : 'you'} on{' '}
+                              {formatManilaDate(apt.commentUpdatedAt, { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </Text>
+                          )}
+                        </>
+                      ) : (
+                        <Text style={styles.commentEmpty}>No comment yet.</Text>
+                      )}
+                    </View>
+
                     <View style={styles.apptFooter}>
                       {apt.status === 'pending' && (
                         <View style={styles.apptActionsRow}>
@@ -715,6 +787,8 @@ export default function ProfessorAppointmentScreen() {
         styles={styles}
         userName={user?.name ?? 'Faculty'}
         userDept={user?.departmentName ?? ''}
+        isAvailable={isAvailable}
+        onToggleAvailability={toggleAvailability}
       />
 
       <ConfirmActionModal
@@ -738,6 +812,38 @@ export default function ProfessorAppointmentScreen() {
         theme={theme}
         styles={styles}
         submitting={rejectSubmitting}
+      />
+
+      <QueueReasonModal
+        visible={!!commentTarget}
+        title="Edit Comment"
+        message={`Leave a note for ${commentTarget?.studentName ?? 'this student'} about this appointment.`}
+        confirmText={commentSubmitting ? 'Saving…' : 'Save Comment'}
+        confirmColor="#16a34a"
+        reason={commentText}
+        onChangeReason={setCommentText}
+        onCancel={() => { setCommentTarget(null); setCommentText(''); }}
+        onConfirm={() => saveComment(commentText)}
+        theme={theme}
+        styles={styles}
+        submitting={commentSubmitting}
+        required={false}
+        placeholder="Leave a note for the student…"
+      />
+
+      <QueueReasonModal
+        visible={unavailableReasonModalOpen}
+        title="Mark Yourself Unavailable"
+        message="Let students and admins know why you're unavailable right now. This reason will be shown wherever your schedule is visible."
+        confirmText={unavailableReasonSubmitting ? 'Submitting...' : 'Confirm'}
+        confirmColor="#ef4444"
+        reason={unavailableReasonText}
+        onChangeReason={setUnavailableReasonText}
+        onCancel={cancelUnavailableModal}
+        onConfirm={() => confirmMarkUnavailable(unavailableReasonText)}
+        theme={theme}
+        styles={styles}
+        submitting={unavailableReasonSubmitting}
       />
 
       <LogoutModal
@@ -839,6 +945,8 @@ function NavDrawer({
   styles,
   userName,
   userDept,
+  isAvailable,
+  onToggleAvailability,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -848,6 +956,8 @@ function NavDrawer({
   styles: ReturnType<typeof createStyles>;
   userName: string;
   userDept: string;
+  isAvailable: boolean;
+  onToggleAvailability: (value: boolean) => void;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -865,6 +975,8 @@ function NavDrawer({
             </View>
             <Text style={styles.drawerCollege}>{userDept}</Text>
           </View>
+
+          <ProfessorAvailabilityToggle isAvailable={isAvailable} onToggle={onToggleAvailability} styles={styles} />
 
           <View style={styles.drawerNav}>
             {navItems.map((item) => {
@@ -1133,6 +1245,22 @@ function createStyles(theme: ThemePalette) {
     apptInfoValue: { fontSize: 12.5, fontWeight: '600', color: '#a855f7', lineHeight: 16 },
     apptNotesText: { fontSize: 12.5, fontWeight: '600', color: theme.text, lineHeight: 16 },
 
+    // Shared appointment comment section (professor-authored, student-readable)
+    commentSection: {
+      marginTop: 10,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      gap: 4,
+    },
+    commentHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    commentHeaderTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    commentHeaderTitle: { fontSize: 11, fontWeight: '700', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
+    commentEditLink: { fontSize: 12, fontWeight: '700', color: '#16a34a' },
+    commentText: { fontSize: 12.5, fontWeight: '600', color: theme.text, lineHeight: 17 },
+    commentMeta: { fontSize: 10.5, color: theme.tertiary, marginTop: 2 },
+    commentEmpty: { fontSize: 12, color: theme.tertiary, fontStyle: 'italic' },
+
     apptFooter: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -1229,6 +1357,19 @@ function createStyles(theme: ThemePalette) {
     drawerRoleBadge: { backgroundColor: 'rgba(22, 163, 74, 0.18)', borderRadius: 999, paddingVertical: 3, paddingHorizontal: 10 },
     drawerRoleBadgeText: { fontSize: 11, fontWeight: '700', color: theme.primary },
     drawerCollege: { fontSize: 12, fontWeight: '500', color: theme.subtext },
+    availabilityRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 14,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+    },
+    availabilityLabel: { fontSize: 14, fontWeight: '700', color: theme.text },
     drawerNav: { flex: 1, marginTop: 28, gap: 4 },
     drawerNavItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 12, borderRadius: 10 },
     drawerNavItemActive: { backgroundColor: theme.primary },

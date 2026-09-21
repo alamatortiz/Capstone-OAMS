@@ -23,6 +23,9 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import NotificationBell from '@/components/NotificationBell';
+import QueueReasonModal from '@/components/QueueReasonModal';
+import ProfessorAvailabilityToggle from '@/components/ProfessorAvailabilityToggle';
+import { useProfessorAvailability } from '@/hooks/useProfessorAvailability';
 import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
@@ -144,6 +147,16 @@ export default function ProfessorAnnouncementScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const {
+    isAvailable,
+    unavailableReasonModalOpen,
+    unavailableReasonText,
+    unavailableReasonSubmitting,
+    setUnavailableReasonText,
+    toggleAvailability,
+    confirmMarkUnavailable,
+    cancelUnavailableModal,
+  } = useProfessorAvailability();
   const router = useRouter();
   const { user, token, logout } = useAuth();
 
@@ -449,6 +462,8 @@ export default function ProfessorAnnouncementScreen() {
               <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
+            <ProfessorAvailabilityToggle isAvailable={isAvailable} onToggle={toggleAvailability} styles={styles} />
+
             <View style={styles.drawerNav}>
               {navItems.map((item) => {
                 const active = item.key === 'announcements';
@@ -507,6 +522,21 @@ export default function ProfessorAnnouncementScreen() {
           </View>
         </View>
       </Modal>
+
+      <QueueReasonModal
+        visible={unavailableReasonModalOpen}
+        title="Mark Yourself Unavailable"
+        message="Let students and admins know why you're unavailable right now. This reason will be shown wherever your schedule is visible."
+        confirmText={unavailableReasonSubmitting ? 'Submitting...' : 'Confirm'}
+        confirmColor="#ef4444"
+        reason={unavailableReasonText}
+        onChangeReason={setUnavailableReasonText}
+        onCancel={cancelUnavailableModal}
+        onConfirm={() => confirmMarkUnavailable(unavailableReasonText)}
+        theme={theme}
+        styles={styles}
+        submitting={unavailableReasonSubmitting}
+      />
     </View>
   );
 }
@@ -854,6 +884,66 @@ function createStyles(theme: ThemePalette) {
       fontWeight: '500',
       color: theme.subtext,
     },
+    availabilityRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 14,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+    },
+    availabilityLabel: { fontSize: 14, fontWeight: '700', color: theme.text },
+    modalOverlay: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      padding: 24,
+    },
+    confirmModalCard: {
+      width: '100%',
+      maxWidth: 340,
+      alignItems: 'center',
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 20,
+      padding: 24,
+    },
+    confirmIconCircle: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+    confirmTitle: { fontSize: 18, fontWeight: '800', color: theme.text, marginBottom: 8, textAlign: 'center' },
+    confirmDescription: { fontSize: 13, color: theme.subtext, textAlign: 'center', lineHeight: 19, marginBottom: 16 },
+    reasonInput: {
+      width: '100%',
+      minHeight: 64,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      padding: 12,
+      fontSize: 13,
+      color: theme.text,
+      backgroundColor: theme.background,
+      textAlignVertical: 'top',
+      marginBottom: 16,
+    },
+    confirmActionsRow: { flexDirection: 'row', gap: 12, width: '100%' },
+    cancelBtn: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+    },
+    cancelBtnText: { fontSize: 14, fontWeight: '700', color: theme.text },
+    confirmBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12 },
+    confirmBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+    formSubmitBtnDisabled: { opacity: 0.6 },
     drawerNav: {
       flex: 1,
       marginTop: 16,

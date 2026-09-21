@@ -5,6 +5,7 @@ import {
   Easing,
   Image,
   ImageSourcePropType,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -129,6 +130,10 @@ interface Appointment {
   createdAt: string;
   appointmentType?: string;
   rejectionReason?: string;
+  slotNote?: string | null;
+  sharedComment?: string | null;
+  commentUpdatedBy?: 'student' | 'faculty' | null;
+  commentUpdatedAt?: string | null;
   approvedAtRaw?: string | null;
   completedAtRaw?: string | null;
   cancelledBy?: 'student' | 'faculty' | 'system' | 'system_expired' | 'student_no_show' | null;
@@ -267,6 +272,10 @@ export default function StudentAppointmentStatusScreen() {
           createdAt: a.createdAt,
           appointmentType: a.appointmentType ?? undefined,
           rejectionReason: a.rejectionReason ?? undefined,
+          slotNote: a.slotNote ?? null,
+          sharedComment: a.sharedComment ?? null,
+          commentUpdatedBy: a.commentUpdatedBy ?? null,
+          commentUpdatedAt: a.commentUpdatedAt ?? null,
           approvedAtRaw: a.approvedAtRaw ?? null,
           completedAtRaw: a.completedAtRaw ?? null,
           cancelledBy: a.cancelledBy ?? null,
@@ -302,8 +311,17 @@ export default function StudentAppointmentStatusScreen() {
     };
     socket.on('appointment:status-updated', onAppointmentStatusUpdated);
 
+    // A professor's comment is otherwise only picked up by the next manual
+    // refresh -- this makes it show up immediately while this screen is open.
+    const onAppointmentCommentUpdated = () => {
+      fetchAppointments();
+      notify('New comment', 'Your professor left a new comment on an appointment.');
+    };
+    socket.on('appointment:comment-updated', onAppointmentCommentUpdated);
+
     return () => {
       socket.off('appointment:status-updated', onAppointmentStatusUpdated);
+      socket.off('appointment:comment-updated', onAppointmentCommentUpdated);
     };
   }, [user, token, fetchAppointments]);
 
@@ -758,6 +776,20 @@ export default function StudentAppointmentStatusScreen() {
                               <Text style={styles.listItemFieldValueMuted}>{appt.purpose}</Text>
                             </View>
                           ) : null}
+                          {appt.slotNote ? (
+                            <View style={styles.listItemFieldFull}>
+                              <Text style={styles.listItemFieldLabel}>Meeting Note</Text>
+                              {/^https?:\/\/\S+$/i.test(appt.slotNote.trim()) ? (
+                                <Pressable onPress={(e) => { e.stopPropagation(); Linking.openURL(appt.slotNote!.trim()); }}>
+                                  <Text style={[styles.listItemFieldValueMuted, { color: '#3b82f6', textDecorationLine: 'underline' }]}>
+                                    {appt.slotNote}
+                                  </Text>
+                                </Pressable>
+                              ) : (
+                                <Text style={styles.listItemFieldValueMuted}>{appt.slotNote}</Text>
+                              )}
+                            </View>
+                          ) : null}
                         </View>
                         {appt.status === 'rejected' && appt.rejectionReason && (
                           <View style={styles.rejectNotice}>
@@ -768,6 +800,25 @@ export default function StudentAppointmentStatusScreen() {
                             </View>
                           </View>
                         )}
+                        <View style={styles.commentSection}>
+                          <View style={styles.commentHeaderRow}>
+                            <Ionicons name="chatbubble-outline" size={14} color={theme.tertiary} />
+                            <Text style={styles.commentHeaderTitle}>Comments</Text>
+                          </View>
+                          {appt.sharedComment ? (
+                            <>
+                              <Text style={styles.commentText}>{appt.sharedComment}</Text>
+                              {appt.commentUpdatedAt && (
+                                <Text style={styles.commentMeta}>
+                                  Last updated by {appt.commentUpdatedBy === 'faculty' ? 'the professor' : 'you'} on{' '}
+                                  {formatManilaDate(appt.commentUpdatedAt, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </Text>
+                              )}
+                            </>
+                          ) : (
+                            <Text style={styles.commentEmpty}>No comment yet.</Text>
+                          )}
+                        </View>
                       </Pressable>
                     );
                   })}
@@ -1135,6 +1186,20 @@ function createStyles(theme: ThemePalette) {
     },
     rejectNoticeTitle: { fontSize: 13, fontWeight: '700', color: '#ef4444' },
     rejectNoticeReason: { fontSize: 12.5, color: theme.text, marginTop: 4, lineHeight: 18 },
+
+    // Shared appointment comment -- read-only here, professor-authored only
+    commentSection: {
+      marginTop: 12,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      gap: 4,
+    },
+    commentHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    commentHeaderTitle: { fontSize: 11, fontWeight: '700', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
+    commentText: { fontSize: 12.5, fontWeight: '600', color: theme.text, lineHeight: 17 },
+    commentMeta: { fontSize: 10.5, color: theme.tertiary, marginTop: 2 },
+    commentEmpty: { fontSize: 12, color: theme.tertiary, fontStyle: 'italic' },
 
     // Detail info card
     infoCard: {
