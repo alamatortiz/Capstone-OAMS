@@ -747,7 +747,10 @@ export default function AdminQueueScreen() {
                 <Text style={styles.cardTitleText}>Currently Serving</Text>
               </View>
               <Text style={styles.servingName}>
-                {monitoringQueue.currentlyServingStudentNumber || 'No student is currently being served'}
+                {monitoringQueue.currentlyServingStudentNumber
+                  ? `Name: ${(monitoringQueue as any).currentlyServingStudentName || 'Student'}
+Student Number: ${monitoringQueue.currentlyServingStudentNumber}`
+                  : 'No student is currently being served'}
               </Text>
               <Text style={styles.servingLabel}>
                 {monitoringQueue.queueType}

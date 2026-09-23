@@ -49,6 +49,44 @@ export async function clearCache(key: string): Promise<void> {
   }
 }
 
+// Wipes every cached entry -- called on logout / forced session expiry so
+// the next person to sign in on this device never sees the previous
+// account's transactions, announcements or FAQs.
+export async function clearAllCache(): Promise<void> {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const ours = keys.filter((k) => k.startsWith(PREFIX));
+    if (ours.length) await AsyncStorage.multiRemove(ours);
+  } catch (err) {
+    console.error('offlineCache: failed to clear all:', err);
+  }
+}
+
+// True when a request failed because the server couldn't be reached (no
+// response at all) or is down (5xx) -- the cases where showing the cached
+// copy is right. A 4xx is a real answer from the server and is not offline.
+export function isOfflineLikeError(err: any): boolean {
+  return !err?.response || err.response.status >= 500;
+}
+
+// Downloads every page of a paginated list (capped) so the whole thing can be
+// cached and then searched/filtered locally while offline.
+export async function fetchAllPages<T>(
+  fetchPage: (page: number) => Promise<{ items: T[]; totalPages: number }>,
+  maxPages = 30,
+): Promise<T[]> {
+  const all: T[] = [];
+  let page = 1;
+  let totalPages = 1;
+  do {
+    const res = await fetchPage(page);
+    all.push(...res.items);
+    totalPages = res.totalPages;
+    page += 1;
+  } while (page <= totalPages && page <= maxPages);
+  return all;
+}
+
 // Short relative-time string for "showing data from X ago" banners --
 // deliberately coarse (minutes/hours/days), this isn't a live-updating clock.
 export function timeAgo(iso: string): string {
@@ -63,7 +101,9 @@ export function timeAgo(iso: string): string {
 }
 
 export const CACHE_KEYS = {
-  studentTransactions: 'student:transactions',
-  studentAnnouncements: 'student:announcements',
+  // The *All keys hold the student's complete unfiltered list so search,
+  // filters, tabs and exports can run locally while offline.
+  studentTransactionsAll: 'student:transactions:all',
+  studentAnnouncementsAll: 'student:announcements:all',
   studentFaqs: 'student:faqs',
 } as const;

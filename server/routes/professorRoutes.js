@@ -1591,6 +1591,7 @@ router.delete(
       const [affected] = await conn.query(
         `SELECT appointment_id, student_id, department_id, appointment_date
          FROM appointments
+         WHERE availability_id = ? AND status IN ('pending','approved')
            AND appointment_date >= ?
          FOR UPDATE`,
         [id, getManilaDateString()],

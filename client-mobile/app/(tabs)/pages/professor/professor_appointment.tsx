@@ -21,7 +21,7 @@ import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
-import { formatManilaDate, formatManilaTime } from '@/utils/date';
+import { formatManilaDate, formatManilaTime, getManilaDateString } from '@/utils/date';
 import { filterByRange } from '@/utils/dateRange';
 import NotificationBell from '@/components/NotificationBell';
 import QueueReasonModal from '@/components/QueueReasonModal';
@@ -104,11 +104,32 @@ interface Appointment {
   completedAtRaw?: string | null;
   cancelledBy?: 'student' | 'faculty' | 'system' | 'system_expired' | 'student_no_show' | 'system_not_entertained' | null;
   cancelReason?: string | null;
+  windowStartRaw?: string | null;
+  windowEndRaw?: string | null;
   slotNote?: string | null;
   sharedComment?: string | null;
   commentUpdatedBy?: 'student' | 'faculty' | null;
   commentUpdatedAt?: string | null;
 }
+
+const manilaTimeNow = () =>
+  new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
+
+// Mirrors the server's approve rule (and web's approveBlockedReason): only on
+// the appointment's date and inside its consultation window; skipped when the
+// window is unknown.
+function approveBlockedReason(apt: Appointment): string | null {
+  const start = apt.windowStartRaw?.slice(0, 5);
+  const end = apt.windowEndRaw?.slice(0, 5);
+  if (!start || !end) return null;
+  if (apt.date.slice(0, 10) !== getManilaDateString()) return `You can only approve on the scheduled date (${apt.date.slice(0, 10)}).`;
+  const now = manilaTimeNow();
+  if (now < start) return `The consultation window hasn't opened yet (opens ${start}).`;
+  if (now > end) return 'The consultation window has already ended.';
+  return null;
+}
+
+const isFutureAppointment = (apt: Appointment) => apt.date.slice(0, 10) > getManilaDateString();
 
 interface NavItem {
   key: string;
@@ -243,6 +264,14 @@ export default function ProfessorAppointmentScreen() {
   // modal component for the identical reason.
   const [commentTarget, setCommentTarget] = useState<Appointment | null>(null);
   const [commentText, setCommentText] = useState('');
+  // Actions Taken starts collapsed on every card (matches web's CommentBlock).
+  const [openComments, setOpenComments] = useState<Set<number>>(new Set());
+  const toggleComment = (id: number) =>
+    setOpenComments((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const router = useRouter();
   const { user, logout, token } = useAuth();
@@ -351,6 +380,14 @@ export default function ProfessorAppointmentScreen() {
     activeTab === 'all' ? rangeFiltered : rangeFiltered.filter((a) => a.status === activeTab);
 
   const requestAction = (type: ActionType, apt: Appointment) => {
+    if (type === 'approve') {
+      const blocked = approveBlockedReason(apt);
+      if (blocked) { Alert.alert('Cannot approve yet', blocked); return; }
+    }
+    if (type === 'complete' && isFutureAppointment(apt)) {
+      Alert.alert('Not yet', "This appointment hasn't happened yet.");
+      return;
+    }
     if (type === 'reject') {
       setRejectReason('');
       setRejectTarget(apt);
@@ -656,17 +693,18 @@ export default function ProfessorAppointmentScreen() {
 
                     <View style={styles.commentSection}>
                       <View style={styles.commentHeaderRow}>
-                        <View style={styles.commentHeaderTitleRow}>
-                          <Ionicons name="chatbubble-outline" size={14} color={theme.tertiary} />
+                        <Pressable style={styles.commentHeaderTitleRow} onPress={() => toggleComment(apt.id)} hitSlop={8}>
+                          <Ionicons name={openComments.has(apt.id) ? 'chevron-down' : 'chevron-forward'} size={14} color={theme.tertiary} />
                           <Text style={styles.commentHeaderTitle}>Actions Taken</Text>
-                        </View>
+                          {!!apt.sharedComment && <Text style={styles.commentRecordedPill}>Recorded</Text>}
+                        </Pressable>
                         {apt.status === 'approved' && (
                           <Pressable onPress={() => openCommentModal(apt)} hitSlop={8}>
-                            <Text style={styles.commentEditLink}>{apt.sharedComment ? 'Edit Actions Taken' : 'Add Actions Taken'}</Text>
+                            <Text style={styles.commentEditLink}>{apt.sharedComment ? 'Edit' : 'Add'}</Text>
                           </Pressable>
                         )}
                       </View>
-                      {apt.sharedComment ? (
+                      {openComments.has(apt.id) && (apt.sharedComment ? (
                         <>
                           <Text style={styles.commentText}>{apt.sharedComment}</Text>
                           {apt.commentUpdatedAt && (
@@ -678,13 +716,13 @@ export default function ProfessorAppointmentScreen() {
                         </>
                       ) : (
                         <Text style={styles.commentEmpty}>No actions taken recorded yet.</Text>
-                      )}
+                      ))}
                     </View>
 
                     <View style={styles.apptFooter}>
                       {apt.status === 'pending' && (
                         <View style={styles.apptActionsRow}>
-                          <Pressable style={[styles.apptBtn, styles.apptBtnApprove]} onPress={() => requestAction('approve', apt)}>
+                          <Pressable style={[styles.apptBtn, styles.apptBtnApprove, !!approveBlockedReason(apt) && { opacity: 0.45 }]} onPress={() => requestAction('approve', apt)}>
                             <Ionicons name="checkmark-outline" size={14} color="#ffffff" />
                             <Text style={styles.apptBtnText}>Approve</Text>
                           </Pressable>
@@ -696,7 +734,7 @@ export default function ProfessorAppointmentScreen() {
                       )}
                       {apt.status === 'approved' && (
                         <View style={styles.apptActionsRow}>
-                          <Pressable style={[styles.apptBtn, styles.apptBtnComplete]} onPress={() => requestAction('complete', apt)}>
+                          <Pressable style={[styles.apptBtn, styles.apptBtnComplete, isFutureAppointment(apt) && { opacity: 0.45 }]} onPress={() => requestAction('complete', apt)}>
                             <Ionicons name="checkmark-outline" size={14} color="#ffffff" />
                             <Text style={styles.apptBtnText}>Mark Complete</Text>
                           </Pressable>
@@ -797,7 +835,7 @@ export default function ProfessorAppointmentScreen() {
         userName={user?.name ?? 'Faculty'}
         userDept={user?.departmentName ?? ''}
         isAvailable={isAvailable}
-        onToggleAvailability={toggleAvailability}
+        onToggleAvailability={(v) => toggleAvailability(v, () => setMenuOpen(false))}
       />
 
       <ConfirmActionModal
@@ -1265,6 +1303,7 @@ function createStyles(theme: ThemePalette) {
     commentHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     commentHeaderTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     commentHeaderTitle: { fontSize: 11, fontWeight: '700', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
+    commentRecordedPill: { fontSize: 10, fontWeight: '700', color: '#16a34a', backgroundColor: 'rgba(34,197,94,0.15)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
     commentEditLink: { fontSize: 12, fontWeight: '700', color: '#16a34a' },
     commentText: { fontSize: 12.5, fontWeight: '600', color: theme.text, lineHeight: 17 },
     commentMeta: { fontSize: 10.5, color: theme.tertiary, marginTop: 2 },

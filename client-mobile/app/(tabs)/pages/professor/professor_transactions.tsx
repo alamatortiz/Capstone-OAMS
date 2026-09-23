@@ -19,7 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DatePickerSheet from '@/components/DatePickerSheet';
 import { toLocalYMD, fromLocalYMD, getManilaDateString, formatManilaDate, formatManilaTime } from '@/utils/date';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -198,7 +198,11 @@ const formatTimeOnly = (dateStr: string) => {
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 };
 
-const csvEscape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+// Leading = + - @ is prefixed with ' so spreadsheets don't run it as a formula.
+const csvEscape = (value: unknown) => {
+  const str = String(value ?? '');
+  return `"${(/^[=+@-]/.test(str) ? `'${str}` : str).replace(/"/g, '""')}"`;
+};
 
 export default function ProfessorTransactionsScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
@@ -563,9 +567,8 @@ export default function ProfessorTransactionsScreen() {
                 )}
               </View>
               {showStartPicker && (
-                <DateTimePicker
-                  value={startDate ? new Date(startDate) : new Date()}
-                  mode="date"
+                <DatePickerSheet
+                  value={startDate ? fromLocalYMD(startDate) : new Date()}
                   maximumDate={fromLocalYMD(getManilaDateString())}
                   onChange={(event, selectedDate) => {
                     setShowStartPicker(false);
@@ -574,10 +577,10 @@ export default function ProfessorTransactionsScreen() {
                 />
               )}
               {showEndPicker && (
-                <DateTimePicker
-                  value={endDate ? new Date(endDate) : new Date()}
-                  mode="date"
-                  minimumDate={fromLocalYMD(getManilaDateString())}
+                <DatePickerSheet
+                  value={endDate ? fromLocalYMD(endDate) : new Date()}
+                  minimumDate={startDate ? fromLocalYMD(startDate) : undefined}
+                  maximumDate={fromLocalYMD(getManilaDateString())}
                   onChange={(event, selectedDate) => {
                     setShowEndPicker(false);
                     if (event.type === 'set' && selectedDate) setEndDate(toLocalYMD(selectedDate));
@@ -722,7 +725,7 @@ export default function ProfessorTransactionsScreen() {
               <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
-            <ProfessorAvailabilityToggle isAvailable={isAvailable} onToggle={toggleAvailability} styles={styles} />
+            <ProfessorAvailabilityToggle isAvailable={isAvailable} onToggle={(v) => toggleAvailability(v, () => setMenuOpen(false))} styles={styles} />
 
             <View style={styles.drawerNav}>
               {navItems.map((item) => {

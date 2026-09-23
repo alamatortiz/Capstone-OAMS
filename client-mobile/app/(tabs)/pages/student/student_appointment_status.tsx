@@ -31,7 +31,7 @@ import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/ut
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
-import { formatManilaDate, formatManilaTime } from '@/utils/date';
+import { formatManilaDate, formatManilaTime, getManilaDateString } from '@/utils/date';
 import { filterByRange } from '@/utils/dateRange';
 
 // Mirrors web's CSS `spin 1s linear infinite` on Loader2 for loading states.
@@ -130,6 +130,8 @@ interface Appointment {
   createdAt: string;
   appointmentType?: string;
   rejectionReason?: string;
+  bookingYearProgram?: string | null;
+  courseCode?: string | null;
   slotNote?: string | null;
   sharedComment?: string | null;
   commentUpdatedBy?: 'student' | 'faculty' | null;
@@ -272,6 +274,8 @@ export default function StudentAppointmentStatusScreen() {
           createdAt: a.createdAt,
           appointmentType: a.appointmentType ?? undefined,
           rejectionReason: a.rejectionReason ?? undefined,
+          bookingYearProgram: a.bookingYearProgram ?? null,
+          courseCode: a.courseCode ?? null,
           slotNote: a.slotNote ?? null,
           sharedComment: a.sharedComment ?? null,
           commentUpdatedBy: a.commentUpdatedBy ?? null,
@@ -514,6 +518,18 @@ export default function StudentAppointmentStatusScreen() {
                     <Text style={styles.detailLabel}>Location</Text>
                     <Text style={styles.detailValue}>{selectedAppt.location}</Text>
                   </View>
+                  {selectedAppt.bookingYearProgram ? (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Year &amp; Program</Text>
+                      <Text style={styles.detailValue}>{selectedAppt.bookingYearProgram}</Text>
+                    </View>
+                  ) : null}
+                  {selectedAppt.courseCode ? (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Course Code</Text>
+                      <Text style={styles.detailValue}>{selectedAppt.courseCode}</Text>
+                    </View>
+                  ) : null}
                   {selectedAppt.purpose ? (
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Purpose</Text>
@@ -586,7 +602,7 @@ export default function StudentAppointmentStatusScreen() {
                     <View style={styles.rejectNotice}>
                       <XCircle size={20} color="#ef4444" />
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.rejectNoticeTitle}>This appointment was automatically cancelled because it wasn't marked as served in time.</Text>
+                        <Text style={styles.rejectNoticeTitle}>This appointment was automatically cancelled because it wasn&apos;t marked as served in time.</Text>
                         {selectedAppt.cancelReason ? (
                           <Text style={styles.rejectNoticeReason}>Details: {selectedAppt.cancelReason}</Text>
                         ) : null}
@@ -636,7 +652,7 @@ export default function StudentAppointmentStatusScreen() {
               )}
 
               {/* Report as Not Served */}
-              {selectedAppt.status === 'approved' && (
+              {selectedAppt.status === 'approved' && !selectedAppt.sharedComment && selectedAppt.date.slice(0, 10) <= getManilaDateString() && (
                 <View style={[styles.infoCard, styles.reportCard]}>
                   <View style={[styles.infoCardHeader, styles.reportCardHeader]}>
                     <AlertCircle size={18} color="#f59e0b" />
@@ -787,6 +803,18 @@ export default function StudentAppointmentStatusScreen() {
                             <Text style={styles.listItemFieldLabel}>Location</Text>
                             <Text style={styles.listItemFieldValue}>{appt.location}</Text>
                           </View>
+                          {appt.bookingYearProgram ? (
+                            <View style={styles.listItemFieldFull}>
+                              <Text style={styles.listItemFieldLabel}>Year &amp; Program</Text>
+                              <Text style={styles.listItemFieldValue}>{appt.bookingYearProgram}</Text>
+                            </View>
+                          ) : null}
+                          {appt.courseCode ? (
+                            <View style={styles.listItemFieldFull}>
+                              <Text style={styles.listItemFieldLabel}>Course Code</Text>
+                              <Text style={styles.listItemFieldValue}>{appt.courseCode}</Text>
+                            </View>
+                          ) : null}
                           {appt.purpose ? (
                             <View style={styles.listItemFieldFull}>
                               <Text style={styles.listItemFieldLabel}>Purpose</Text>

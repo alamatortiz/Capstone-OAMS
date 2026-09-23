@@ -28,6 +28,7 @@ import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { readCache, writeCache, CACHE_KEYS } from '@/utils/offlineCache';
 import OfflineBanner from '@/components/OfflineBanner';
+import { useIsOnline } from '@/context/NetworkContext';
 
 type LucideIconType = typeof Calendar;
 
@@ -137,6 +138,7 @@ export default function StudentFaqScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
   const { user, token, logout } = useAuth();
+  const isOnline = useIsOnline();
 
   const [faqs, setFaqs] = useState<FaqItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -162,12 +164,11 @@ export default function StudentFaqScreen() {
       writeCache(CACHE_KEYS.studentFaqs, list);
     } catch (err) {
       console.error('Failed to load FAQs:', err);
-      // Only fall back to the cache when there's nothing on screen yet --
-      // a background refresh failure with an already-loaded list keeps
-      // today's behavior (error card) rather than silently swapping in
-      // possibly-stale data over a list the student is already looking at.
+      // A list is already on screen (loaded live, or from the cache earlier):
+      // keep it -- search and expand/collapse are local, so they still work.
+      if (hasFaqsRef.current) return;
       let usedCache = false;
-      if (!hasFaqsRef.current) {
+      {
         const cached = await readCache<FaqItem[]>(CACHE_KEYS.studentFaqs);
         if (cached) {
           setFaqs(cached.data);
@@ -184,6 +185,13 @@ export default function StudentFaqScreen() {
   useEffect(() => {
     fetchFaqs();
   }, [fetchFaqs]);
+
+  // Coming back online: swap the offline copy for live data.
+  const wasOnlineRef = useRef(isOnline);
+  useEffect(() => {
+    if (isOnline && !wasOnlineRef.current) fetchFaqs();
+    wasOnlineRef.current = isOnline;
+  }, [isOnline, fetchFaqs]);
 
   // ── Live updates: silently refetch when an admin posts/edits/removes an
   // FAQ (mirrors stud-faqs.jsx's "faq:changed" -- unlike announcements, web's

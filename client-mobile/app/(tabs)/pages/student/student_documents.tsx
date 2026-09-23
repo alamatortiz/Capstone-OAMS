@@ -26,11 +26,11 @@ import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import NotificationBell from '@/components/NotificationBell';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DatePickerSheet from '@/components/DatePickerSheet';
 import * as DocumentPicker from 'expo-document-picker';
 import { connectSocket } from '@/utils/socket';
 import { DocStatus, getHubStatusMeta, normalizeDocStatus } from '@/utils/documentStatus';
-import { toLocalYMD } from '@/utils/date';
+import { toLocalYMD, fromLocalYMD } from '@/utils/date';
 
 // Mirrors the server's limits (server/middleware/upload.js) -- purely
 // advisory here for the running-total UI, the server stays authoritative.
@@ -895,9 +895,8 @@ export default function StudentDocumentsScreen() {
                   <Calendar size={16} color={theme.orange} />
                 </Pressable>
                 {showNeededByPicker && (
-                  <DateTimePicker
-                    value={formData.neededBy ? new Date(formData.neededBy) : tomorrowDate}
-                    mode="date"
+                  <DatePickerSheet
+                    value={formData.neededBy ? fromLocalYMD(formData.neededBy) : tomorrowDate}
                     minimumDate={tomorrowDate}
                     onChange={(event, selectedDate) => {
                       setShowNeededByPicker(false);
@@ -1003,9 +1002,8 @@ export default function StudentDocumentsScreen() {
                   <Calendar size={16} color={theme.orange} />
                 </Pressable>
                 {showSendNeededByPicker && (
-                  <DateTimePicker
-                    value={sendFormData.neededBy ? new Date(sendFormData.neededBy) : tomorrowDate}
-                    mode="date"
+                  <DatePickerSheet
+                    value={sendFormData.neededBy ? fromLocalYMD(sendFormData.neededBy) : tomorrowDate}
                     minimumDate={tomorrowDate}
                     onChange={(event, selectedDate) => {
                       setShowSendNeededByPicker(false);

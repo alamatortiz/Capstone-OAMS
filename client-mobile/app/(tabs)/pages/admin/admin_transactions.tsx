@@ -11,6 +11,7 @@ import {
   Text,
   TextInput,
   View,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -30,7 +31,7 @@ import {
   Users,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DatePickerSheet from '@/components/DatePickerSheet';
 import { toLocalYMD, fromLocalYMD, getManilaDateString } from '@/utils/date';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -40,6 +41,7 @@ import ExportMenu from '@/components/ExportMenu';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
+import { fetchAllPages } from '@/utils/offlineCache';
 import { exportRowsAsCsv } from '@/utils/csvExport';
 import { exportRowsAsPdf } from '@/utils/pdfExport';
 
@@ -109,6 +111,7 @@ interface Transaction {
   details: string;
   status: TxStatus;
   trackingNumber?: string | null;
+  sharedComment?: string | null;
   timestamp: string;
 }
 
@@ -150,10 +153,10 @@ const STATUS_META: Record<string, { label: string; bg: string; border: string; c
   cancelled: { label: 'Cancelled', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', color: '#ef4444' },
   pending: { label: 'Pending', bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)', color: '#f59e0b' },
   processing: { label: 'Processing', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6' },
-  ready: { label: 'Ready', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
+  ready: { label: 'Ready for Pickup', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
   // Defensive aliases for rows that predate the lifeline collapse.
-  generated: { label: 'Ready', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
-  released: { label: 'Ready', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
+  generated: { label: 'Ready for Pickup', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
+  released: { label: 'Ready for Pickup', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
   claimed: { label: 'Claimed', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
   no_show: { label: 'No Show', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', color: '#ef4444' },
   created: { label: 'Created', bg: 'rgba(20, 184, 166, 0.15)', border: 'rgba(20, 184, 166, 0.3)', color: '#14b8a6' },
@@ -204,6 +207,8 @@ export default function AdminTransactionsScreen() {
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [selectField, setSelectField] = useState<SelectField>(null);
   const [page, setPage] = useState(0);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [totalPages, setTotalPages] = useState(1);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [stats, setStats] = useState({ total: 0, queue: 0, appointments: 0, documents: 0, adminActions: 0 });
   const [loading, setLoading] = useState(true);
@@ -232,6 +237,11 @@ export default function AdminTransactionsScreen() {
           status: filterStatus,
           startDate: startDate || undefined,
           endDate: endDate || undefined,
+          // Search + paging run server-side so they cover the full history,
+          // not just the newest 200 rows (mirrors web's adm-transactions).
+          search: debouncedSearch || undefined,
+          page: page + 1,
+          limit: PAGE_SIZE,
         },
       });
       if (requestId !== requestIdRef.current) return;
@@ -247,10 +257,12 @@ export default function AdminTransactionsScreen() {
           details: t.details,
           status: t.status,
           trackingNumber: t.trackingNumber ?? null,
+          sharedComment: t.sharedComment ?? null,
           timestamp: t.timestamp,
         })),
       );
       if (data.stats) setStats(data.stats);
+      setTotalPages(data.totalPages ?? 1);
     } catch (err) {
       if (requestId !== requestIdRef.current) return;
       console.error('Failed to load transactions:', err);
@@ -258,7 +270,13 @@ export default function AdminTransactionsScreen() {
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [filterType, filterStatus, startDate, endDate]);
+  }, [filterType, filterStatus, startDate, endDate, debouncedSearch, page]);
+
+  // Debounce the search box so each keystroke doesn't hit the server.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 400);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   useEffect(() => {
     fetchTransactions();
@@ -322,40 +340,49 @@ export default function AdminTransactionsScreen() {
     router.replace('/login');
   };
 
-  const filteredTransactions = transactions.filter((t) => {
-    const q = searchQuery.trim().toLowerCase();
-    const matchesSearch =
-      !q ||
-      t.studentName?.toLowerCase().includes(q) ||
-      t.studentId?.toLowerCase().includes(q) ||
-      t.processor?.toLowerCase().includes(q) ||
-      t.details?.toLowerCase().includes(q);
-    return matchesSearch;
-  });
-
   // Shared by both export formats -- same header/rows every time, PDF is
   // just a second consumer of the identical data (mirrors web's
   // exportPdf.js/ExportMenu.jsx pairing).
-  const buildExportRows = () => {
-    const header = ['Type', 'Action', 'Requester', 'Processor', 'Details', 'Status', 'Tracking', 'Timestamp'];
-    const rows = filteredTransactions.map((t) => [
-      TYPE_META[t.type]?.label ?? DEFAULT_TYPE_META.label,
+  const buildExportRows = async () => {
+    // Every page of the current filters (100/page), not just the visible one.
+    const all = await fetchAllPages<any>(async (p) => {
+      const { data } = await api.get('/admin/transactions', {
+        params: {
+          type: filterType,
+          status: filterStatus,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+          search: debouncedSearch || undefined,
+          page: p,
+          limit: 100,
+        },
+      });
+      return { items: data.transactions ?? [], totalPages: data.totalPages ?? 1 };
+    }, 100);
+    const withComment = filterType === 'appointment';
+    const header = [
+      'Type', 'Action', 'Requester', 'Processor', 'Details', 'Status', 'Tracking',
+      ...(withComment ? ['Comment'] : []), 'Timestamp',
+    ];
+    const rows = all.map((t) => [
+      TYPE_META[t.type as TxType]?.label ?? DEFAULT_TYPE_META.label,
       t.action,
       t.studentName ? `${t.studentName} (${t.studentId ?? ''})` : '',
       t.processor,
       t.details,
       STATUS_META[t.status]?.label ?? DEFAULT_STATUS_META.label,
       t.trackingNumber ?? '',
+      ...(withComment ? [t.sharedComment ?? ''] : []),
       t.timestamp,
     ]);
     return { header, rows };
   };
 
   const handleExportCsv = async () => {
-    if (filteredTransactions.length === 0 || exporting) return;
+    if (transactions.length === 0 || exporting) return;
     setExporting(true);
     try {
-      const { header, rows } = buildExportRows();
+      const { header, rows } = await buildExportRows();
       const csvRows = rows.map((row) => Object.fromEntries(header.map((h, i) => [h, row[i]])));
       const fileName = `transactions-${new Date().toISOString().slice(0, 10)}.csv`;
       await exportRowsAsCsv(csvRows, fileName);
@@ -368,10 +395,10 @@ export default function AdminTransactionsScreen() {
   };
 
   const handleExportPdf = async () => {
-    if (filteredTransactions.length === 0 || exporting) return;
+    if (transactions.length === 0 || exporting) return;
     setExporting(true);
     try {
-      const { header, rows } = buildExportRows();
+      const { header, rows } = await buildExportRows();
       const fileName = `transactions-${new Date().toISOString().slice(0, 10)}.pdf`;
       await exportRowsAsPdf({
         title: 'Transaction Log',
@@ -388,13 +415,12 @@ export default function AdminTransactionsScreen() {
     }
   };
 
+  // Any filter/search change starts over at the first page.
   useEffect(() => {
     setPage(0);
-  }, [searchQuery, filterType, filterStatus, startDate, endDate]);
+  }, [debouncedSearch, filterType, filterStatus, startDate, endDate]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages - 1);
-  const pagedTransactions = filteredTransactions.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+  const safePage = page;
 
   const STAT_TINTS = {
     total: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.3)', color: theme.primary },
@@ -503,9 +529,9 @@ export default function AdminTransactionsScreen() {
               </View>
               <ExportMenu
                 theme={theme}
-                triggerStyle={[styles.exportBtn, filteredTransactions.length === 0 && styles.exportBtnDisabled]}
+                triggerStyle={[styles.exportBtn, transactions.length === 0 && styles.exportBtnDisabled]}
                 triggerTextStyle={styles.exportBtnText}
-                disabled={filteredTransactions.length === 0 || exporting}
+                disabled={transactions.length === 0 || exporting}
                 busy={exporting}
                 onExportCsv={handleExportCsv}
                 onExportPdf={handleExportPdf}
@@ -563,9 +589,8 @@ export default function AdminTransactionsScreen() {
               </View>
             </View>
             {showStartPicker && (
-              <DateTimePicker
-                value={startDate ? new Date(startDate) : new Date()}
-                mode="date"
+              <DatePickerSheet
+                value={startDate ? fromLocalYMD(startDate) : new Date()}
                 maximumDate={fromLocalYMD(getManilaDateString())}
                 onChange={(event, selectedDate) => {
                   setShowStartPicker(false);
@@ -574,10 +599,10 @@ export default function AdminTransactionsScreen() {
               />
             )}
             {showEndPicker && (
-              <DateTimePicker
-                value={endDate ? new Date(endDate) : new Date()}
-                mode="date"
-                minimumDate={fromLocalYMD(getManilaDateString())}
+              <DatePickerSheet
+                value={endDate ? fromLocalYMD(endDate) : new Date()}
+                minimumDate={startDate ? fromLocalYMD(startDate) : undefined}
+                maximumDate={fromLocalYMD(getManilaDateString())}
                 onChange={(event, selectedDate) => {
                   setShowEndPicker(false);
                   if (event.type === 'set' && selectedDate) setEndDate(toLocalYMD(selectedDate));
@@ -600,9 +625,9 @@ export default function AdminTransactionsScreen() {
                 <Text style={styles.filterSelectText}>Retry</Text>
               </Pressable>
             </View>
-          ) : filteredTransactions.length > 0 ? (
+          ) : transactions.length > 0 ? (
             <View style={styles.txList}>
-              {pagedTransactions.map((t) => {
+              {transactions.map((t) => {
                 const typeMeta = TYPE_META[t.type] ?? DEFAULT_TYPE_META;
                 const statusMeta = STATUS_META[t.status] ?? DEFAULT_STATUS_META;
                 return (
@@ -635,6 +660,9 @@ export default function AdminTransactionsScreen() {
                     {t.trackingNumber && (
                       <Text style={styles.txTracking}>Tracking #{t.trackingNumber}</Text>
                     )}
+                    {t.type === 'appointment' && t.sharedComment ? (
+                      <Text style={styles.txDetails}>Actions taken: {t.sharedComment}</Text>
+                    ) : null}
                     <Text style={styles.txProcessor}>Processed by: {t.processor}</Text>
 
                     <View style={styles.txMetaRow}>
@@ -1047,7 +1075,7 @@ function createStyles(theme: ThemePalette) {
     facultyBadgeText: { fontSize: 10, fontWeight: '700', color: '#8b5cf6' },
     txDetails: { fontSize: 12, color: theme.subtext, lineHeight: 16 },
     txProcessor: { fontSize: 10, color: theme.tertiary },
-    txTracking: { fontSize: 10, color: theme.tertiary, fontFamily: 'monospace' },
+    txTracking: { fontSize: 10, color: theme.tertiary, fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }) },
     txMetaRow: {
       flexDirection: 'row',
       alignItems: 'center',

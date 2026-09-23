@@ -115,11 +115,11 @@ export default function SuperadminPinnacleSyncScreen() {
   const [activeTab, setActiveTab] = useState<PinnacleTab>('configuration');
   const [apiUrl, setApiUrl] = useState('https://pinnacle-api.pnc.edu.ph/v1');
   const [apiKey, setApiKey] = useState('');
+  const [apiKeySet, setApiKeySet] = useState(false);
   const [syncInterval, setSyncInterval] = useState('60');
   const [syncEnabled, setSyncEnabled] = useState(false);
   const [syncStats, setSyncStats] = useState({ total: 0, students: 0, professors: 0, admins: 0 });
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isTesting, setIsTesting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [syncMessage, setSyncMessage] = useState<SyncMessage | null>(null);
 
@@ -139,7 +139,8 @@ export default function SuperadminPinnacleSyncScreen() {
         ]);
         const cfg = cfgRes.data;
         setApiUrl(cfg.apiUrl);
-        setApiKey(cfg.apiKey);
+        // Server never returns the stored key anymore, only whether one is set.
+        setApiKeySet(Boolean(cfg.apiKeySet));
         setSyncInterval(String(cfg.syncInterval));
         setSyncEnabled(cfg.syncEnabled);
         const s = statsRes.data;
@@ -184,12 +185,10 @@ export default function SuperadminPinnacleSyncScreen() {
   // Connection in quick succession clearing the newer message early), and so
   // neither fires a state update after the screen has unmounted.
   const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const testTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
       if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
-      if (testTimeoutRef.current) clearTimeout(testTimeoutRef.current);
     };
   }, []);
 
@@ -208,28 +207,24 @@ export default function SuperadminPinnacleSyncScreen() {
         syncInterval: parseInt(syncInterval, 10) || 60,
         syncEnabled,
       });
+      if (apiKey.trim()) setApiKeySet(true);
+      setApiKey('');
       flashMessage({ type: 'success', text: 'Configuration saved successfully.' });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to save configuration:', err);
-      flashMessage({ type: 'error', text: 'Failed to save configuration.' });
+      flashMessage({ type: 'error', text: err?.response?.data?.error || 'Failed to save configuration.' });
     } finally {
       setIsSaving(false);
     }
   };
 
+  // The server no longer fakes a successful test: the integration isn't
+  // connected yet, so say so instead of reporting a made-up result.
   const handleTestConnection = () => {
-    if (testTimeoutRef.current) clearTimeout(testTimeoutRef.current);
-    setIsTesting(true);
-    setSyncMessage({ type: 'info', text: 'Testing connection to PinnaCle API...' });
-    testTimeoutRef.current = setTimeout(() => {
-      setIsTesting(false);
-      flashMessage(
-        syncEnabled
-          ? { type: 'success', text: 'Connection successful!' }
-          : { type: 'error', text: 'Connection failed. Please check your API key.' },
-        4000
-      );
-    }, 1500);
+    flashMessage(
+      { type: 'warning', text: 'Pinnacle integration is not connected yet. The saved URL and key are stored for later use.' },
+      4000
+    );
   };
 
   const handleSyncNow = async () => {
@@ -245,16 +240,16 @@ export default function SuperadminPinnacleSyncScreen() {
       const s = statsRes.data;
       setSyncStats({ total: s.total, students: s.students, professors: s.professors, admins: s.admins });
       flashMessage({ type: 'success', text: res.data.message || 'Sync completed successfully.' });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Sync failed:', err);
-      flashMessage({ type: 'error', text: 'Sync failed. Please try again.' });
+      flashMessage({ type: 'error', text: err?.response?.data?.error || 'Sync failed. Please try again.' });
     } finally {
       setIsSyncing(false);
     }
   };
 
   const stats = [
-    { key: 'total', label: 'Total Synced Users', value: syncStats.total, tint: 'blue' as const },
+    { key: 'total', label: 'Total OAMS Users', value: syncStats.total, tint: 'blue' as const },
     { key: 'students', label: 'Students', value: syncStats.students, tint: 'green' as const },
     { key: 'professors', label: 'Professors', value: syncStats.professors, tint: 'purple' as const },
     { key: 'admins', label: 'Admins', value: syncStats.admins, tint: 'orange' as const },
@@ -393,7 +388,7 @@ export default function SuperadminPinnacleSyncScreen() {
                 </Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter your PinnaCle API key"
+                  placeholder={apiKeySet ? 'Key saved — leave blank to keep it' : 'Enter your PinnaCle API key'}
                   placeholderTextColor={theme.tertiary}
                   value={apiKey}
                   onChangeText={setApiKey}
@@ -435,9 +430,9 @@ export default function SuperadminPinnacleSyncScreen() {
                   <Settings size={15} color="#ffffff" />
                   <Text style={styles.primaryBtnText}>{isSaving ? 'Saving…' : 'Save Configuration'}</Text>
                 </Pressable>
-                <Pressable style={styles.secondaryBtn} onPress={handleTestConnection} disabled={isTesting}>
-                  {isTesting ? <RefreshCw size={15} color={theme.text} /> : <Zap size={15} color={theme.text} />}
-                  <Text style={styles.secondaryBtnText}>{isTesting ? 'Testing...' : 'Test Connection'}</Text>
+                <Pressable style={styles.secondaryBtn} onPress={handleTestConnection}>
+                  <Zap size={15} color={theme.text} />
+                  <Text style={styles.secondaryBtnText}>Test Connection</Text>
                 </Pressable>
               </View>
             </View>

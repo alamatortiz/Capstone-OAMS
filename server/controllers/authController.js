@@ -66,7 +66,7 @@ const fetchUserProfile = async (userId, role) => {
 };
 
 const login = async (req, res) => {
-  const { emailOrSchoolId, password } = req.body;
+  const { emailOrSchoolId, password, keepLoggedIn } = req.body;
   const ipAddress = req.ip || req.headers["x-forwarded-for"] || "";
   const userAgent = req.headers["user-agent"] || "";
 
@@ -176,8 +176,14 @@ const login = async (req, res) => {
       userId: user.user_id,
       role: user.role,
     };
+    // "Keep me logged in" (mobile student login only): a longer-lived token so
+    // the student's saved announcements/FAQs/transactions stay reachable
+    // offline for weeks instead of the session lapsing after a day.
+    const keepLong = keepLoggedIn === true && user.role === "student";
     const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
-      expiresIn: process.env.JWT_EXPIRES_IN || "24h",
+      expiresIn: keepLong
+        ? process.env.JWT_KEEP_LOGGED_IN_EXPIRES_IN || "30d"
+        : process.env.JWT_EXPIRES_IN || "24h",
     });
 
     await pool.query(

@@ -91,6 +91,10 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  // Students only: signs in with a 30-day session so saved FAQs, announcements
+  // and transactions stay readable offline. Other roles never see it.
+  const [keepLoggedIn, setKeepLoggedIn] = useState(true);
+  const showKeepLoggedIn = !APP_VARIANT || APP_VARIANT === 'student';
   const { isDarkMode, toggleTheme } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -115,7 +119,7 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
-      const authedUser = await login(email, password);
+      const authedUser = await login(email, password, showKeepLoggedIn && keepLoggedIn);
       const routeRole = getRouteRole(authedUser.role);
 
       const allowedRoles = APP_VARIANT ? VARIANT_ALLOWED_ROUTE_ROLES[APP_VARIANT] : null;
@@ -268,6 +272,28 @@ export default function LoginScreen() {
                   </Pressable>
                 </View>
               </View>
+
+              {showKeepLoggedIn && (
+                <Pressable
+                  style={styles.keepRow}
+                  onPress={() => setKeepLoggedIn((prev) => !prev)}
+                  disabled={isLoading}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: keepLoggedIn }}
+                >
+                  <Ionicons
+                    name={keepLoggedIn ? 'checkbox' : 'square-outline'}
+                    size={20}
+                    color={keepLoggedIn ? '#22c55e' : theme.inputIcon}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.keepLabel}>Keep me logged in</Text>
+                    <Text style={styles.keepHint}>
+                      Stay signed in for 30 days and read your FAQs, announcements and transactions offline.
+                    </Text>
+                  </View>
+                </Pressable>
+              )}
 
               {/* Submit */}
               <Pressable
@@ -459,6 +485,9 @@ function createStyles(theme: ThemePalette) {
       fontWeight: '600',
       color: theme.text,
     },
+    keepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    keepLabel: { fontSize: 13, fontWeight: '600', color: theme.text },
+    keepHint: { fontSize: 11, color: theme.subtext, marginTop: 2 },
     inputWrap: {
       position: 'relative',
       justifyContent: 'center',

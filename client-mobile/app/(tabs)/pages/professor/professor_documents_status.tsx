@@ -12,6 +12,7 @@ import {
   StyleSheet,
   Text,
   View,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -622,7 +623,7 @@ export default function ProfessorDocumentsStatusScreen() {
               <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
-            <ProfessorAvailabilityToggle isAvailable={isAvailable} onToggle={toggleAvailability} styles={styles} />
+            <ProfessorAvailabilityToggle isAvailable={isAvailable} onToggle={(v) => toggleAvailability(v, () => setMenuOpen(false))} styles={styles} />
 
             <View style={styles.drawerNav}>
               {navItems.map((item) => {
@@ -1326,7 +1327,7 @@ function createStyles(theme: ThemePalette) {
     listClaimedDate: { fontSize: 11, color: theme.tertiary, marginTop: 2 },
     listClaimedTime: { fontSize: 10, color: theme.tertiary },
     listTracking: { fontSize: 10, color: theme.tertiary, marginTop: 2 },
-    listTrackingValue: { fontFamily: 'monospace', fontWeight: '700', color: theme.orange, letterSpacing: 0.3 },
+    listTrackingValue: { fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }), fontWeight: '700', color: theme.orange, letterSpacing: 0.3 },
 
     statusBadgePill: {
       borderWidth: 1, borderRadius: 8, paddingVertical: 3, paddingHorizontal: 8, flexShrink: 0,
@@ -1418,7 +1419,7 @@ function createStyles(theme: ThemePalette) {
     rejectNoticeTitle: { fontSize: 13.5, fontWeight: '700', color: '#ef4444' },
     rejectNoticeReason: { fontSize: 12.5, color: theme.text, marginTop: 4, lineHeight: 18 },
 
-    trackingBig: { fontSize: 22, fontWeight: '800', color: theme.orange, fontFamily: 'monospace', letterSpacing: 1 },
+    trackingBig: { fontSize: 22, fontWeight: '800', color: theme.orange, fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }), letterSpacing: 1 },
     trackingCaption: { fontSize: 11, color: theme.tertiary, marginTop: 4 },
 
     // Cancel card
@@ -1443,7 +1444,7 @@ function createStyles(theme: ThemePalette) {
     // Digital Pickup Code card (QR + text code)
     qrWrap: { alignItems: 'center', paddingVertical: 8, gap: 12 },
     qrBox: { padding: 12, backgroundColor: '#ffffff', borderRadius: 12 },
-    deliveryCodeText: { fontSize: 15, fontWeight: '700', color: theme.text, fontFamily: 'monospace', letterSpacing: 1 },
+    deliveryCodeText: { fontSize: 15, fontWeight: '700', color: theme.text, fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }), letterSpacing: 1 },
     claimedNote: { fontSize: 12, color: theme.subtext, textAlign: 'center', marginTop: 4 },
 
     // Nav drawer

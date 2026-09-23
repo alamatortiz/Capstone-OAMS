@@ -1035,7 +1035,7 @@ export default function ProfessorScheduleManagerScreen() {
         userName={user?.name ?? 'Faculty'}
         userDept={user?.departmentName ?? ''}
         isAvailable={isAvailable}
-        onToggleAvailability={toggleAvailability}
+        onToggleAvailability={(v) => toggleAvailability(v, () => setMenuOpen(false))}
       />
 
       <QueueReasonModal

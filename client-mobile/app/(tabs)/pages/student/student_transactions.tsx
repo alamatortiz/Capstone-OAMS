@@ -19,7 +19,7 @@ import {
   Megaphone, Search, Users, ClipboardList,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DatePickerSheet from '@/components/DatePickerSheet';
 import { toLocalYMD, fromLocalYMD, getManilaDateString, formatManilaDate, formatManilaTime } from '@/utils/date';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -30,7 +30,8 @@ import NotificationBell from '@/components/NotificationBell';
 import ExportMenu from '@/components/ExportMenu';
 import { exportRowsAsCsv } from '@/utils/csvExport';
 import { exportRowsAsPdf } from '@/utils/pdfExport';
-import { readCache, writeCache, CACHE_KEYS } from '@/utils/offlineCache';
+import { readCache, writeCache, CACHE_KEYS, fetchAllPages, isOfflineLikeError } from '@/utils/offlineCache';
+import { useIsOnline } from '@/context/NetworkContext';
 import OfflineBanner from '@/components/OfflineBanner';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 
@@ -161,6 +162,41 @@ const STATUS_OPTIONS = [
   { value: 'cancelled', label: 'Cancelled' },
 ];
 
+const PAGE_SIZE = 20;
+
+interface TxFilters {
+  search: string;
+  type: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+}
+
+// Local mirror of GET /student/transactions' filters (title/details search,
+// type, status, Manila-date range), so the cached full history can be
+// searched and filtered while offline exactly like the live list.
+function filterTransactionsLocal(all: Transaction[], f: TxFilters): Transaction[] {
+  const q = f.search.toLowerCase();
+  return all.filter((t) => {
+    if (f.type !== 'all' && t.type !== f.type) return false;
+    if (f.status !== 'all' && t.status !== f.status) return false;
+    if (f.startDate && t.date < f.startDate) return false;
+    if (f.endDate && t.date > f.endDate) return false;
+    if (q && !(t.title ?? '').toLowerCase().includes(q) && !(t.details ?? '').toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+
+function computeTxStats(list: Transaction[]) {
+  const month = getManilaDateString().slice(0, 7);
+  return {
+    total: list.length,
+    completed: list.filter((t) => t.status === 'completed').length,
+    ongoing: list.filter((t) => t.status === 'ongoing').length,
+    thisMonth: list.filter((t) => t.date.startsWith(month)).length,
+  };
+}
+
 export default function StudentTransactionsScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -186,6 +222,7 @@ export default function StudentTransactionsScreen() {
   const [offlineCachedAt, setOfflineCachedAt] = useState<string | null>(null);
   const router = useRouter();
   const { user, token, logout } = useAuth();
+  const isOnline = useIsOnline();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -221,6 +258,45 @@ export default function StudentTransactionsScreen() {
   // student_notifications.tsx: pageNum is always an explicit argument, never
   // read from `page` state, so a filter change re-fires the mount effect
   // below with pageNum=1 with no extra reset logic needed).
+  // Downloads the whole (unfiltered) history in the background whenever we're
+  // online, throttled to once a minute, so it's there to search offline.
+  const lastSyncRef = useRef(0);
+  const syncFullHistory = useCallback(async () => {
+    if (Date.now() - lastSyncRef.current < 60000) return;
+    lastSyncRef.current = Date.now();
+    try {
+      const all = await fetchAllPages<Transaction>(async (p) => {
+        const { data } = await api.get('/student/transactions', { params: { limit: 100, page: p } });
+        return { items: data.transactions ?? [], totalPages: data.totalPages ?? 1 };
+      }, 30);
+      await writeCache(CACHE_KEYS.studentTransactionsAll, all);
+    } catch (err) {
+      lastSyncRef.current = 0;
+      console.error('Offline history sync failed:', err);
+    }
+  }, []);
+
+  // Offline path: same search/filters/paging as the server, applied to the
+  // cached full history. Returns false when nothing has been cached yet.
+  const applyOfflineCache = useCallback(async (pageNum: number): Promise<boolean> => {
+    const cached = await readCache<Transaction[]>(CACHE_KEYS.studentTransactionsAll);
+    if (!cached) return false;
+    const filtered = filterTransactionsLocal(cached.data, {
+      search: debouncedSearch,
+      type: filterType,
+      status: filterStatus,
+      startDate,
+      endDate,
+    });
+    setTransactions(filtered.slice(0, pageNum * PAGE_SIZE));
+    setPage(pageNum);
+    setTotalPages(Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)));
+    setTxStats(computeTxStats(filtered));
+    setTxError(null);
+    setOfflineCachedAt(cached.cachedAt);
+    return true;
+  }, [debouncedSearch, filterType, filterStatus, startDate, endDate]);
+
   const fetchTransactions = useCallback(async (pageNum = 1) => {
     const requestId = ++requestIdRef.current;
     try {
@@ -232,7 +308,7 @@ export default function StudentTransactionsScreen() {
           status: filterStatus !== 'all' ? filterStatus : undefined,
           startDate: startDate || undefined,
           endDate: endDate || undefined,
-          limit: 20,
+          limit: PAGE_SIZE,
           page: pageNum,
         },
       });
@@ -244,27 +320,19 @@ export default function StudentTransactionsScreen() {
       if (data.stats) setTxStats(data.stats);
       setTxError(null);
       setOfflineCachedAt(null);
-      // Only the page-1 view is cached (not every filter/search combination)
-      // -- that's what a student reasonably expects to still see offline.
-      if (pageNum === 1) writeCache(CACHE_KEYS.studentTransactions, newTransactions);
+      // Keep a full unfiltered copy for offline search/filter/export.
+      if (pageNum === 1) syncFullHistory();
     } catch (err) {
       if (requestId !== requestIdRef.current) return;
-      console.error('Failed to fetch transactions:', err);
-      let usedCache = false;
-      if (transactionsRef.current.length === 0) {
-        const cached = await readCache<Transaction[]>(CACHE_KEYS.studentTransactions);
-        if (cached) {
-          setTransactions(cached.data);
-          setOfflineCachedAt(cached.cachedAt);
-          usedCache = true;
-        }
+      if (isOfflineLikeError(err)) {
+        // Offline: serve the same search/filters/paging from the local copy.
+        if (await applyOfflineCache(pageNum)) return;
       }
-      if (!usedCache) {
-        if (transactionsRef.current.length === 0) {
-          setTxError('Could not load your transaction history.');
-        } else {
-          Toast.show({ type: 'error', text1: 'Could not refresh your transaction history.' });
-        }
+      console.error('Failed to fetch transactions:', err);
+      if (transactionsRef.current.length === 0) {
+        setTxError('Could not load your transaction history.');
+      } else {
+        Toast.show({ type: 'error', text1: 'Could not refresh your transaction history.' });
       }
     } finally {
       if (requestId === requestIdRef.current) {
@@ -272,7 +340,7 @@ export default function StudentTransactionsScreen() {
         setLoadingMore(false);
       }
     }
-  }, [debouncedSearch, filterType, filterStatus, startDate, endDate]);
+  }, [debouncedSearch, filterType, filterStatus, startDate, endDate, applyOfflineCache, syncFullHistory]);
 
   // Background refresh (socket/queue-events/poll, below) -- re-fetches every
   // page currently on screen and replaces the list in one shot, so it
@@ -291,7 +359,7 @@ export default function StudentTransactionsScreen() {
               status: filterStatus !== 'all' ? filterStatus : undefined,
               startDate: startDate || undefined,
               endDate: endDate || undefined,
-              limit: 20,
+              limit: PAGE_SIZE,
               page: i + 1,
             },
           }),
@@ -306,17 +374,26 @@ export default function StudentTransactionsScreen() {
       if (last?.stats) setTxStats(last.stats);
       setTxError(null);
       setOfflineCachedAt(null);
-      writeCache(CACHE_KEYS.studentTransactions, merged);
+      syncFullHistory();
     } catch (err) {
       if (requestId !== requestIdRef.current) return;
+      // A dropped connection mid-refresh is expected -- stay quiet.
+      if (isOfflineLikeError(err)) return;
       console.error('Failed to refresh transactions:', err);
       Toast.show({ type: 'error', text1: 'Could not refresh your transaction history.' });
     }
-  }, [debouncedSearch, filterType, filterStatus, startDate, endDate]);
+  }, [debouncedSearch, filterType, filterStatus, startDate, endDate, syncFullHistory]);
 
   useEffect(() => {
     fetchTransactions(1);
   }, [fetchTransactions]);
+
+  // Coming back online: replace the offline copy with live data.
+  const wasOnlineRef = useRef(isOnline);
+  useEffect(() => {
+    if (isOnline && !wasOnlineRef.current) fetchTransactions(1);
+    wasOnlineRef.current = isOnline;
+  }, [isOnline, fetchTransactions]);
 
   const handleLoadMore = () => {
     if (loadingMore || page >= totalPages) return;
@@ -391,20 +468,43 @@ export default function StudentTransactionsScreen() {
   // page is currently loaded on-screen -- mirrors stud-transactions.jsx's
   // own fetchExportRows(), a separate one-shot fetch capped at 100 rows.
   const fetchExportRows = async () => {
-    const { data } = await api.get('/student/transactions', {
-      params: {
-        search: debouncedSearch || undefined,
-        type: filterType !== 'all' ? filterType : undefined,
-        status: filterStatus !== 'all' ? filterStatus : undefined,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-        limit: 100,
-        page: 1,
-      },
-    });
-    const header = ['Type', 'Title', 'Details', 'Status', 'College', 'Date', 'Time'];
-    const rows = (data.transactions ?? []).map((t: Transaction) => [
-      t.type, t.title, t.details, t.status, t.college, t.date, t.time,
+    // Page through everything (100/page) -- a single request silently
+    // truncated histories over 100 rows.
+    let all: Transaction[];
+    try {
+      all = await fetchAllPages<Transaction>(async (p) => {
+        const { data } = await api.get('/student/transactions', {
+          params: {
+            search: debouncedSearch || undefined,
+            type: filterType !== 'all' ? filterType : undefined,
+            status: filterStatus !== 'all' ? filterStatus : undefined,
+            startDate: startDate || undefined,
+            endDate: endDate || undefined,
+            limit: 100,
+            page: p,
+          },
+        });
+        return { items: data.transactions ?? [], totalPages: data.totalPages ?? 1 };
+      }, 100);
+    } catch (err) {
+      // Offline: export from the locally saved history with the same filters.
+      if (!isOfflineLikeError(err)) throw err;
+      const cached = await readCache<Transaction[]>(CACHE_KEYS.studentTransactionsAll);
+      if (!cached) throw err;
+      all = filterTransactionsLocal(cached.data, {
+        search: debouncedSearch, type: filterType, status: filterStatus, startDate, endDate,
+      });
+      Toast.show({ type: 'info', text1: 'Offline: exporting your saved history.' });
+    }
+    // Mirrors web: the Comment column only appears when exporting appointments.
+    const withComment = filterType === 'appointment';
+    const cap = (v: string) => (v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, ' ') : '');
+    const header = ['Type', 'Title', 'Details', 'Status', 'College', ...(withComment ? ['Comment'] : []), 'Date', 'Time'];
+    const rows = all.map((t) => [
+      cap(t.type === 'submission' ? 'document submission' : t.type === 'document' ? 'document request' : t.type),
+      t.title, t.details, cap(t.status), t.college,
+      ...(withComment ? [t.sharedComment ?? ''] : []),
+      t.date, t.time,
     ]);
     return { header, rows };
   };
@@ -600,9 +700,8 @@ export default function StudentTransactionsScreen() {
                 )}
               </View>
               {showStartPicker && (
-                <DateTimePicker
-                  value={startDate ? new Date(startDate) : new Date()}
-                  mode="date"
+                <DatePickerSheet
+                  value={startDate ? fromLocalYMD(startDate) : new Date()}
                   maximumDate={fromLocalYMD(getManilaDateString())}
                   onChange={(event, selectedDate) => {
                     setShowStartPicker(false);
@@ -611,10 +710,10 @@ export default function StudentTransactionsScreen() {
                 />
               )}
               {showEndPicker && (
-                <DateTimePicker
-                  value={endDate ? new Date(endDate) : new Date()}
-                  mode="date"
-                  minimumDate={fromLocalYMD(getManilaDateString())}
+                <DatePickerSheet
+                  value={endDate ? fromLocalYMD(endDate) : new Date()}
+                  minimumDate={startDate ? fromLocalYMD(startDate) : undefined}
+                  maximumDate={fromLocalYMD(getManilaDateString())}
                   onChange={(event, selectedDate) => {
                     setShowEndPicker(false);
                     if (event.type === 'set' && selectedDate) setEndDate(toLocalYMD(selectedDate));

@@ -462,7 +462,7 @@ export default function ProfessorAnnouncementScreen() {
               <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
-            <ProfessorAvailabilityToggle isAvailable={isAvailable} onToggle={toggleAvailability} styles={styles} />
+            <ProfessorAvailabilityToggle isAvailable={isAvailable} onToggle={(v) => toggleAvailability(v, () => setMenuOpen(false))} styles={styles} />
 
             <View style={styles.drawerNav}>
               {navItems.map((item) => {

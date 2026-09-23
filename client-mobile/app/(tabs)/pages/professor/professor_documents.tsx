@@ -28,8 +28,8 @@ import ProfessorAvailabilityToggle from '@/components/ProfessorAvailabilityToggl
 import { useProfessorAvailability } from '@/hooks/useProfessorAvailability';
 import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import { DocStatus, getHubStatusMeta, normalizeDocStatus } from '@/utils/documentStatus';
-import { toLocalYMD, formatManilaDate, formatManilaTime } from '@/utils/date';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { toLocalYMD, fromLocalYMD, formatManilaDate, formatManilaTime } from '@/utils/date';
+import DatePickerSheet from '@/components/DatePickerSheet';
 import * as DocumentPicker from 'expo-document-picker';
 
 // Mirrors the server's limits (server/middleware/upload.js) -- purely
@@ -972,9 +972,8 @@ export default function ProfessorDocumentsScreen() {
                   <Ionicons name="calendar-outline" size={16} color={theme.subtext} />
                 </Pressable>
                 {showNeededByPicker && (
-                  <DateTimePicker
-                    value={formData.neededBy ? new Date(formData.neededBy) : tomorrowDate}
-                    mode="date"
+                  <DatePickerSheet
+                    value={formData.neededBy ? fromLocalYMD(formData.neededBy) : tomorrowDate}
                     minimumDate={tomorrowDate}
                     onChange={(event, selectedDate) => {
                       setShowNeededByPicker(false);
@@ -1084,9 +1083,8 @@ export default function ProfessorDocumentsScreen() {
                   <Ionicons name="calendar-outline" size={16} color={theme.subtext} />
                 </Pressable>
                 {showSendNeededByPicker && (
-                  <DateTimePicker
-                    value={sendFormData.neededBy ? new Date(sendFormData.neededBy) : tomorrowDate}
-                    mode="date"
+                  <DatePickerSheet
+                    value={sendFormData.neededBy ? fromLocalYMD(sendFormData.neededBy) : tomorrowDate}
                     minimumDate={tomorrowDate}
                     onChange={(event, selectedDate) => {
                       setShowSendNeededByPicker(false);
@@ -1226,7 +1224,7 @@ export default function ProfessorDocumentsScreen() {
         userName={user?.name ?? 'Faculty'}
         userDept={user?.departmentName ?? ''}
         isAvailable={isAvailable}
-        onToggleAvailability={toggleAvailability}
+        onToggleAvailability={(v) => toggleAvailability(v, () => setMenuOpen(false))}
       />
 
       <QueueReasonModal

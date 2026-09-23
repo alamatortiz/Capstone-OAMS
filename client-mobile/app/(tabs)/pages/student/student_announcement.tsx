@@ -32,7 +32,8 @@ import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/ut
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
-import { readCache, writeCache, CACHE_KEYS } from '@/utils/offlineCache';
+import { readCache, writeCache, CACHE_KEYS, fetchAllPages, isOfflineLikeError } from '@/utils/offlineCache';
+import { useIsOnline } from '@/context/NetworkContext';
 import OfflineBanner from '@/components/OfflineBanner';
 
 type LucideIconType = typeof Megaphone;
@@ -161,6 +162,8 @@ const formatPostedLabel = (announcement: { date: string; isReposted: boolean }) 
   return `${label}: ${formatted}`;
 };
 
+const ANNOUNCEMENTS_PAGE_SIZE = 10;
+
 type FilterTabKey = 'pinned' | 'all' | AnnouncementCategory;
 
 const FILTER_TABS: { key: FilterTabKey; label: string }[] = [
@@ -204,6 +207,7 @@ export default function StudentAnnouncementScreen() {
   const [selectedFilter, setSelectedFilter] = useState<FilterTabKey>('pinned');
   const router = useRouter();
   const { user, token, logout } = useAuth();
+  const isOnline = useIsOnline();
 
   // Holds whatever page(s) have been loaded for the CURRENT tab only --
   // filtering/pagination now happens server-side (see fetchAnnouncements),
@@ -234,6 +238,39 @@ export default function StudentAnnouncementScreen() {
   // wrong tab's list (mirrors student_transactions.tsx's requestIdRef).
   const requestIdRef = useRef(0);
 
+  // Downloads every announcement (category "all", all pages) whenever we're
+  // online so the tabs can be browsed from the local copy while offline.
+  const lastSyncRef = useRef(0);
+  const syncAllAnnouncements = useCallback(async () => {
+    if (Date.now() - lastSyncRef.current < 60000) return;
+    lastSyncRef.current = Date.now();
+    try {
+      const all = await fetchAllPages<Announcement>(async (p) => {
+        const { data } = await api.get('/student/announcements', { params: { category: 'all', page: p } });
+        return { items: data.announcements ?? [], totalPages: data.totalPages ?? 1 };
+      }, 30);
+      await writeCache(CACHE_KEYS.studentAnnouncementsAll, all);
+    } catch (err) {
+      lastSyncRef.current = 0;
+      console.error('Offline announcements sync failed:', err);
+    }
+  }, []);
+
+  // Offline path: same tab filter + paging as the server, on the local copy
+  // (server order is already pinned-first, newest-first). False = no copy yet.
+  const applyOfflineCache = useCallback(async (pageNum: number, category: FilterTabKey): Promise<boolean> => {
+    const cached = await readCache<Announcement[]>(CACHE_KEYS.studentAnnouncementsAll);
+    if (!cached) return false;
+    const filtered = cached.data.filter((a) =>
+      category === 'all' ? true : category === 'pinned' ? a.isPinned : a.category === category,
+    );
+    setAnnouncements(filtered.slice(0, pageNum * ANNOUNCEMENTS_PAGE_SIZE));
+    setPage(pageNum);
+    setTotalPages(Math.max(1, Math.ceil(filtered.length / ANNOUNCEMENTS_PAGE_SIZE)));
+    setOfflineCachedAt(cached.cachedAt);
+    return true;
+  }, []);
+
   const fetchAnnouncements = useCallback(async (pageNum: number, category: FilterTabKey) => {
     const requestId = ++requestIdRef.current;
     setError(null);
@@ -248,27 +285,17 @@ export default function StudentAnnouncementScreen() {
       setPage(data.page ?? pageNum);
       setTotalPages(data.totalPages ?? 1);
       setOfflineCachedAt(null);
-      // Only the page-1 view is cached (not every tab/page combination) --
-      // that's what a student reasonably expects to still see offline.
-      if (pageNum === 1) writeCache(CACHE_KEYS.studentAnnouncements, fetched);
+      if (pageNum === 1) syncAllAnnouncements();
     } catch (err) {
       if (requestId !== requestIdRef.current) return;
-      console.error('Fetch announcements error:', err);
-      let usedCache = false;
-      if (announcementsRef.current.length === 0) {
-        const cached = await readCache<Announcement[]>(CACHE_KEYS.studentAnnouncements);
-        if (cached) {
-          setAnnouncements(cached.data);
-          setOfflineCachedAt(cached.cachedAt);
-          usedCache = true;
-        }
+      if (isOfflineLikeError(err)) {
+        if (await applyOfflineCache(pageNum, category)) return;
       }
-      if (!usedCache) {
-        if (announcementsRef.current.length === 0) {
-          setError('Could not load announcements. Please try again.');
-        } else {
-          Toast.show({ type: 'error', text1: 'Could not refresh announcements.' });
-        }
+      console.error('Fetch announcements error:', err);
+      if (announcementsRef.current.length === 0) {
+        setError('Could not load announcements. Please try again.');
+      } else {
+        Toast.show({ type: 'error', text1: 'Could not refresh announcements.' });
       }
     } finally {
       if (requestId === requestIdRef.current) {
@@ -276,7 +303,7 @@ export default function StudentAnnouncementScreen() {
         setLoadingMore(false);
       }
     }
-  }, []);
+  }, [applyOfflineCache, syncAllAnnouncements]);
 
   // Background refresh (socket, below) -- re-fetches every page currently on
   // screen and replaces the list in one shot, so it doesn't collapse
@@ -298,13 +325,14 @@ export default function StudentAnnouncementScreen() {
       setPage(last?.page ?? upTo);
       setTotalPages(last?.totalPages ?? 1);
       setOfflineCachedAt(null);
-      writeCache(CACHE_KEYS.studentAnnouncements, merged);
+      syncAllAnnouncements();
     } catch (err) {
       if (requestId !== requestIdRef.current) return;
+      if (isOfflineLikeError(err)) return;
       console.error('Failed to refresh announcements:', err);
       Toast.show({ type: 'error', text1: 'Could not refresh announcements.' });
     }
-  }, []);
+  }, [syncAllAnnouncements]);
 
   // Fresh load at page 1 whenever the mount happens or the selected tab
   // changes -- explicitly shows the loading state since the visible content
@@ -313,6 +341,13 @@ export default function StudentAnnouncementScreen() {
     setLoading(true);
     fetchAnnouncements(1, selectedFilter);
   }, [selectedFilter, fetchAnnouncements]);
+
+  // Coming back online: swap the offline copy for live data.
+  const wasOnlineRef = useRef(isOnline);
+  useEffect(() => {
+    if (isOnline && !wasOnlineRef.current) fetchAnnouncements(1, selectedFilter);
+    wasOnlineRef.current = isOnline;
+  }, [isOnline, fetchAnnouncements, selectedFilter]);
 
   const handleLoadMore = () => {
     if (loadingMore || page >= totalPages) return;
@@ -370,7 +405,10 @@ export default function StudentAnnouncementScreen() {
       await Sharing.shareAsync(uri, { mimeType: attachment.mimeType ?? undefined });
     } catch (err) {
       console.error('Failed to download attachment:', err);
-      Alert.alert('Error', 'Could not open the attachment.');
+      Alert.alert(
+        isOfflineLikeError(err) ? 'You are offline' : 'Error',
+        isOfflineLikeError(err) ? 'Attachments need an internet connection to open.' : 'Could not open the attachment.',
+      );
     } finally {
       setDownloadingId(null);
     }

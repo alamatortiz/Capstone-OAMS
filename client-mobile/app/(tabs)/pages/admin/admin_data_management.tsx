@@ -28,6 +28,7 @@ import {
   Home as HomeIcon,
   Pencil,
   Plus,
+  RotateCcw,
   Trash2,
   X,
 } from 'lucide-react-native';
@@ -678,6 +679,18 @@ export default function AdminDataManagementScreen() {
     }
   };
 
+  // Brings an inactive document type back into the request form.
+  const reactivateDocType = async (id: string | number) => {
+    try {
+      await api.patch(`/admin/data-management/document-types/${id}/reactivate`);
+      Alert.alert('Done', 'Document type reactivated.');
+      fetchDocumentTypes(docStatusFilter);
+    } catch (err: any) {
+      console.error('Failed to reactivate document type:', err);
+      Alert.alert('Error', err?.response?.data?.error ?? 'Failed to reactivate the document type.');
+    }
+  };
+
   // ── Delete ────────────────────────────────────────────────────────────
   const runDeleteAction = async () => {
     if (!deleteTarget) return;
@@ -929,13 +942,23 @@ export default function AdminDataManagementScreen() {
                           >
                             <Pencil size={15} color="#3b82f6" />
                           </Pressable>
-                          <Pressable
-                            style={[styles.iconActionBtn, styles.iconActionBtnDelete]}
-                            onPress={() => setDeleteTarget({ type: 'document', id: doc.id, name: doc.name })}
-                            hitSlop={6}
-                          >
-                            <Trash2 size={15} color="#ef4444" />
-                          </Pressable>
+                          {doc.status === 'inactive' ? (
+                            <Pressable
+                              style={[styles.iconActionBtn, styles.iconActionBtnEdit]}
+                              onPress={() => reactivateDocType(doc.id)}
+                              hitSlop={6}
+                            >
+                              <RotateCcw size={15} color="#22c55e" />
+                            </Pressable>
+                          ) : (
+                            <Pressable
+                              style={[styles.iconActionBtn, styles.iconActionBtnDelete]}
+                              onPress={() => setDeleteTarget({ type: 'document', id: doc.id, name: doc.name })}
+                              hitSlop={6}
+                            >
+                              <Trash2 size={15} color="#ef4444" />
+                            </Pressable>
+                          )}
                         </View>
                       </View>
                     </View>

@@ -23,6 +23,7 @@ export default function ProfessorAvailabilityToggle({
         onValueChange={onToggle}
         trackColor={{ false: '#3f3f46', true: '#22c55e' }}
         thumbColor="#ffffff"
+        ios_backgroundColor="#3f3f46"
       />
     </View>
   );

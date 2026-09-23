@@ -14,6 +14,12 @@ const variantLabel = VARIANT_LABELS[process.env.APP_VARIANT];
 // Android/iOS both key installed-app identity off this string -- two
 // variants sharing one package name would silently overwrite each other on
 // the same test device instead of installing side by side.
+// Only the admin build scans QR codes (admin_scan_document.tsx); the combined
+// dev app (APP_VARIANT unset) keeps it too. Student/faculty drop the camera
+// plugin, its CAMERA/RECORD_AUDIO permissions, and (via
+// scripts/exclude-unused-native-modules.js) the native ML Kit barcode code.
+const needsCamera = !process.env.APP_VARIANT || process.env.APP_VARIANT === "admin";
+
 const appId = variantLabel ? `com.pnc.oams.${process.env.APP_VARIANT}` : "com.pnc.oams";
 
 module.exports = {
@@ -46,7 +52,10 @@ module.exports = {
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
-      permissions: ["android.permission.CAMERA", "android.permission.RECORD_AUDIO"],
+      permissions: needsCamera ? ["android.permission.CAMERA", "android.permission.RECORD_AUDIO"] : [],
+      // A leftover library manifest still merged these in after the plugin was
+      // dropped, so strip them explicitly from the builds that never use them.
+      ...(needsCamera ? {} : { blockedPermissions: ["android.permission.CAMERA", "android.permission.RECORD_AUDIO"] }),
     },
     web: {
       output: "static",
@@ -54,6 +63,16 @@ module.exports = {
     },
     plugins: [
       "expo-router",
+      ...(needsCamera
+        ? [
+            [
+              "expo-camera",
+              {
+                cameraPermission: "Allow $(PRODUCT_NAME) to access your camera to scan document QR codes.",
+              },
+            ],
+          ]
+        : []),
       [
         "expo-splash-screen",
         {
@@ -64,12 +83,6 @@ module.exports = {
           dark: {
             backgroundColor: "#000000",
           },
-        },
-      ],
-      [
-        "expo-camera",
-        {
-          cameraPermission: "Allow $(PRODUCT_NAME) to access your camera to scan document QR codes.",
         },
       ],
       "@react-native-community/datetimepicker",

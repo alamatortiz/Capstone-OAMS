@@ -1,4 +1,4 @@
-import { Modal, Pressable, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 // Shared by admin_queue_hosting.tsx (pause/close) and admin_queue.tsx
@@ -60,6 +60,7 @@ export default function QueueReasonModal({
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onCancel}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.modalOverlay}>
         <View style={styles.confirmModalCard}>
           <View style={[styles.confirmIconCircle, { backgroundColor: `${confirmColor}26` }]}>
@@ -90,6 +91,7 @@ export default function QueueReasonModal({
           </View>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

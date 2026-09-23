@@ -30,7 +30,7 @@ import {
   UserX,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DatePickerSheet from '@/components/DatePickerSheet';
 import { toLocalYMD, fromLocalYMD, getManilaDateString } from '@/utils/date';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -430,9 +430,8 @@ export default function AdminQueueAnalyticsScreen() {
                 )}
               </View>
               {showStartPicker && (
-                <DateTimePicker
-                  value={startDate ? new Date(startDate) : new Date()}
-                  mode="date"
+                <DatePickerSheet
+                  value={startDate ? fromLocalYMD(startDate) : new Date()}
                   maximumDate={fromLocalYMD(endDate || getManilaDateString())}
                   onChange={(event, selectedDate) => {
                     setShowStartPicker(false);
@@ -441,9 +440,8 @@ export default function AdminQueueAnalyticsScreen() {
                 />
               )}
               {showEndPicker && (
-                <DateTimePicker
-                  value={endDate ? new Date(endDate) : new Date()}
-                  mode="date"
+                <DatePickerSheet
+                  value={endDate ? fromLocalYMD(endDate) : new Date()}
                   minimumDate={startDate ? fromLocalYMD(startDate) : undefined}
                   maximumDate={fromLocalYMD(getManilaDateString())}
                   onChange={(event, selectedDate) => {

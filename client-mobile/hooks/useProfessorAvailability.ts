@@ -34,10 +34,18 @@ export function useProfessorAvailability() {
   // requires one -- the server 400s otherwise (professorRoutes.js) -- so that
   // path just opens the reason modal instead; the actual PATCH happens in
   // confirmMarkUnavailable() once the professor submits a reason.
-  const toggleAvailability = async (value: boolean) => {
+  // closeDrawer: iOS can't present a Modal while another (the nav drawer) is
+  // still visible, so the drawer is dismissed first and the reason modal opens
+  // after its fade-out finishes.
+  const toggleAvailability = async (value: boolean, closeDrawer?: () => void) => {
     if (!value) {
       setUnavailableReasonText('');
-      setUnavailableReasonModalOpen(true);
+      if (closeDrawer) {
+        closeDrawer();
+        setTimeout(() => setUnavailableReasonModalOpen(true), 350);
+      } else {
+        setUnavailableReasonModalOpen(true);
+      }
       return;
     }
     const prev = isAvailable;

@@ -2,7 +2,10 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
 function escapeCsvValue(value) {
-  const str = value == null ? '' : String(value);
+  let str = value == null ? '' : String(value);
+  // Spreadsheet formula-injection guard (matches web's utils/csv.js): a cell
+  // starting with = + - @ would otherwise run as a formula when opened.
+  if (/^[=+\-@]/.test(str)) str = `'${str}`;
   if (/[",\n]/.test(str)) {
     return `"${str.replace(/"/g, '""')}"`;
   }

@@ -1,6 +1,7 @@
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 import { router } from "expo-router";
+import { clearAllCache } from "./offlineCache";
 
 const api = axios.create({
   baseURL: process.env.EXPO_PUBLIC_API_URL,
@@ -44,6 +45,7 @@ api.interceptors.response.use(
       cachedToken = null;
       await SecureStore.deleteItemAsync("oams_token");
       await SecureStore.deleteItemAsync("oams_user");
+      await clearAllCache();
       router.replace("/login");
     }
     return Promise.reject(error);

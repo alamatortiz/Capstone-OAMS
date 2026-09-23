@@ -1,4 +1,4 @@
-import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Check, HelpCircle } from 'lucide-react-native';
 
 // Prompts the student for an optional concern before joining a queue.
@@ -74,6 +74,7 @@ export default function QueueConcernModal({
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onCancel}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.logoutOverlay}>
         {/* Universal join needs the room of the doc-request dialog (maxWidth 400,
             maxHeight 85%). Applied inline only here so the shared logout-modal
@@ -248,6 +249,7 @@ export default function QueueConcernModal({
           </View>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

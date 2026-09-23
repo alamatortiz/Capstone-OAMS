@@ -11,6 +11,7 @@ import {
   Text,
   TextInput,
   View,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -35,7 +36,7 @@ import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DatePickerSheet from '@/components/DatePickerSheet';
 import { toLocalYMD, fromLocalYMD, getManilaDateString } from '@/utils/date';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -1105,9 +1106,8 @@ export default function AdminDocumentProcessingScreen() {
                       Only applies once this document is marked Ready -- the requester sees it as a pickup deadline.
                     </Text>
                     {showClaimByPicker && (
-                      <DateTimePicker
+                      <DatePickerSheet
                         value={claimByDate ? fromLocalYMD(claimByDate) : fromLocalYMD(getManilaDateString())}
-                        mode="date"
                         minimumDate={fromLocalYMD(getManilaDateString())}
                         onChange={(event, selectedDate) => {
                           setShowClaimByPicker(false);
@@ -1666,7 +1666,7 @@ function createStyles(theme: ThemePalette) {
       backgroundColor: 'rgba(124, 58, 237, 0.08)',
     },
     deliveryCodeLabel: { fontSize: 11, fontWeight: '700', color: '#7c3aed', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
-    deliveryCodeValue: { fontSize: 13, fontWeight: '700', color: theme.text, fontFamily: 'monospace' },
+    deliveryCodeValue: { fontSize: 13, fontWeight: '700', color: theme.text, fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }) },
 
     detailsModalFooter: {
       flexDirection: 'row',

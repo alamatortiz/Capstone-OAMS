@@ -9,6 +9,7 @@ import React, {
 import * as SecureStore from "expo-secure-store";
 import api, { setCachedToken } from "../utils/api";
 import { disconnectSocket } from "../utils/socket";
+import { clearAllCache } from "../utils/offlineCache";
 import { ensureNotificationPermission } from "../utils/notifications";
 
 type Role = "student" | "faculty" | "admin" | "superadmin";
@@ -34,7 +35,7 @@ type AuthContextValue = {
   user: UserData | null;
   token: string | null;
   isLoading: boolean;
-  login: (emailOrSchoolId: string, password: string) => Promise<UserData>;
+  login: (emailOrSchoolId: string, password: string, keepLoggedIn?: boolean) => Promise<UserData>;
   logout: () => void;
   isAuthenticated: boolean;
 };
@@ -137,10 +138,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user) ensureNotificationPermission();
   }, [user]);
 
-  const login = async (emailOrSchoolId: string, password: string) => {
+  const login = async (emailOrSchoolId: string, password: string, keepLoggedIn = false) => {
     setIsLoading(true);
     try {
-      const response = await api.post("/auth/login", { emailOrSchoolId, password });
+      const response = await api.post("/auth/login", { emailOrSchoolId, password, keepLoggedIn });
       const normalized = normalizeUser(response.data.user);
       await saveAuthData(normalized, response.data.token);
       return normalized;
@@ -154,6 +155,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     clearAuthData();
+    // Offline copies belong to the account that just left this device.
+    clearAllCache();
     disconnectSocket();
     api.post("/auth/logout").catch((error) => console.error("Logout error:", error));
   };

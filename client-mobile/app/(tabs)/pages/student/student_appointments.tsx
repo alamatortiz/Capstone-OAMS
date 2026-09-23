@@ -375,11 +375,14 @@ export default function StudentAppointmentsScreen() {
 
     const slotEvents = ['appointment:slot-updated', 'appointment:slot-removed'];
     slotEvents.forEach((event) => socket.on(event, fetchSlots));
+    // A cancel frees its slot, so slots refetch too (matches web).
     socket.on('appointment:status-updated', fetchMyBookings);
+    socket.on('appointment:status-updated', fetchSlots);
 
     return () => {
       slotEvents.forEach((event) => socket.off(event, fetchSlots));
       socket.off('appointment:status-updated', fetchMyBookings);
+      socket.off('appointment:status-updated', fetchSlots);
     };
   }, [user, token, fetchSlots, fetchMyBookings]);
 
@@ -515,8 +518,8 @@ export default function StudentAppointmentsScreen() {
       Alert.alert('Missing information', 'Please select an appointment type.');
       return;
     }
-    if (!yearProgram.trim() || !courseCode.trim()) {
-      Alert.alert('Missing information', 'Please provide your year level and program, and course code.');
+    if (!yearProgram.trim()) {
+      Alert.alert('Missing information', 'Please provide your year level and program.');
       return;
     }
     setSubmitting(true);
@@ -1055,7 +1058,7 @@ export default function StudentAppointmentsScreen() {
                   </View>
 
                   <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>Course Code *</Text>
+                    <Text style={styles.formLabel}>Course Code (optional)</Text>
                     <TextInput
                       style={styles.textInput}
                       placeholder="e.g., CS 101"

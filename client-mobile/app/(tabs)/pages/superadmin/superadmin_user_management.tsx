@@ -230,7 +230,7 @@ export default function SuperadminUserManagementScreen() {
       setUsers(data.users ?? []);
     } catch (err) {
       console.error('Failed to load users:', err);
-      setError('Failed to load users.');
+      setError((err as any)?.response?.data?.error ?? 'Failed to load users.');
     } finally {
       setLoading(false);
     }
@@ -302,7 +302,7 @@ export default function SuperadminUserManagementScreen() {
       fetchUsers();
     } catch (err) {
       console.error('Failed to update user:', err);
-      Alert.alert('Error', 'Failed to update user');
+      Alert.alert('Error', (err as any)?.response?.data?.error ?? 'Failed to update user');
     }
   };
 
@@ -314,7 +314,7 @@ export default function SuperadminUserManagementScreen() {
       fetchUsers();
     } catch (err) {
       console.error('Failed to delete user:', err);
-      Alert.alert('Error', 'Failed to delete user');
+      Alert.alert('Error', (err as any)?.response?.data?.error ?? 'Failed to delete user');
     }
   };
   const handleResetPassword = async (u: AppUser) => {
@@ -323,7 +323,7 @@ export default function SuperadminUserManagementScreen() {
       Alert.alert('Temporary password generated', `${data.tempPassword}\n\nRelay this to ${u.name} manually.`);
     } catch (err) {
       console.error('Failed to reset password:', err);
-      Alert.alert('Error', 'Failed to reset password');
+      Alert.alert('Error', (err as any)?.response?.data?.error ?? 'Failed to reset password');
     }
   };
   const handleToggleSuspend = async (u: AppUser) => {
@@ -334,7 +334,7 @@ export default function SuperadminUserManagementScreen() {
       fetchUsers();
     } catch (err) {
       console.error('Failed to update account status:', err);
-      Alert.alert('Error', 'Failed to update account status');
+      Alert.alert('Error', (err as any)?.response?.data?.error ?? 'Failed to update account status');
     }
   };
 
