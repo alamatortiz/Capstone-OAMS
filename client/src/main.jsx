@@ -5,7 +5,6 @@ import {
   BrowserRouter,
   Routes,
   Route,
-  Navigate,
   useLocation,
 } from "react-router-dom";
 
@@ -23,6 +22,7 @@ const PrivacyPolicy = React.lazy(
   () => import("./pages/legal/PrivacyPolicy.jsx"),
 );
 import LoadingOverlay from "./components/LoadingOverlay.jsx";
+import OfflineBanner from "./components/OfflineBanner.jsx";
 import ErrorPage from "./components/ErrorPage.jsx";
 import ErrorPageRoute from "./components/ErrorPageRoute.jsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
@@ -132,6 +132,7 @@ createRoot(document.getElementById("root")).render(
   <StrictMode>
     <AuthProvider>
       <Toaster richColors position="top-right" />
+      <OfflineBanner />
       <QueueProvider>
       <FacultyProvider>
         <BrowserRouter>
@@ -255,10 +256,6 @@ createRoot(document.getElementById("root")).render(
                     <ProfessorAnnouncementsPage />
                   </Suspense>
                 }
-              />
-              <Route
-                path="/professor/queue"
-                element={<Navigate to="/professor/appointments" replace />}
               />
               {/* ★ Appointments page */}
               <Route

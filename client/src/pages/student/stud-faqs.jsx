@@ -5,13 +5,9 @@ import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
 import AccordionItem from "../../components/AccordionItem";
 import api from "../../utils/api";
-import { connectSocket } from "../../utils/socket";
-import { useAuth } from "../../context/AuthContext";
-import "./stud-announcements.css";
 import "./stud-faqs.css";
 
 export default function StudentFaqs() {
-  const { token } = useAuth();
   const [faqs, setFaqs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -31,20 +27,10 @@ export default function StudentFaqs() {
     }
   }, []);
 
+  // FAQs are static reference content: fetched on mount / Retry only.
   useEffect(() => {
     fetchFaqs();
   }, [fetchFaqs]);
-
-  // Live refresh when an admin adds/edits/removes an FAQ, mirroring
-  // stud-announcements.jsx's own socket-driven refresh pattern. fetchFaqs
-  // is a stable useCallback (empty deps), so it's safe to depend on here.
-  useEffect(() => {
-    if (!token) return;
-    const socket = connectSocket(token);
-    if (!socket) return;
-    socket.on("faq:changed", fetchFaqs);
-    return () => socket.off("faq:changed", fetchFaqs);
-  }, [token, fetchFaqs]);
 
   const trimmedQuery = searchQuery.trim().toLowerCase();
   const filteredFaqs = trimmedQuery

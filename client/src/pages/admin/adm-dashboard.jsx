@@ -5,7 +5,6 @@ import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import "./adm-dashboard.css";
 import api from "../../utils/api";
-import { useLiveRefetch } from "../../hooks/useLiveRefetch";
 import { getCollegeLogo } from "../../data/collegeLogo";
 import { parseOfficeHoursSchedule } from "../../utils/dateTime";
 import AdminPageShell from "../../components/AdminPageShell";
@@ -176,24 +175,6 @@ const quickActions = [
   },
 ];
 
-// Every source feeding a dashboard stat tile / the Faculty Availability preview.
-const DASHBOARD_LIVE_EVENTS = [
-  "queue:slot-opened",
-  "queue:slot-status",
-  "queue:called",
-  "queue:served",
-  "queue:no-show",
-  "queue:student-joined",
-  "queue:student-left",
-  "faculty:availability-status-changed",
-  "appointment:status-updated",
-  "appointment:slot-updated",
-  "appointment:slot-removed",
-  "document:new-request",
-  "document:status-updated",
-  "document:cancelled",
-];
-
 export default function AdminDashboard() {
   const { user: authUser } = useAuth();
   const user = authUser
@@ -243,14 +224,8 @@ export default function AdminDashboard() {
     if (authUser) fetchStats();
   }, [authUser, fetchStats]);
 
-  // ── Live updates: every stat tile + the Faculty Availability preview
-  // tracks its source in real time (queue events, faculty toggles,
-  // appointment/document changes). useLiveRefetch also refetches on socket
-  // reconnect.
-  useLiveRefetch(DASHBOARD_LIVE_EVENTS, fetchStats);
-
-  // ── Fallback poll: covers a silently-dropped/blocked WebSocket connection,
-  // same pattern as QueueProvider.jsx / stud-dashboard.jsx ──
+  // ── No socket listeners: stats load on mount and refresh on this light
+  // visible-tab poll. ──
   useEffect(() => {
     if (!authUser) return;
     const interval = setInterval(() => {

@@ -1,18 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+
+import { Link } from "react-router-dom";
 import { ChevronLeft, Bell, Clock, FileText, Calendar, Megaphone } from "lucide-react";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
 import FilterSelect from "../../components/FilterSelect";
 import Pagination from "../../components/Pagination";
-import {
-  NOTIFICATION_EVENTS,
-  NOTIFICATIONS_SYNC_EVENT,
-  broadcastNotificationsChanged,
-} from "../../components/NotificationBell";
-import api from "../../utils/api";
+import { useNotificationsPage } from "../../hooks/useNotificationsPage";
 import { formatManilaDateTime } from "../../utils/dateTime";
-import { useLiveRefetch } from "../../hooks/useLiveRefetch";
 
 import "./adm-notifications.css";
 
@@ -46,86 +40,10 @@ const TYPE_PATHS = {
 };
 
 export default function AdminNotifications() {
-  const navigate = useNavigate();
-  const [filterType, setFilterType] = useState("all");
-  const [page, setPage] = useState(1);
-  const [notifications, setNotifications] = useState([]);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  // Guards against out-of-order responses: e.g. changing the type filter and
-  // then the page before the first request resolves would otherwise let the
-  // stale response land after the fresh one and overwrite it. Each call
-  // captures the current token; a response is only applied if its token is
-  // still the latest by the time it resolves.
-  const requestIdRef = useRef(0);
-
-  const fetchNotifications = useCallback(async () => {
-    const requestId = ++requestIdRef.current;
-    try {
-      setError(null);
-      const res = await api.get("/admin/notifications", {
-        params: { type: filterType !== "all" ? filterType : undefined, page },
-      });
-      if (requestId !== requestIdRef.current) return;
-      setNotifications(res.data.notifications ?? []);
-      setTotalPages(res.data.totalPages ?? 1);
-    } catch (err) {
-      if (requestId !== requestIdRef.current) return;
-      console.error("Failed to fetch notifications:", err);
-      setError("Could not load your notifications.");
-    } finally {
-      if (requestId === requestIdRef.current) setLoading(false);
-    }
-  }, [filterType, page]);
-
-  useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
-
-  // Live updates (also reconciles on socket reconnect).
-  useLiveRefetch(NOTIFICATION_EVENTS, fetchNotifications);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (document.visibilityState === "visible") fetchNotifications();
-    }, 45000);
-    return () => clearInterval(interval);
-  }, [fetchNotifications]);
-
-  useEffect(() => {
-    window.addEventListener(NOTIFICATIONS_SYNC_EVENT, fetchNotifications);
-    return () => window.removeEventListener(NOTIFICATIONS_SYNC_EVENT, fetchNotifications);
-  }, [fetchNotifications]);
-
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
-
-  const markRead = async (id) => {
-    setNotifications((prev) => prev.map((n) => (n.notification_id === id ? { ...n, is_read: true } : n)));
-    try {
-      await api.patch(`/admin/notifications/${id}/read`);
-      broadcastNotificationsChanged();
-    } catch {
-      setNotifications((prev) => prev.map((n) => (n.notification_id === id ? { ...n, is_read: false } : n)));
-    }
-  };
-
-  const markAllRead = async () => {
-    const previous = notifications;
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    try {
-      await api.patch("/admin/notifications/read-all");
-      broadcastNotificationsChanged();
-    } catch {
-      setNotifications(previous);
-    }
-  };
-
-  const goToNotification = (n) => {
-    if (!n.is_read) markRead(n.notification_id);
-    navigate(TYPE_PATHS[n.type] ?? "/admin/dashboard");
-  };
+  const {
+    filterType, changeFilterType, page, setPage, notifications, totalPages,
+    loading, error, unreadCount, markAllRead, goToNotification,
+  } = useNotificationsPage({ basePath: "/admin", typePaths: TYPE_PATHS, fallbackPath: "/admin/dashboard" });
 
   return (
     <AdminPageShell outerClassName="adm-notifications-with-sidebar" mainClassName="adm-notifications-main">
@@ -159,7 +77,7 @@ export default function AdminNotifications() {
                 id="notif-type-select"
                 label="Type"
                 value={filterType}
-                onChange={(e) => { setFilterType(e.target.value); setPage(1); }}
+                onChange={(e) => changeFilterType(e.target.value)}
                 options={TYPE_OPTIONS}
                 chevronIcon={<ChevronDownIcon className="filter-chevron" />}
               />

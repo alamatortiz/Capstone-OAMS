@@ -476,7 +476,11 @@ export default function ProfessorScheduleManager() {
     } catch (err) {
       const msg = err?.response?.data?.message ?? "Failed to save time slot.";
       toast.error(msg);
-    } finally { setAddSaving(false); }
+    } finally {
+      setAddSaving(false);
+      // Unlock the modal after any failed/partial save so the user can fix and retry.
+      setShowSaveConfirm(false);
+    }
   };
 
   // ── Delete slot ─────────────────────────────────────────────────────────────
@@ -879,7 +883,7 @@ export default function ProfessorScheduleManager() {
                   <input
                     className="sa-tag-input"
                     type="text"
-                    placeholder={addApptTypes.length === 0 ? "e.g. Thesis Consultation, Grade Inquiry…" : "Add another…"}
+                    placeholder={addApptTypes.length === 0 ? "Enter appointment type (e.g. Thesis Consultation)" : "Enter another appointment type"}
                     value={addApptInput}
                     onChange={(e) => setAddApptInput(e.target.value)}
                     onKeyDown={(e) => {

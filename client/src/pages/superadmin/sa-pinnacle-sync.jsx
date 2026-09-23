@@ -146,6 +146,9 @@ const ClockIconSm = () => (
   </svg>
 );
 
+const NOT_CONNECTED_TEXT =
+  "Pinnacle integration is not connected yet. The URL and key can be saved for later, but no connection test or sync can run.";
+
 export default function SuperadminPinnacleSync() {
   const { user: authUser } = useAuth();
 
@@ -153,6 +156,7 @@ export default function SuperadminPinnacleSync() {
   const [activeTab, setActiveTab] = useState("configuration");
   const [apiUrl, setApiUrl] = useState("https://pinnacle-api.pnc.edu.ph/v1");
   const [apiKey, setApiKey] = useState("");
+  const [apiKeySet, setApiKeySet] = useState(false);
   const [syncInterval, setSyncInterval] = useState(60);
   const [syncEnabled, setSyncEnabled] = useState(false);
   const [syncStats, setSyncStats] = useState({ total: 0, students: 0, professors: 0, admins: 0 });
@@ -170,7 +174,7 @@ export default function SuperadminPinnacleSync() {
         ]);
         const cfg = cfgRes.data;
         setApiUrl(cfg.apiUrl);
-        setApiKey(cfg.apiKey);
+        setApiKeySet(!!cfg.apiKeySet);
         setSyncInterval(cfg.syncInterval);
         setSyncEnabled(cfg.syncEnabled);
         const s = statsRes.data;
@@ -185,43 +189,18 @@ export default function SuperadminPinnacleSync() {
   const handleSaveConfiguration = async () => {
     try {
       await api.post("/admin/pinnacle-sync/config", { apiUrl, apiKey, syncInterval, syncEnabled });
-      setSyncMessage({ type: "success", text: "Configuration saved successfully." });
+      if (apiKey.trim()) setApiKeySet(true);
+      setApiKey("");
+      setSyncMessage({ type: "success", text: "Configuration saved. (Pinnacle is not connected yet, so nothing will sync.)" });
     } catch (err) {
-      setSyncMessage({ type: "error", text: "Failed to save configuration." });
+      setSyncMessage({ type: "error", text: err?.response?.data?.error || "Failed to save configuration." });
     }
     setTimeout(() => setSyncMessage(null), 3000);
   };
 
   const handleTestConnection = () => {
-    setSyncMessage({ type: "info", text: "Testing connection to PinnaCle API..." });
-    setTimeout(() => {
-      setSyncMessage({
-        type: syncEnabled ? "success" : "error",
-        text: syncEnabled ? "Connection successful!" : "Connection failed. Please check your API key.",
-      });
-      setTimeout(() => setSyncMessage(null), 4000);
-    }, 1500);
-  };
-
-  const handleSyncNow = async () => {
-    if (!syncEnabled) {
-      setSyncMessage({ type: "warning", text: "PinnaCle sync is currently disabled. Enable it in the Configuration tab." });
-      return;
-    }
-    setIsSyncing(true);
-    setSyncMessage({ type: "info", text: "Syncing data from PinnaCle..." });
-    try {
-      const res = await api.post("/admin/pinnacle-sync/trigger");
-      const statsRes = await api.get("/admin/pinnacle-sync/stats");
-      const s = statsRes.data;
-      setSyncStats({ total: s.total, students: s.students, professors: s.professors, admins: s.admins });
-      setSyncMessage({ type: "success", text: res.data.message || "Sync completed successfully." });
-    } catch (err) {
-      setSyncMessage({ type: "error", text: "Sync failed. Please try again." });
-    } finally {
-      setIsSyncing(false);
-      setTimeout(() => setSyncMessage(null), 3000);
-    }
+    setSyncMessage({ type: "warning", text: NOT_CONNECTED_TEXT });
+    setTimeout(() => setSyncMessage(null), 4000);
   };
 
   return (
@@ -245,20 +224,23 @@ export default function SuperadminPinnacleSync() {
                 </p>
               </div>
             </div>
-            <div
-              className={`aps-sync-badge ${syncEnabled ? "aps-sync-badge--enabled" : "aps-sync-badge--disabled"}`}
-            >
+            <div className="aps-sync-badge aps-sync-badge--disabled">
               <span className="aps-sync-dot"></span>
-              {syncEnabled ? "Sync Enabled" : "Sync Disabled"}
+              Not connected
             </div>
           </div>
+          </div>
+
+          <div className="aps-alert aps-alert--warning">
+            <AlertTriangleIcon />
+            <span>{NOT_CONNECTED_TEXT}</span>
           </div>
 
           {/* Stat Cards */}
           <div className="aps-stats-grid">
             {[
               {
-                label: "Total Synced Users",
+                label: "Total OAMS Users",
                 value: syncStats.total,
                 color: "aps-stat-blue",
                 icon: <UsersIcon />,
@@ -305,7 +287,7 @@ export default function SuperadminPinnacleSync() {
               },
               {
                 key: "synced-users",
-                label: `Synced Users (${syncStats.total})`,
+                label: "Synced Users",
                 icon: <UsersIcon />,
               },
             ].map((tab) => (
@@ -361,10 +343,12 @@ export default function SuperadminPinnacleSync() {
                   className="aps-input"
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="Enter your PinnaCle API key"
+                  placeholder={apiKeySet ? "Key saved — leave blank to keep it" : "Enter your PinnaCle API key"}
+                  autoComplete="new-password"
                 />
                 <p className="aps-hint">
                   Authentication key for accessing PinnaCle API
+                  {apiKeySet ? " (a key is stored; it is never shown again)" : ""}
                 </p>
               </div>
 
@@ -430,23 +414,18 @@ export default function SuperadminPinnacleSync() {
               </div>
 
               <button
-                className={`aps-sync-now-btn ${isSyncing ? "aps-sync-now-btn--loading" : ""}`}
-                onClick={handleSyncNow}
-                disabled={isSyncing}
+                className="aps-sync-now-btn"
+                disabled
+                title="Pinnacle integration is not connected yet"
               >
                 <RefreshIcon />
-                {isSyncing ? "Syncing..." : "Sync Now from PinnaCle"}
+                Sync Now from PinnaCle
               </button>
 
-              {!syncEnabled && (
-                <div className="aps-alert aps-alert--warning">
-                  <AlertTriangleIcon />
-                  <span>
-                    PinnaCle sync is currently disabled. Enable it in the
-                    Configuration tab to sync user data.
-                  </span>
-                </div>
-              )}
+              <div className="aps-alert aps-alert--warning">
+                <AlertTriangleIcon />
+                <span>{NOT_CONNECTED_TEXT}</span>
+              </div>
 
               <div className="aps-how-it-works">
                 <h3 className="aps-how-title">How PinnaCle Sync Works</h3>
@@ -482,26 +461,14 @@ export default function SuperadminPinnacleSync() {
                 </p>
               </div>
 
-              {syncStats.total === 0 ? (
-                <div className="aps-empty-state">
-                  <DatabaseIcon />
-                  <h3 className="aps-empty-title">No Synced Users</h3>
-                  <p className="aps-empty-desc">
-                    Click "Sync Now" to import users from PinnaCle
-                  </p>
-                  <button
-                    className="aps-btn-primary"
-                    style={{ marginTop: "1rem" }}
-                    onClick={() => setActiveTab("sync-control")}
-                  >
-                    <RefreshIcon /> Go to Sync Control
-                  </button>
-                </div>
-              ) : (
-                <div className="aps-users-table">
-                  <p>Users will appear here after syncing.</p>
-                </div>
-              )}
+              <div className="aps-empty-state">
+                <DatabaseIcon />
+                <h3 className="aps-empty-title">No Synced Users</h3>
+                <p className="aps-empty-desc">
+                  Nothing has been imported from Pinnacle. The integration is
+                  not connected yet.
+                </p>
+              </div>
             </div>
           )}
         </div>

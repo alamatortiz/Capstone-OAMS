@@ -6,7 +6,6 @@ import { Link } from "react-router-dom";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
 import "./prof-dashboard.css";
 import api from "../../utils/api";
-import { connectSocket } from "../../utils/socket";
 import { getCollegeLogo } from "../../data/collegeLogo";
 import { formatManilaDateTime, parseOfficeHoursSchedule } from "../../utils/dateTime";
 
@@ -133,22 +132,6 @@ export default function ProfessorDashboard() {
     if (authUser) fetchStats();
   }, [authUser, fetchStats]);
 
-  // ── Live updates: refetch when an appointment or document status changes ──
-  useEffect(() => {
-    const token = localStorage.getItem("oams_token");
-    if (!authUser || !token) return;
-
-    const socket = connectSocket(token);
-    if (!socket) return;
-
-    const events = ["appointment:slot-updated", "appointment:status-updated", "document:status-updated"];
-    events.forEach((event) => socket.on(event, fetchStats));
-
-    return () => {
-      events.forEach((event) => socket.off(event, fetchStats));
-    };
-  }, [authUser, fetchStats]);
-
   // ── Announcements (for the Quick Actions tile's live pinned count) ────────
   // Kept separate from fetchStats/dashStats since it's an unrelated resource
   // (mirrors stud-dashboard.jsx's own separate announcements fetch).
@@ -165,19 +148,6 @@ export default function ProfessorDashboard() {
 
   useEffect(() => {
     if (authUser) fetchAnnouncements();
-  }, [authUser, fetchAnnouncements]);
-
-  useEffect(() => {
-    const token = localStorage.getItem("oams_token");
-    if (!authUser || !token) return;
-
-    const socket = connectSocket(token);
-    if (!socket) return;
-
-    socket.on("announcement:changed", fetchAnnouncements);
-    return () => {
-      socket.off("announcement:changed", fetchAnnouncements);
-    };
   }, [authUser, fetchAnnouncements]);
 
   // ── Office hours state (mirrors stud-dashboard.jsx's own fetch) ───────────

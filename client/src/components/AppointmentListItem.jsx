@@ -1,4 +1,5 @@
 import { Calendar, XCircle, CheckCircle2, AlertCircle, MapPin, Clock } from "lucide-react";
+import { getAppointmentActions } from "../utils/appointmentActions";
 import "./AppointmentListItem.css";
 
 const STATUS_META = {
@@ -30,9 +31,7 @@ export default function AppointmentListItem({
     label: appointment.status,
     cls: "apt-badge-pending",
   };
-  const canCancel = appointment.status === "pending" || appointment.status === "approved";
-  const canComplete = appointment.status === "approved";
-  const canReportNotServed = appointment.status === "approved" && !appointment.sharedComment;
+  const { canCancel, canComplete, canReportNotServed } = getAppointmentActions(appointment);
 
   return (
     <div

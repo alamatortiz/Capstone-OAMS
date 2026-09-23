@@ -74,12 +74,6 @@ router.get(
     const manilaToday = getManilaDateString();
 
     try {
-      // 0. Current availability status (global Available/Unavailable toggle)
-      const [[statusRow]] = await pool.query(
-        "SELECT availability_status FROM faculty WHERE faculty_id = ?",
-        [facultyId],
-      );
-
       // 1. Pending + today's appointments, plus the pending/approved split
       // that powers the "Pending Appointments" stat card's description
       // (mirrors student's own appointments.{pending,approved} breakdown).
@@ -94,14 +88,6 @@ router.get(
            AND status IN ('pending', 'approved')
            AND appointment_date >= ?`,
         [manilaToday, facultyId, manilaToday],
-      );
-
-      // 2. Distinct students with pending requests
-      const [[studentRow]] = await pool.query(
-        `SELECT COUNT(DISTINCT student_id) AS student_count
-         FROM appointments
-         WHERE faculty_id = ? AND status = 'pending'`,
-        [facultyId],
       );
 
       // 3. Faculty's own document requests, broken down by status -- mirrors
@@ -211,7 +197,6 @@ router.get(
       );
 
       res.json({
-        availabilityStatus: statusRow?.availability_status ?? "available",
         stats: {
           pendingAppointments: apptRow.pending_count || 0,
           appointments: {
@@ -219,7 +204,6 @@ router.get(
             approved: Number(apptRow.approved_only || 0),
           },
           todayAppointments: apptRow.today_count || 0,
-          studentRequests: studentRow.student_count || 0,
           documentsToReview: docCount,
           documents: {
             total: docCount + docReady,
@@ -454,6 +438,9 @@ router.get(
             r.window_start && r.window_end
               ? `${formatTime(r.window_start)} – ${formatTime(r.window_end)}`
               : formatTime(r.appointment_time),
+          // Raw consultation window (HH:MM:SS) so the client can gate Approve.
+          windowStartRaw: r.window_start ? String(r.window_start) : null,
+          windowEndRaw: r.window_end ? String(r.window_end) : null,
           location: r.location ?? "TBA",
           slotNote: r.slot_note ?? null,
           status: r.status,
@@ -661,7 +648,7 @@ router.patch(
 
     try {
       const [[appt]] = await pool.query(
-        `SELECT appointment_id, student_id, faculty_id, department_id, status, appointment_date
+        `SELECT appointment_id, student_id, faculty_id, department_id, status, appointment_date, shared_comment
          FROM appointments WHERE appointment_id = ? AND faculty_id = ?`,
         [id, facultyId],
       );
@@ -687,11 +674,15 @@ router.patch(
       emitToDept(appt.department_id, "appointment:comment-updated", {
         appointmentId: Number(id),
       });
-      createNotification(
-        appt.student_id,
-        `The professor added actions taken for your appointment on ${getManilaDateString(appt.appointment_date)}.`,
-        "appointment",
-      );
+      // Only notify when the text actually changed to a non-empty value
+      // (not on clearing or re-saving identical text).
+      if (trimmed && trimmed !== (appt.shared_comment ?? "").trim()) {
+        createNotification(
+          appt.student_id,
+          `The professor added actions taken for your appointment on ${getManilaDateString(appt.appointment_date)}.`,
+          "appointment",
+        );
+      }
 
       res.json({
         message: "Actions taken saved",
@@ -719,6 +710,15 @@ router.patch(
 // endpoint's response shape must stay backward-compatible for it (only the
 // URL path itself was renamed for mobile; no payload/shape changes are in
 // scope there). `title`/`details` are purely additive fields for web.
+//
+// Pagination (same limit rules as admin/student transactions: `limit` default
+// 20, max 100): when `page` is ABSENT the response is the legacy bare array of
+// every matching row (client-mobile depends on that). When `page` is PRESENT
+// the response is { transactions, total, totalPages, page, limit, stats } where
+// `stats` ({ total, completed, ongoing, thisMonth }) covers the FULL filtered
+// set, not just the page.
+// `search` matches student name / student ID / details / purpose / service /
+// title / tracking # for all three row types (where each field exists).
 router.get(
   "/transactions",
   authenticateToken,
@@ -761,8 +761,8 @@ router.get(
         }
         if (search) {
           sql +=
-            " AND (s.first_name LIKE ? OR s.last_name LIKE ? OR s.student_number LIKE ?)";
-          params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+            " AND (s.first_name LIKE ? OR s.last_name LIKE ? OR CONCAT(s.first_name, ' ', s.last_name) LIKE ? OR s.student_number LIKE ? OR svc.service_name LIKE ? OR a.notes LIKE ?)";
+          for (let i = 0; i < 6; i++) params.push(`%${search}%`);
         }
         if (startUTC) { sql += " AND a.updated_at >= ?"; params.push(startUTC); }
         if (endExclusiveUTC) { sql += " AND a.updated_at < ?"; params.push(endExclusiveUTC); }
@@ -792,8 +792,8 @@ router.get(
         }
         if (search) {
           sql +=
-            " AND (ds.service_name LIKE ? OR fdr.purpose LIKE ? OR fdr.tracking_number LIKE ?)";
-          params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+            " AND (ds.service_name LIKE ? OR fdr.request_type LIKE ? OR fdr.purpose LIKE ? OR fdr.tracking_number LIKE ?)";
+          for (let i = 0; i < 4; i++) params.push(`%${search}%`);
         }
         if (startUTC) { sql += " AND fdr.updated_at >= ?"; params.push(startUTC); }
         if (endExclusiveUTC) { sql += " AND fdr.updated_at < ?"; params.push(endExclusiveUTC); }
@@ -826,8 +826,8 @@ router.get(
           params.push(filterStatus);
         }
         if (search) {
-          sql += " AND sub.title LIKE ?";
-          params.push(`%${search}%`);
+          sql += " AND (sub.title LIKE ? OR sub.purpose LIKE ? OR sub.tracking_number LIKE ?)";
+          for (let i = 0; i < 3; i++) params.push(`%${search}%`);
         }
         if (startUTC) { sql += " AND sub.updated_at >= ?"; params.push(startUTC); }
         if (endExclusiveUTC) { sql += " AND sub.updated_at < ?"; params.push(endExclusiveUTC); }
@@ -839,7 +839,27 @@ router.get(
         new Date(b.event_time) - new Date(a.event_time) ||
         `${b.type}-${b.id}`.localeCompare(`${a.type}-${a.id}`),
       );
-      res.json(rows);
+      if (req.query.page === undefined) return res.json(rows);
+
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+      const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+      const thisManilaMonth = getManilaDateString().slice(0, 7);
+      let completed = 0;
+      let ongoing = 0;
+      let thisMonth = 0;
+      for (const r of rows) {
+        if (TXN_STATUS_BUCKET[r.status] === "completed") completed++;
+        else if (TXN_STATUS_BUCKET[r.status] === "ongoing") ongoing++;
+        if (r.event_time && getManilaDateString(new Date(r.event_time)).slice(0, 7) === thisManilaMonth) thisMonth++;
+      }
+      res.json({
+        transactions: rows.slice((page - 1) * limit, page * limit),
+        total: rows.length,
+        totalPages: Math.max(1, Math.ceil(rows.length / limit)),
+        page,
+        limit,
+        stats: { total: rows.length, completed, ongoing, thisMonth },
+      });
     } catch (err) {
       sendServerError(res, err, "GET /transactions error:");
     }
@@ -854,7 +874,9 @@ router.get(
 // reflect whatever search/type/status filter happens to be active client-side.
 // Kept as a separate endpoint (rather than folding stats into GET
 // /transactions above) so that endpoint's bare-array response shape never
-// changes -- client-mobile's professor transactions screen depends on it.
+// changes -- client-mobile's professor transactions screen depends on it
+// (it calls this endpoint directly), so do not remove it. The web page now
+// uses the filtered `stats` returned by the paginated GET /transactions.
 const TXN_STATUS_BUCKET = {
   completed: "completed",
   claimed: "completed",
@@ -1230,10 +1252,11 @@ router.patch(
     // Matches `location`'s own COALESCE-based partial-update convention below
     // (a `null`/omitted value leaves the existing value untouched via
     // COALESCE, same limitation location already has).
+    // slotNote is the exception: undefined/non-string = leave unchanged, while
+    // an explicit string (including "") is applied, so "" clears the note.
+    const noteProvided = typeof slotNote === "string";
     const noteVal =
-      typeof slotNote === "string" && slotNote.trim()
-        ? slotNote.trim().slice(0, 500)
-        : null;
+      noteProvided && slotNote.trim() ? slotNote.trim().slice(0, 500) : null;
 
     if (day_of_week !== undefined && !VALID_DAYS.includes(day_of_week)) {
       return res.status(400).json({ message: "Invalid day_of_week" });
@@ -1286,7 +1309,7 @@ router.patch(
         start_time ?? String(current.start_time).slice(0, 5);
       const effectiveEnd = end_time ?? String(current.end_time).slice(0, 5);
       const effectiveLocation = location ?? current.location;
-      const effectiveNote = noteVal ?? current.slot_note;
+      const effectiveNote = noteProvided ? noteVal : current.slot_note;
       // Did the student-visible window/room actually move? Used below to decide
       // whether to re-sync surviving bookings' snapshots + re-notify.
       const windowMoved =
@@ -1323,13 +1346,22 @@ router.patch(
       // a student's card would silently start showing the new window while
       // their actual (unvalidated) appointment_date/appointment_time stays
       // whatever it was originally booked as.
+      // Only today-or-later bookings are considered; past-dated ones are left
+      // untouched (no cancellation, no re-notification).
       const [bookings] = await conn.query(
-        `SELECT appointment_id, student_id, department_id, appointment_date, appointment_time
+        `SELECT appointment_id, student_id, department_id, appointment_date, appointment_time,
+                window_start_snapshot, window_end_snapshot
          FROM appointments
          WHERE availability_id = ? AND status IN ('pending', 'approved')
+           AND appointment_date >= ?
          FOR UPDATE`,
-        [id],
+        [id, getManilaDateString()],
       );
+      // Fit rule: a booking is cancelled only if its weekday no longer matches,
+      // or if neither its own time nor its originally booked window (snapshot,
+      // falling back to the template's pre-edit window) overlaps the new
+      // window. So shifting 09:00-12:00 to 09:30-12:00 keeps a booking, while
+      // moving the slot entirely away from what the student booked cancels it.
       const noLongerFits = bookings.filter((b) => {
         const dateObj =
           b.appointment_date instanceof Date
@@ -1338,7 +1370,15 @@ router.patch(
         const weekday = WEEKDAY_NAMES[dateObj.getDay()];
         if (weekday !== effectiveDay) return true;
         const apptTime = String(b.appointment_time).slice(0, 5);
-        return apptTime < effectiveStart || apptTime >= effectiveEnd;
+        if (apptTime >= effectiveStart && apptTime < effectiveEnd) return false;
+        const origStart = String(
+          b.window_start_snapshot ?? current.start_time,
+        ).slice(0, 5);
+        const origEnd = String(b.window_end_snapshot ?? current.end_time).slice(
+          0,
+          5,
+        );
+        return !(origStart < effectiveEnd && effectiveStart < origEnd);
       });
       if (noLongerFits.length > 0) {
         await conn.query(
@@ -1423,7 +1463,7 @@ router.patch(
              start_time = COALESCE(?, start_time),
              end_time = COALESCE(?, end_time),
              location = COALESCE(?, location),
-             slot_note = COALESCE(?, slot_note),
+             slot_note = CASE WHEN ? THEN ? ELSE slot_note END,
              max_students = COALESCE(?, max_students)
          WHERE availability_id = ? AND faculty_id = ?`,
         [
@@ -1431,6 +1471,7 @@ router.patch(
           start_time ?? null,
           end_time ?? null,
           location ?? null,
+          noteProvided ? 1 : 0,
           noteVal,
           maxStu ?? null,
           id,
@@ -1550,15 +1591,15 @@ router.delete(
       const [affected] = await conn.query(
         `SELECT appointment_id, student_id, department_id, appointment_date
          FROM appointments
-         WHERE availability_id = ? AND status IN ('pending', 'approved')
+           AND appointment_date >= ?
          FOR UPDATE`,
-        [id],
+        [id, getManilaDateString()],
       );
       if (affected.length > 0) {
         await conn.query(
           `UPDATE appointments SET status = 'cancelled', cancelled_by = 'system'
-           WHERE availability_id = ? AND status IN ('pending', 'approved')`,
-          [id],
+           WHERE appointment_id IN (?)`,
+          [affected.map((a) => a.appointment_id)],
         );
       }
 

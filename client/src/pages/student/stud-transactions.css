@@ -1108,3 +1108,16 @@ body {
 @media (max-width: 380px) {
   .tx-stats-grid { grid-template-columns: 1fr; }
 }
+
+/* Clear-filters button shown in the filtered-empty state */
+.tx-clear-btn {
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--primary-color);
+  background: transparent;
+  color: var(--primary-color);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}

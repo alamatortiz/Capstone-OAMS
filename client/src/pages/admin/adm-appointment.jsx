@@ -600,6 +600,11 @@ export default function AdminAppointment() {
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
+                    title={
+                      tab === "cancelled"
+                        ? "All cancellations: by student or faculty, and by the system (schedule change, expired, or not served). Open a card to see who cancelled."
+                        : undefined
+                    }
                     className={`admin-appointment-tab-trigger ${
                       activeTab === tab ? "active" : ""
                     }`}

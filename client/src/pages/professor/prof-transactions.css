@@ -731,7 +731,6 @@ html, body {
 .txn-badge-generated   { background: rgba(16,185,129,0.15);  color: var(--success);  border: 0.5px solid rgba(16,185,129,0.3); }
 .txn-badge-released    { background: rgba(16,185,129,0.15);  color: var(--success);  border: 0.5px solid rgba(16,185,129,0.3); }
 .txn-badge-claimed     { background: rgba(16,185,129,0.15);  color: var(--success);  border: 0.5px solid rgba(16,185,129,0.3); }
-.txn-badge-noshow      { background: rgba(239,68,68,0.15);   color: var(--danger);  border: 0.5px solid rgba(239,68,68,0.3); }
 
 /* ── Item student line ───────────────────────────────────── */
 /* Row, not column: the appointment branch shows the name and ID badge
@@ -961,3 +960,15 @@ html, body {
   .transactions-stats-grid { grid-template-columns: 1fr; }
 }
 
+/* Clear-filters button shown in the filtered-empty state */
+.txn-clear-btn {
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--primary-color);
+  background: transparent;
+  color: var(--primary-color);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}

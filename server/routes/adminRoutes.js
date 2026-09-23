@@ -67,6 +67,9 @@ router.get(
         [adminId],
       );
       const deptId = adminRow?.department_id;
+      if (!deptId) {
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
 
       // 1. Active queues today in this department. "Live / servicing" = slots
       // that are still 'open', OR are 'full'/'expired' (closed to new joins)
@@ -532,7 +535,8 @@ router.post(
   authorizeRoles("admin"),
   async (req, res) => {
     const adminId = req.user.userId;
-    const { serviceId, maxCapacity, startTime, endTime, noShowTimeoutMinutes, serviceTimeMinutes } = req.body;
+    const { serviceId, maxCapacity, noShowTimeoutMinutes, serviceTimeMinutes } = req.body;
+    let { startTime, endTime } = req.body;
     const hostAllServices = req.body.hostAllServices === true;
 
     if ((!hostAllServices && !serviceId) || !maxCapacity || !startTime || !endTime || !serviceTimeMinutes) {
@@ -540,6 +544,14 @@ router.post(
         error: "serviceId (unless hostAllServices), maxCapacity, startTime, endTime, and serviceTimeMinutes are required",
       });
     }
+    // Times must be HH:MM or HH:MM:SS (24h); normalize to HH:MM:SS so string
+    // comparison against getManilaTimeString() is valid.
+    const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
+    if (typeof startTime !== "string" || typeof endTime !== "string" || !TIME_RE.test(startTime) || !TIME_RE.test(endTime)) {
+      return res.status(400).json({ error: "startTime and endTime must be valid HH:MM times" });
+    }
+    if (startTime.length === 5) startTime += ":00";
+    if (endTime.length === 5) endTime += ":00";
     const capacityNum = parseInt(maxCapacity, 10);
     if (!capacityNum || capacityNum <= 0) {
       return res
@@ -562,6 +574,18 @@ router.post(
         error:
           "End time has already passed — choose a window that ends later than the current time",
       });
+    }
+    // A start time already in the past is rejected, with a 30-minute grace so
+    // the form's default ("now" at modal-open) still works after the admin
+    // fills in the other fields.
+    {
+      const [nh, nm] = getManilaTimeString().split(":").map(Number);
+      const [sh, sm] = startTime.split(":").map(Number);
+      if (sh * 60 + sm < nh * 60 + nm - 30) {
+        return res.status(400).json({
+          error: "Start time has already passed — choose a start time that is now or later",
+        });
+      }
     }
     const noShowTimeoutNum = noShowTimeoutMinutes != null
       ? parseInt(noShowTimeoutMinutes, 10)
@@ -610,6 +634,22 @@ router.post(
           await conn.rollback();
           return res.status(409).json({
             error: "A Universal Service Queue is already running for your department.",
+          });
+        }
+        // Symmetric to the single-service check below: a universal queue can't
+        // open over a live single-service queue in the same window.
+        const [[svcOverlap]] = await conn.query(
+          `SELECT slot_id FROM queue_slots
+           WHERE department_id = ? AND is_universal = FALSE AND slot_date = ?
+             AND status IN ('open', 'paused', 'full')
+             AND start_time < ? AND end_time > ?
+           LIMIT 1`,
+          [deptId, today, endTime, startTime],
+        );
+        if (svcOverlap) {
+          await conn.rollback();
+          return res.status(409).json({
+            error: "A service queue is running in this window — close it first, or pick a non-overlapping time.",
           });
         }
       } else {
@@ -1487,7 +1527,17 @@ router.get(
 //   status    = "all" | <status string from the relevant table>
 //   startDate = "YYYY-MM-DD" -- inclusive, Manila-local
 //   endDate   = "YYYY-MM-DD" -- inclusive, Manila-local
-//   search    = free text matched against student name/id, processor, details
+//   search    = free text (LIKE) matched in SQL against student name/id, processor,
+//               details/purpose, tracking #, action title, service and document type
+//               (admin-action rows: processor + logged old/new values)
+//   page      = 1-based page number. When PRESENT the endpoint is paginated:
+//               `limit` (default 20, max 100) rows per page, and the response adds
+//               `total`, `totalPages`, `page`, `limit`; `stats` then covers the FULL
+//               filtered set (type/status/search/date), not just the page.
+//   limit     = page size (only meaningful with `page`)
+// When `page` is ABSENT (client-mobile) the legacy shape is kept: newest 200 rows,
+// and `stats` = department totals ignoring the type/status/search filters.
+// Response keys are only ever added to, never renamed/removed (mobile depends on them).
 router.get(
   "/transactions",
   authenticateToken,
@@ -1502,11 +1552,20 @@ router.get(
       }
 
       const { type = "all", status = "all", startDate, endDate } = req.query;
+      const isPaged = req.query.page !== undefined;
+      const pageSize = isPaged
+        ? Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100)
+        : 200;
+      const pageNum = isPaged ? Math.max(parseInt(req.query.page, 10) || 1, 1) : 1;
+      const rowOffset = (pageNum - 1) * pageSize;
+      const searchTerm = typeof req.query.search === "string" ? req.query.search.trim() : "";
+      const searchLike = searchTerm
+        ? `%${searchTerm.replace(/[\\%_]/g, "\\$&")}%`
+        : null;
 
-      // Date-range boundary applied identically to all three branches below
-      // (via fetchTransactionRows, called twice -- see its two call sites
-      // further down -- so this also correctly scopes the stat-card counts
-      // to the same range, not just the displayed list). event_time is a
+      // Date-range boundary applied identically to every branch below
+      // (rows and counts both go through fetchTransactionRows, so the stat
+      // cards are scoped to the same range as the displayed list). event_time is a
       // real UTC instant, so the picked dates must be anchored to Manila
       // midnight, not the DB server's (UTC) CURDATE(). An invalid/malformed
       // date string degrades to null (treated as "not provided"), never a
@@ -1572,14 +1631,15 @@ router.get(
       const AUDIT_STATUS_TO_ACTION = { created: "CREATE", updated: "UPDATE", deleted: "DELETE", viewed: "READ" };
       const REQUEST_TYPES = ["queue", "appointment", "document", "submission"];
 
-      // Runs the 5-branch request UNION plus the admin_action audit query
-      // for one (type, status) filter combination, each capped to its own
-      // 200 most-recent rows. Filtering happens in SQL, before that cap, so
-      // a low-volume type/status is never crowded out of a shared top-200
-      // window by busier ones. Called once unfiltered (for stats and
-      // the default view) and, only when a filter is actually active, a
-      // second time with the real filter values.
-      async function fetchTransactionRows(filterType, filterStatus) {
+      // Runs the 5-branch request UNION plus the admin_action audit query for
+      // one (type, status[, search]) filter combination. Filtering (incl.
+      // search) happens in SQL. mode "rows" returns the merged, recency-sorted
+      // slice [offset, offset+limit) (each source fetches its top offset+limit
+      // rows, which is enough to merge-slice correctly); mode "count" returns
+      // { queue, appointment, document, submission, admin_action } counts over
+      // the whole filtered set -- no row cap, so totals are always exact.
+      async function fetchTransactionRows(filterType, filterStatus, useSearch, mode, offset = 0, limit = 200) {
+        const isCount = mode === "count";
         let requestTypeClause = "";
         let requestTypeParam = null;
         if (filterType !== "all") {
@@ -1608,8 +1668,16 @@ router.get(
           }
         }
 
+        let requestSearchClause = "";
+        const requestSearchParams = [];
+        if (useSearch && searchLike) {
+          requestSearchClause =
+            "AND (student_name LIKE ? OR student_id LIKE ? OR processor LIKE ? OR details LIKE ? OR tracking_number LIKE ? OR action LIKE ? OR raw_service_name LIKE ? OR request_type LIKE ?)";
+          for (let i = 0; i < 8; i++) requestSearchParams.push(searchLike);
+        }
+
         const unionSql = `
-          SELECT * FROM (
+          SELECT ${isCount ? "type, COUNT(*) AS n" : "*"} FROM (
             (
               SELECT
                 'queue' AS type,
@@ -1640,6 +1708,9 @@ router.get(
                 qs.is_universal AS is_universal,
                 q.admin_reason AS admin_reason_raw,
                 CAST(NULL AS CHAR(100) CHARACTER SET utf8mb4) AS request_type,
+                CAST(NULL AS CHAR(1000) CHARACTER SET utf8mb4) AS shared_comment,
+                CAST(NULL AS CHAR(10) CHARACTER SET utf8mb4) AS comment_updated_by,
+                CAST(NULL AS DATETIME) AS comment_updated_at,
                 q.status AS raw_status,
                 q.updated_at AS event_time,
                 'student' AS requester_type
@@ -1675,6 +1746,9 @@ router.get(
                 FALSE AS is_universal,
                 CAST(NULL AS CHAR(255) CHARACTER SET utf8mb4) AS admin_reason_raw,
                 CAST(NULL AS CHAR(100) CHARACTER SET utf8mb4) AS request_type,
+                a.shared_comment AS shared_comment,
+                a.comment_updated_by AS comment_updated_by,
+                a.comment_updated_at AS comment_updated_at,
                 a.status AS raw_status,
                 a.updated_at AS event_time,
                 'student' AS requester_type
@@ -1714,6 +1788,9 @@ router.get(
                 FALSE AS is_universal,
                 CAST(NULL AS CHAR(255) CHARACTER SET utf8mb4) AS admin_reason_raw,
                 dr.request_type AS request_type,
+                CAST(NULL AS CHAR(1000) CHARACTER SET utf8mb4) AS shared_comment,
+                CAST(NULL AS CHAR(10) CHARACTER SET utf8mb4) AS comment_updated_by,
+                CAST(NULL AS DATETIME) AS comment_updated_at,
                 dr.status AS raw_status,
                 dr.updated_at AS event_time,
                 'student' AS requester_type
@@ -1752,6 +1829,9 @@ router.get(
                 FALSE AS is_universal,
                 CAST(NULL AS CHAR(255) CHARACTER SET utf8mb4) AS admin_reason_raw,
                 fdr.request_type AS request_type,
+                CAST(NULL AS CHAR(1000) CHARACTER SET utf8mb4) AS shared_comment,
+                CAST(NULL AS CHAR(10) CHARACTER SET utf8mb4) AS comment_updated_by,
+                CAST(NULL AS DATETIME) AS comment_updated_at,
                 fdr.status AS raw_status,
                 fdr.updated_at AS event_time,
                 'faculty' AS requester_type
@@ -1789,6 +1869,9 @@ router.get(
                 FALSE AS is_universal,
                 CAST(NULL AS CHAR(255) CHARACTER SET utf8mb4) AS admin_reason_raw,
                 ds.title AS request_type,
+                CAST(NULL AS CHAR(1000) CHARACTER SET utf8mb4) AS shared_comment,
+                CAST(NULL AS CHAR(10) CHARACTER SET utf8mb4) AS comment_updated_by,
+                CAST(NULL AS DATETIME) AS comment_updated_at,
                 ds.status AS raw_status,
                 ds.updated_at AS event_time,
                 ds.submitter_type AS requester_type
@@ -1799,15 +1882,16 @@ router.get(
               WHERE ds.department_id = ?
             )
           ) AS combined
-          WHERE 1=1 ${dateClause} ${requestTypeClause} ${requestStatusClause}
-          ORDER BY event_time DESC, type, requester_type, id DESC
-          LIMIT 200
+          WHERE 1=1 ${dateClause} ${requestTypeClause} ${requestStatusClause} ${requestSearchClause}
+          ${isCount ? "GROUP BY type" : `ORDER BY event_time DESC, type, requester_type, id DESC
+          LIMIT ${Number(offset + limit)}`}
         `;
 
         const unionParams = [deptId, deptId, deptId, deptId, deptId];
         unionParams.push(...dateParams);
         if (requestTypeParam) unionParams.push(requestTypeParam);
         if (requestStatusParam) unionParams.push(requestStatusParam);
+        unionParams.push(...requestSearchParams);
         const [rows] = await pool.query(unionSql, unionParams);
 
         // "Admin Action" rows -- things admins do to the system itself (post an
@@ -1832,11 +1916,19 @@ router.get(
           }
         }
 
+        let auditSearchClause = "";
+        const auditSearchParams = [];
+        if (useSearch && searchLike) {
+          auditSearchClause =
+            "AND (CONCAT(adm.first_name, ' ', adm.last_name) LIKE ? OR al.target_table LIKE ? OR CAST(al.new_values AS CHAR) LIKE ? OR CAST(al.old_values AS CHAR) LIKE ?)";
+          for (let i = 0; i < 4; i++) auditSearchParams.push(searchLike);
+        }
+
         const auditSql = `
-          SELECT al.log_id AS id, al.action AS audit_action, al.target_table, al.target_record_id,
+          SELECT ${isCount ? "COUNT(*) AS n" : `al.log_id AS id, al.action AS audit_action, al.target_table, al.target_record_id,
                  al.old_values, al.new_values, al.created_at AS event_time,
                  CONCAT(adm.first_name, ' ', adm.last_name) AS processor,
-                 d.department_abbreviation AS college_abbrev
+                 d.department_abbreviation AS college_abbrev`}
           FROM audit_logs al
           JOIN administrators adm ON al.admin_id = adm.admin_id
           JOIN departments d ON adm.department_id = d.department_id
@@ -1845,14 +1937,21 @@ router.get(
               'services','document_services','service_requirements','service_procedure_steps',
               'system_settings','generated_files','announcements','faqs','queue_slots','locations'
             )
-            ${auditDateClause} ${auditTypeClause} ${auditStatusClause}
-          ORDER BY al.created_at DESC, al.log_id DESC
-          LIMIT 200
+            ${auditDateClause} ${auditTypeClause} ${auditStatusClause} ${auditSearchClause}
+          ${isCount ? "" : `ORDER BY al.created_at DESC, al.log_id DESC
+          LIMIT ${Number(offset + limit)}`}
         `;
         const auditParams = [deptId];
         auditParams.push(...dateParams);
         if (auditStatusParam) auditParams.push(auditStatusParam);
+        auditParams.push(...auditSearchParams);
         const [auditRows] = await pool.query(auditSql, auditParams);
+
+        if (isCount) {
+          const counts = { queue: 0, appointment: 0, document: 0, submission: 0, admin_action: Number(auditRows[0]?.n) || 0 };
+          for (const r of rows) counts[r.type] = Number(r.n) || 0;
+          return counts;
+        }
 
         const requestRows = rows.map((r) => {
           // Queue rows get a student-facing ticket badge (e.g. "CCS-REG-012"),
@@ -1889,6 +1988,10 @@ router.get(
             isUniversal: r.type === "queue" ? !!r.is_universal : false,
             adminReason: r.type === "queue" ? (r.admin_reason_raw || null) : null,
             requestType: r.request_type || null,
+            // Appointment-only shared professor/student comment (null elsewhere).
+            sharedComment: r.shared_comment || null,
+            commentUpdatedBy: r.comment_updated_by || null,
+            commentUpdatedAt: r.comment_updated_at || null,
             status: statusMap[r.raw_status] ?? r.raw_status,
             rawEventTime: r.event_time,
           };
@@ -1916,28 +2019,27 @@ router.get(
           };
         });
 
-        // Merge, cap at 200 by recency -- filtering (above) already happened
-        // in SQL, so this cap doesn't risk crowding out a low-volume
-        // type/status.
+        // Merge by recency and take this page's slice -- filtering (above)
+        // already happened in SQL.
         return requestRows
           .concat(adminActionRows)
           .sort((a, b) =>
             new Date(b.rawEventTime) - new Date(a.rawEventTime) ||
             String(b.id).localeCompare(String(a.id)),
           )
-          .slice(0, 200);
+          .slice(offset, offset + limit);
       }
 
-      // Unfiltered call feeds `stats` (always the department total) and
-      // doubles as the result set itself when no filter is active. Both
-      // calls are kicked off before either is awaited, so an active filter
-      // costs one concurrent pair of extra queries rather than a second
-      // round-trip tacked on after the first.
-      const combinedPromise = fetchTransactionRows("all", "all");
-      const filteredPromise = (type !== "all" || status !== "all")
-        ? fetchTransactionRows(type, status)
-        : combinedPromise;
-      const [combined, filteredRows] = await Promise.all([combinedPromise, filteredPromise]);
+      const sumCounts = (c) => c.queue + c.appointment + c.document + c.submission + c.admin_action;
+      // Paged: stats/total cover the full filtered set. Legacy (mobile):
+      // stats cover the department (date range only), list = newest 200.
+      const [filteredRows, filteredCounts, statsCounts] = await Promise.all([
+        fetchTransactionRows(type, status, true, "rows", rowOffset, pageSize),
+        fetchTransactionRows(type, status, true, "count"),
+        isPaged ? null : fetchTransactionRows("all", "all", false, "count"),
+      ]);
+      const statsSource = statsCounts ?? filteredCounts;
+      const totalFiltered = sumCounts(filteredCounts);
 
       // Format the display timestamp last, only on what's actually returned.
       // `date` is the raw instant (for client-side formatManilaDate/Time,
@@ -1959,25 +2061,23 @@ router.get(
         }),
       }));
 
-      // Aggregate stats over the full (unfiltered-by-type/status) dataset
-      // so the summary cards always reflect the department total.
-      const allForStats = combined.map((t) => ({ type: t.type, status: t.status }));
-
       res.json({
         transactions,
         stats: {
-          total: allForStats.length,
-          queue: allForStats.filter((t) => t.type === "queue").length,
-          appointments: allForStats.filter((t) => t.type === "appointment")
-            .length,
+          total: sumCounts(statsSource),
+          queue: statsSource.queue,
+          appointments: statsSource.appointment,
           // Sent documents fold into the same "documents" bucket as document
           // requests -- both are document-related activity, just opposite
           // directions.
-          documents: allForStats.filter(
-            (t) => t.type === "document" || t.type === "submission",
-          ).length,
-          adminActions: allForStats.filter((t) => t.type === "admin_action").length,
+          documents: statsSource.document + statsSource.submission,
+          adminActions: statsSource.admin_action,
         },
+        // Additive pagination info (always present; meaningful when `page` sent).
+        total: totalFiltered,
+        page: pageNum,
+        limit: pageSize,
+        totalPages: Math.max(1, Math.ceil(totalFiltered / pageSize)),
       });
     } catch (error) {
       sendServerError(res, error, "Admin transactions fetch error:");
@@ -2555,7 +2655,13 @@ router.patch(
       await logAudit(adminId, "UPDATE", "document_requests", requestId, { status: request.status }, { status: dbStatus });
 
       if (needsCode) {
-        await linkOfficialCode(false, requestId, trimmedCode);
+        // Post-commit: the status update already succeeded, so a link failure
+        // must not turn the response into a 500.
+        try {
+          await linkOfficialCode(false, requestId, trimmedCode);
+        } catch (linkErr) {
+          console.error("linkOfficialCode post-commit error:", linkErr.message);
+        }
       }
 
       emitToUser(request.student_id, "document:status-updated", { requestId, status });
@@ -3477,51 +3583,6 @@ for (const verb of ["deactivate", "reactivate"]) {
     },
   );
 }
-
-// DELETE /api/admin/data-management/document-types/:id -> deactivate (see above)
-router.delete(
-  "/data-management/document-types/:id",
-  authenticateToken,
-  authorizeRoles("admin"),
-  async (req, res) => {
-    const serviceId = parseInt(req.params.id, 10);
-    const conn = await pool.getConnection();
-    try {
-      await conn.beginTransaction();
-      const deptId = await getAdminDepartmentId(req.user.userId);
-      if (!deptId) {
-        await conn.rollback();
-        return res.status(403).json({ error: "Admin has no department assigned" });
-      }
-      const [[svc]] = await conn.query(
-        `SELECT service_name, status FROM document_services
-         WHERE service_id = ? AND department_id = ? FOR UPDATE`,
-        [serviceId, deptId],
-      );
-      if (!svc) {
-        await conn.rollback();
-        return res.status(404).json({ error: "Document type not found" });
-      }
-      let result = { studentReqs: [], facultyReqs: [] };
-      if (svc.status !== "inactive") {
-        result = await deactivateDocumentType(conn, serviceId);
-        await logAudit(req.user.userId, "UPDATE", "document_services", serviceId,
-          { status: svc.status }, { status: "inactive" });
-      }
-      await conn.commit();
-      notifyDeactivatedRequesters(deptId, svc.service_name, result);
-      res.json({
-        message: "Document type set inactive",
-        declinedCount: result.studentReqs.length + result.facultyReqs.length,
-      });
-    } catch (error) {
-      await conn.rollback();
-      sendServerError(res, error, "Document type delete error:");
-    } finally {
-      conn.release();
-    }
-  },
-);
 
 // ─────────────────────────────────────────────────────────────
 // LOCATIONS — fixed premises admins pick from via dropdown
@@ -4718,6 +4779,14 @@ router.get(
       const today = getManilaDateString();
       const startDate = req.query.startDate || today;
       const endDate = req.query.endDate || today;
+      const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+      const validDate = (s) => DATE_RE.test(s) && !Number.isNaN(Date.parse(`${s}T00:00:00Z`));
+      if (!validDate(startDate) || !validDate(endDate)) {
+        return res.status(400).json({ error: "startDate and endDate must be valid YYYY-MM-DD dates" });
+      }
+      if (startDate > endDate) {
+        return res.status(400).json({ error: "startDate must be on or before endDate" });
+      }
       const service =
         req.query.service && req.query.service !== "All Services"
           ? req.query.service
@@ -4945,7 +5014,12 @@ router.get(
       const map = Object.fromEntries(rows.map((r) => [r.setting_key, r.setting_value]));
       res.json({
         apiUrl: map.pinnacle_api_url || "https://pinnacle-api.pnc.edu.ph/v1",
-        apiKey: map.pinnacle_api_key || "",
+        // Never send the stored secret back. apiKey kept as "" so older
+        // clients (mobile) that read the key don't break.
+        apiKey: "",
+        apiKeySet: !!map.pinnacle_api_key,
+        // No real Pinnacle integration consumes this config yet.
+        connected: false,
         syncInterval: parseInt(map.pinnacle_sync_interval || "60", 10),
         syncEnabled: map.pinnacle_sync_enabled === "true",
       });
@@ -4966,10 +5040,13 @@ router.post(
     try {
       const updates = [
         ["pinnacle_api_url", apiUrl ?? ""],
-        ["pinnacle_api_key", apiKey ?? ""],
         ["pinnacle_sync_interval", String(syncInterval ?? 60)],
         ["pinnacle_sync_enabled", syncEnabled ? "true" : "false"],
       ];
+      // Only overwrite the stored key when a new one is provided.
+      if (typeof apiKey === "string" && apiKey.trim() !== "") {
+        updates.push(["pinnacle_api_key", apiKey.trim()]);
+      }
       for (const [key, value] of updates) {
         await pool.query(
           `INSERT INTO system_settings (setting_key, setting_value)
@@ -5035,19 +5112,11 @@ router.post(
   authenticateToken,
   authorizeRoles("superadmin"),
   async (req, res) => {
-    try {
-      const [result] = await pool.query(
-        `INSERT INTO external_sync_logs (external_system, sync_type, sync_status)
-         VALUES ('Pinnacle', 'profile', 'success')`,
-      );
-      const [[inserted]] = await pool.query(
-        `SELECT synced_at FROM external_sync_logs WHERE sync_id = ?`,
-        [result.insertId],
-      );
-      res.json({ message: "Sync completed successfully.", syncedAt: inserted.synced_at });
-    } catch (error) {
-      sendServerError(res, error, "Pinnacle trigger error:");
-    }
+    // No code in this server consumes the saved pinnacle_* settings, so a
+    // "sync" would be fake. Refuse honestly instead of logging a false success.
+    res.status(501).json({
+      error: "Pinnacle integration is not connected yet. The saved URL and key are stored for later use, but no sync can run.",
+    });
   },
 );
 
@@ -5105,7 +5174,10 @@ router.put(
 
     if (surveyUrl) {
       try {
-        new URL(surveyUrl);
+        const parsed = new URL(surveyUrl);
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+          return res.status(400).json({ error: "Survey link must start with http:// or https://." });
+        }
       } catch {
         return res.status(400).json({ error: "Please enter a valid URL." });
       }
@@ -5344,7 +5416,20 @@ router.get(
         );
       }
 
-      res.json({ users });
+      // Existing callers get every user (same key) up to a sane cap; `total`
+      // is the pre-cap match count. Optional ?page=&limit= slices server-side.
+      const total = users.length;
+      const MAX_USERS = 5000;
+      const limitParam = parseInt(req.query.limit, 10);
+      if (Number.isInteger(limitParam) && limitParam > 0) {
+        const pageParam = Math.max(1, parseInt(req.query.page, 10) || 1);
+        const lim = Math.min(limitParam, MAX_USERS);
+        users = users.slice((pageParam - 1) * lim, pageParam * lim);
+      } else if (users.length > MAX_USERS) {
+        users = users.slice(0, MAX_USERS);
+      }
+
+      res.json({ users, total });
     } catch (error) {
       sendServerError(res, error, "GET /users error:");
     }
@@ -5365,6 +5450,14 @@ router.put(
     try {
       const [[userRow]] = await pool.query(`SELECT role, status FROM users WHERE user_id = ?`, [userId]);
       if (!userRow) return res.status(404).json({ error: "User not found" });
+      if (status && status !== "active" && status !== userRow.status) {
+        if (userId === adminId) {
+          return res.status(400).json({ error: "You cannot suspend or deactivate your own account" });
+        }
+        if (userRow.role === "superadmin") {
+          return res.status(403).json({ error: "You cannot suspend or deactivate another superadmin" });
+        }
+      }
 
       let deptId = null;
       if (college) {
@@ -5424,8 +5517,17 @@ router.patch(
     }
 
     try {
-      const [[userRow]] = await pool.query(`SELECT status FROM users WHERE user_id = ?`, [userId]);
+      const [[userRow]] = await pool.query(`SELECT status, role FROM users WHERE user_id = ?`, [userId]);
       if (!userRow) return res.status(404).json({ error: "User not found" });
+
+      if (status !== "active") {
+        if (userId === adminId) {
+          return res.status(400).json({ error: "You cannot suspend or deactivate your own account" });
+        }
+        if (userRow.role === "superadmin") {
+          return res.status(403).json({ error: "You cannot suspend or deactivate another superadmin" });
+        }
+      }
 
       await pool.query(`UPDATE users SET status = ? WHERE user_id = ?`, [status, userId]);
       await logAudit(adminId, "UPDATE", "users", userId, { status: userRow.status }, { status });
@@ -5453,6 +5555,9 @@ router.delete(
     try {
       const [[userRow]] = await pool.query(`SELECT role FROM users WHERE user_id = ?`, [userId]);
       if (!userRow) return res.status(404).json({ error: "User not found" });
+      if (userRow.role === "superadmin") {
+        return res.status(403).json({ error: "You cannot delete another superadmin" });
+      }
 
       await pool.query(`DELETE FROM users WHERE user_id = ?`, [userId]);
       await logAudit(adminId, "DELETE", "users", userId, { role: userRow.role }, null);

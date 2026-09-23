@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { ChevronLeft, FileText } from "lucide-react";
@@ -7,13 +7,16 @@ import PageHeader from "../../components/PageHeader";
 import FilterSelect from "../../components/FilterSelect";
 import FilterDateRange from "../../components/FilterDateRange";
 import ExportMenu from "../../components/ExportMenu";
+import Pagination from "../../components/Pagination";
 import "./prof-dashboard.css";
 import "./prof-transactions.css";
 import api from "../../utils/api";
 import { formatManilaDate, formatManilaTime, getManilaDateString } from "../../utils/dateTime";
 import { exportTransactionsPdf } from "../../utils/exportPdf";
 import { useAuth } from "../../context/AuthContext";
-import { connectSocket } from "../../utils/socket";
+import { downloadCsv } from "../../utils/csv";
+import { transactionStatusLabel, transactionTypeLabel } from "../../utils/transactionLabels";
+import { ClipboardListIcon, AlertCircleIcon, ChevronDownIcon } from "../../components/TransactionIcons";
 import { PROFESSOR_STATUSES_BY_TYPE, getStatusOptionsForType } from "../../data/transactionStatusOptions";
 
 // ── Icons ────────────────────────────────────────────────────────────────────
@@ -31,14 +34,6 @@ const SearchIcon = () => (
     <line x1="21" y1="21" x2="16.65" y2="16.65" />
   </svg>
 );
-const ClipboardListIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-    <line x1="8" y1="11" x2="16" y2="11"></line>
-    <line x1="8" y1="15" x2="12" y2="15"></line>
-  </svg>
-);
 const CheckCircleIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
@@ -51,26 +46,6 @@ const ClockIcon = () => (
     <polyline points="12 6 12 12 16 14"></polyline>
   </svg>
 );
-const ChevronDownIcon = ({ className = "" }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="6 9 12 15 18 9"></polyline>
-  </svg>
-);
-const AlertCircleIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="12" cy="12" r="10"></circle>
-    <line x1="12" y1="8" x2="12" y2="12"></line>
-    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-  </svg>
-);
-
 // ── Transactions data ─────────────────────────────────────────────────────────
 
 const TYPE_OPTIONS = [
@@ -91,7 +66,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function ProfessorTransactionsPage() {
-  const { user: authUser, token } = useAuth();
+  const { user: authUser } = useAuth();
 
   // ── Filter state ─────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
@@ -100,14 +75,21 @@ export default function ProfessorTransactionsPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [txStats, setTxStats] = useState({ total: 0, completed: 0, ongoing: 0, thisMonth: 0 });
+  const [isExporting, setIsExporting] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [txError, setTxError] = useState(null);
+  const PAGE_SIZE = 20;
 
   // Mirrors `transactions` for the catch block below, without making
   // fetchTransactions depend on (and change identity with) the state itself.
   const transactionsRef = useRef(transactions);
   useEffect(() => { transactionsRef.current = transactions; }, [transactions]);
+  // Drops out-of-order responses (fast page/filter changes).
+  const requestIdRef = useRef(0);
 
   // ── Badge helpers ─────────────────────────────────────────────────────────
   const typeBadgeClass = (type) =>
@@ -117,8 +99,7 @@ export default function ProfessorTransactionsPage() {
       submission: "txn-badge txn-badge-document",
     }[type] ?? "txn-badge");
 
-  const typeLabel = (type) =>
-    ({ appointment: "Appointment", document: "Document Request", submission: "Document Submission" }[type] ?? type);
+  const typeLabel = transactionTypeLabel;
 
   const statusBadgeClass = (status) =>
     ({
@@ -126,7 +107,6 @@ export default function ProfessorTransactionsPage() {
       approved: "txn-badge txn-badge-approved",
       rejected: "txn-badge txn-badge-rejected",
       cancelled: "txn-badge txn-badge-cancelled",
-      no_show: "txn-badge txn-badge-noshow",
       pending: "txn-badge txn-badge-pending",
       processing: "txn-badge txn-badge-processing",
       ready: "txn-badge txn-badge-ready",
@@ -136,31 +116,39 @@ export default function ProfessorTransactionsPage() {
       claimed: "txn-badge txn-badge-claimed",
     }[status] ?? "txn-badge");
 
-  const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const statusLabel = transactionStatusLabel;
 
-  const statusLabel = (status) => {
-    if (status === "ready" || status === "generated" || status === "released")
-      return "Ready for Pickup";
-    if (status === "no_show") return "No Show";
-    return capitalize(status);
+  const buildParams = () => {
+    const params = {};
+    if (debouncedSearch) params.search = debouncedSearch;
+    if (filterType !== "all") params.filterType = filterType;
+    if (filterStatus !== "all") params.filterStatus = filterStatus;
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    return params;
   };
 
+  const withLabels = (t) => ({
+    ...t,
+    dateLabel: t.date ? formatManilaDate(t.date, { month: "short", day: "numeric", year: "numeric" }) : "",
+    timeLabel: t.date ? formatManilaTime(t.date) : "",
+  });
+
+  // No live/socket refresh on purpose -- a history log; refetches on mount
+  // and whenever a filter/search/page changes.
   const fetchTransactions = async () => {
+    const requestId = ++requestIdRef.current;
     try {
-      const params = {};
-      if (debouncedSearch) params.search = debouncedSearch;
-      if (filterType !== "all") params.filterType = filterType;
-      if (filterStatus !== "all") params.filterStatus = filterStatus;
-      if (startDate) params.startDate = startDate;
-      if (endDate) params.endDate = endDate;
-      const res = await api.get("/professor/transactions", { params });
-      setTransactions(res.data.map((t) => ({
-        ...t,
-        dateLabel: t.date ? formatManilaDate(t.date, { month: "short", day: "numeric", year: "numeric" }) : "",
-        timeLabel: t.date ? formatManilaTime(t.date) : "",
-      })));
+      const res = await api.get("/professor/transactions", {
+        params: { ...buildParams(), page, limit: PAGE_SIZE },
+      });
+      if (requestId !== requestIdRef.current) return;
+      setTransactions((res.data.transactions ?? []).map(withLabels));
+      setTotalPages(res.data.totalPages ?? 1);
+      if (res.data.stats) setTxStats(res.data.stats);
       setTxError(null);
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error("Failed to fetch transactions:", err);
       if (transactionsRef.current.length === 0) {
         setTxError("Could not load your transaction history.");
@@ -168,73 +156,36 @@ export default function ProfessorTransactionsPage() {
         toast.error("Could not refresh your transaction history.");
       }
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   };
 
-  // Debounced 400ms, mirroring stud-transactions.jsx's own search debounce,
-  // so typing doesn't fire a request on every keystroke.
+  // Debounced 400ms so typing doesn't fire a request on every keystroke;
+  // resets to page 1 together with the new term.
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 400);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery.trim());
+      setPage(1);
+    }, 400);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  useEffect(() => { fetchTransactions(); }, [debouncedSearch, filterType, filterStatus, startDate, endDate]);
+  useEffect(() => { fetchTransactions(); }, [debouncedSearch, filterType, filterStatus, startDate, endDate, page]);
 
-  // ── Live updates: refetches on socket events so activity elsewhere
-  // (e.g. a document status change) shows up without the professor
-  // needing to tweak a filter or reload.
-  useEffect(() => {
-    if (!authUser || !token) return;
-    const socket = connectSocket(token);
-    if (!socket) return;
+  const hasActiveFilters =
+    !!debouncedSearch || filterType !== "all" || filterStatus !== "all" || !!startDate || !!endDate;
+  const clearFilters = () => {
+    setSearchQuery("");
+    setDebouncedSearch("");
+    setFilterType("all");
+    setFilterStatus("all");
+    setStartDate("");
+    setEndDate("");
+    setPage(1);
+  };
 
-    const events = [
-      "appointment:status-updated",
-      "document:status-updated",
-      "document:cancelled",
-      "queue:called",
-      "queue:served",
-      "queue:no-show",
-    ];
-    events.forEach((event) => socket.on(event, fetchTransactions));
-    return () => {
-      events.forEach((event) => socket.off(event, fetchTransactions));
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authUser, token]);
-
-  // Server already handles filtering (including search); just use
-  // transactions directly.
-  const filtered = transactions;
-
-  // ── Statistics ─────────────────────────────────────────────────────────────
-  // Computed client-side from `filtered` -- the exact, already-filtered set
-  // on screen -- instead of a separate always-unfiltered stats endpoint.
-  // That older approach meant the cards (and the exported summary, which
-  // reads this same `txStats`) never moved when a search/type/status/date
-  // filter narrowed the list, which read as broken. Bucket/month semantics
-  // match GET /professor/transactions/stats exactly (still used by
-  // client-mobile, untouched) -- completed = completed/claimed, ongoing =
-  // ready/pending/approved/processing/generated/released, this-month is
-  // Manila-calendar-anchored.
-  const txStats = useMemo(() => {
-    const COMPLETED = new Set(["completed", "claimed"]);
-    const ONGOING = new Set(["ready", "pending", "approved", "processing", "generated", "released"]);
-    const thisManilaMonth = getManilaDateString().slice(0, 7);
-    let completed = 0;
-    let ongoing = 0;
-    let thisMonth = 0;
-    for (const t of filtered) {
-      if (COMPLETED.has(t.status)) completed++;
-      else if (ONGOING.has(t.status)) ongoing++;
-      if (t.date && getManilaDateString(new Date(t.date)).slice(0, 7) === thisManilaMonth) thisMonth++;
-    }
-    return { total: filtered.length, completed, ongoing, thisMonth };
-  }, [filtered]);
-
-  // Exports exactly what's currently on screen (the server-filtered list
-  // already held in state) — no new backend endpoint needed.
+  // Exports EVERYTHING matching the current filters/search (pages through the
+  // endpoint at its 100/page max), not just the page on screen.
   // "Tracking #" is meaningless on an appointment-only export (appointments
   // never have one, so the column would just be blank down the whole
   // sheet) -- swap it for the shared comment instead, since that's the
@@ -245,7 +196,7 @@ export default function ProfessorTransactionsPage() {
     isAppointmentOnly ? "Comment" : "Tracking #",
     "Date", "Time",
   ];
-  const exportRows = filtered.map((t) => [
+  const buildExportRow = (t) => [
     typeLabel(t.type),
     t.title,
     t.details,
@@ -257,13 +208,23 @@ export default function ProfessorTransactionsPage() {
       : (t.type === "document" || t.type === "submission") ? (t.trackingNumber ?? "") : "",
     t.dateLabel,
     t.timeLabel,
-  ]);
-  // Prefixes a leading =/+/-/@ so a cell can't execute as a formula when the
-  // CSV is opened in Excel/Sheets (matches the guard in adm-transactions.jsx).
-  const csvEscape = (value) => {
-    const str = String(value ?? "");
-    const safe = /^[=+\-@]/.test(str) ? `'${str}` : str;
-    return `"${safe.replace(/"/g, '""')}"`;
+  ];
+
+  const fetchAllForExport = async () => {
+    let all = [];
+    let exportStats = txStats;
+    let fetchPage = 1;
+    let pages;
+    do {
+      const res = await api.get("/professor/transactions", {
+        params: { ...buildParams(), page: fetchPage, limit: 100 },
+      });
+      all = all.concat((res.data.transactions ?? []).map(withLabels));
+      if (res.data.stats) exportStats = res.data.stats;
+      pages = res.data.totalPages ?? 1;
+      fetchPage += 1;
+    } while (fetchPage <= pages);
+    return { rows: all.map(buildExportRow), exportStats };
   };
 
   const dateRangeLabel =
@@ -271,36 +232,48 @@ export default function ProfessorTransactionsPage() {
       ? `${startDate || "…"} to ${endDate || "…"}`
       : "All Time";
 
-  const summaryRows = [
+  const buildSummaryRows = (st) => [
     ["Date Range", dateRangeLabel],
-    ["Total", txStats.total],
-    ["Completed", txStats.completed],
-    ["Ongoing", txStats.ongoing],
-    ["This Month", txStats.thisMonth],
+    ["Total", st.total],
+    ["Completed", st.completed],
+    ["Ongoing", st.ongoing],
+    ["This Month", st.thisMonth],
   ];
 
-  const handleExportCsv = () => {
-    const csv = [...summaryRows, [], exportHeader, ...exportRows]
-      .map((row) => row.map(csvEscape).join(","))
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `transactions-${getManilaDateString()}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+  const handleExportCsv = async () => {
+    setIsExporting(true);
+    try {
+      const { rows, exportStats } = await fetchAllForExport();
+      downloadCsv(
+        [...buildSummaryRows(exportStats), [], exportHeader, ...rows],
+        `transactions-${getManilaDateString()}.csv`,
+      );
+    } catch (err) {
+      console.error("Failed to export transactions:", err);
+      toast.error("Could not export your transaction history.");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
-  const handleExportPdf = () => {
-    exportTransactionsPdf({
-      title: "Transaction History",
-      subtitle: `${authUser?.name ?? "Professor"} — ${dateRangeLabel} — Generated ${getManilaDateString()}`,
-      columns: exportHeader,
-      rows: exportRows,
-      filename: `transactions-${getManilaDateString()}.pdf`,
-      summary: summaryRows.map(([label, value]) => ({ label, value })),
-    });
+  const handleExportPdf = async () => {
+    setIsExporting(true);
+    try {
+      const { rows, exportStats } = await fetchAllForExport();
+      exportTransactionsPdf({
+        title: "Transaction History",
+        subtitle: `${authUser?.name ?? "Professor"} — ${dateRangeLabel} — Generated ${getManilaDateString()}`,
+        columns: exportHeader,
+        rows,
+        filename: `transactions-${getManilaDateString()}.pdf`,
+        summary: buildSummaryRows(exportStats).map(([label, value]) => ({ label, value })),
+      });
+    } catch (err) {
+      console.error("Failed to export transactions:", err);
+      toast.error("Could not export your transaction history.");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -362,8 +335,8 @@ export default function ProfessorTransactionsPage() {
               </div>
               <ExportMenu
                 triggerClassName="txn-export-btn"
-                label="Export"
-                disabled={filtered.length === 0}
+                label={isExporting ? "Exporting…" : "Export"}
+                disabled={isExporting || transactions.length === 0}
                 onExportCsv={handleExportCsv}
                 onExportPdf={handleExportPdf}
               />
@@ -376,7 +349,7 @@ export default function ProfessorTransactionsPage() {
                   <input
                     id="txn-search"
                     type="text"
-                    placeholder="Search by student name, ID, or details..."
+                    placeholder="Search by student name, ID, service, purpose, or tracking #..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="filter-search-input"
@@ -391,6 +364,7 @@ export default function ProfessorTransactionsPage() {
                 onChange={(e) => {
                   const nextType = e.target.value;
                   setFilterType(nextType);
+                  setPage(1);
                   const allowedStatuses = PROFESSOR_STATUSES_BY_TYPE[nextType];
                   if (allowedStatuses && filterStatus !== "all" && !allowedStatuses.includes(filterStatus)) {
                     setFilterStatus("all");
@@ -404,7 +378,7 @@ export default function ProfessorTransactionsPage() {
                 id="txn-status-select"
                 label="Status"
                 value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
+                onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
                 options={getStatusOptionsForType(STATUS_OPTIONS, PROFESSOR_STATUSES_BY_TYPE, filterType)}
                 chevronIcon={<ChevronDownIcon className="filter-chevron" />}
               />
@@ -415,9 +389,9 @@ export default function ProfessorTransactionsPage() {
                 label="Date Range"
                 startValue={startDate}
                 endValue={endDate}
-                onStartChange={(e) => setStartDate(e.target.value)}
-                onEndChange={(e) => setEndDate(e.target.value)}
-                onClear={() => { setStartDate(""); setEndDate(""); }}
+                onStartChange={(e) => { setStartDate(e.target.value); setPage(1); }}
+                onEndChange={(e) => { setEndDate(e.target.value); setPage(1); }}
+                onClear={() => { setStartDate(""); setEndDate(""); setPage(1); }}
               />
             </div>
           </div>
@@ -435,14 +409,25 @@ export default function ProfessorTransactionsPage() {
                 <h3>Could not load transactions</h3>
                 <p>{txError}</p>
               </div>
-            ) : filtered.length === 0 ? (
+            ) : transactions.length === 0 ? (
               <div className="txn-empty">
                 <ClipboardListIcon />
-                <h3>No Transactions Found</h3>
-                <p>You have no transaction records yet.</p>
+                {hasActiveFilters ? (
+                  <>
+                    <h3>No transactions match your filters</h3>
+                    <button type="button" className="txn-clear-btn" onClick={clearFilters}>
+                      Clear filters
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <h3>No Transactions Found</h3>
+                    <p>You have no transaction records yet.</p>
+                  </>
+                )}
               </div>
             ) : (
-              filtered.map((txn) => (
+              transactions.map((txn) => (
                 <div key={`${txn.type}-${txn.id}`} className={`txn-item txn-type-${txn.type}`}>
                   <div className="txn-item-icon">
                     <span className={`txn-icon-wrap txn-icon-${txn.type}`}>
@@ -467,6 +452,12 @@ export default function ProfessorTransactionsPage() {
                           <span className="txn-student-id-badge">{txn.studentId}</span>
                         )}
                       </div>
+                    )}
+                    {txn.details && !(txn.title ?? "").includes(txn.details) && (
+                      <p className="txn-item-details">
+                        {txn.details}
+                        {txn.type === "document" && txn.copies > 1 ? ` · ${txn.copies} copies` : ""}
+                      </p>
                     )}
                     {txn.type === "appointment" && txn.cancelledBy === "student_no_show" && (
                       <p className="txn-item-comment-text">
@@ -520,6 +511,9 @@ export default function ProfessorTransactionsPage() {
               ))
             )}
           </div>
+          {!loading && !txError && (
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+          )}
         </div>
     </ProfessorPageShell>
   );

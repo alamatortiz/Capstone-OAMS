@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
-import { ChevronLeft, FileText } from "lucide-react";
+import { ChevronLeft, FileText, RotateCcw } from "lucide-react";
 import "./adm-dashboard.css";
 import "./adm-data-management.css";
 import { toast } from "sonner";
@@ -345,6 +345,16 @@ export default function AdminDataManagement() {
       toast.error(err?.response?.data?.error || "Failed to set the document type inactive.");
     } finally {
       setDeleteDocTarget(null);
+    }
+  };
+
+  const handleReactivateDoc = async (doc) => {
+    try {
+      await api.patch(`/admin/data-management/document-types/${doc.id}/reactivate`);
+      toast.success("Document type reactivated.");
+      fetchDocumentTypes(docStatusFilter);
+    } catch (err) {
+      toast.error(err?.response?.data?.error || "Failed to reactivate the document type.");
     }
   };
 
@@ -1098,9 +1108,15 @@ export default function AdminDataManagement() {
                         <button className="adm-btn-icon adm-btn-edit" onClick={() => openEditDocModal(doc)} title="Edit">
                           <EditSvgIcon />
                         </button>
-                        <button className="adm-btn-icon adm-btn-delete" onClick={() => setDeleteDocTarget(doc)} title="Set inactive">
-                          <TrashIcon />
-                        </button>
+                        {doc.status === "inactive" ? (
+                          <button className="adm-btn-icon adm-btn-edit" onClick={() => handleReactivateDoc(doc)} title="Reactivate">
+                            <RotateCcw size={16} />
+                          </button>
+                        ) : (
+                          <button className="adm-btn-icon adm-btn-delete" onClick={() => setDeleteDocTarget(doc)} title="Set inactive">
+                            <TrashIcon />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}

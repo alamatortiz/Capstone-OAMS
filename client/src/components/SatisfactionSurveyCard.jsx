@@ -24,7 +24,17 @@ export default function SatisfactionSurveyCard({ endpointBase }) {
     api
       .get(`/${endpointBase}/settings/satisfaction-survey`)
       .then((res) => {
-        if (!cancelled) setSurveyUrl(res.data?.surveyUrl || "");
+        if (cancelled) return;
+        const raw = res.data?.surveyUrl || "";
+        // Defensive: only ever render http(s) links (blocks javascript: etc.)
+        let safe = "";
+        try {
+          const p = new URL(raw);
+          if (p.protocol === "http:" || p.protocol === "https:") safe = raw;
+        } catch {
+          /* invalid URL -> render nothing */
+        }
+        setSurveyUrl(safe);
       })
       .catch(() => {
         // Silent -- an admin simply hasn't configured a survey link yet is

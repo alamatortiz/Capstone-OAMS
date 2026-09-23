@@ -18,9 +18,11 @@ export default function SuperadminSatisfactionSurvey() {
   const [savingId, setSavingId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState(null);
+  const [loadError, setLoadError] = useState(null);
 
-  useEffect(() => {
-    if (!authUser) return;
+  const loadConfig = () => {
+    setLoading(true);
+    setLoadError(null);
     api
       .get("/admin/settings/satisfaction-survey")
       .then((res) => {
@@ -30,14 +32,37 @@ export default function SuperadminSatisfactionSurvey() {
           Object.fromEntries(depts.map((d) => [d.departmentId, d.surveyUrl || ""])),
         );
       })
-      .catch((err) => console.error("Failed to load satisfaction survey config:", err))
+      .catch((err) => {
+        console.error("Failed to load satisfaction survey config:", err);
+        setLoadError(err?.response?.data?.error ?? "Failed to load survey links.");
+      })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (!authUser) return;
+    loadConfig();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authUser]);
 
   const handleSave = async (departmentId) => {
+    const surveyUrl = (urlsByDept[departmentId] ?? "").trim();
+    if (surveyUrl) {
+      let ok = false;
+      try {
+        const p = new URL(surveyUrl);
+        ok = p.protocol === "http:" || p.protocol === "https:";
+      } catch {
+        ok = false;
+      }
+      if (!ok) {
+        setMessage({ type: "error", text: "Survey link must be a valid http:// or https:// URL." });
+        setTimeout(() => setMessage(null), 3000);
+        return;
+      }
+    }
     setSavingId(departmentId);
     try {
-      const surveyUrl = (urlsByDept[departmentId] ?? "").trim();
       const res = await api.put(
         `/admin/settings/satisfaction-survey/${departmentId}`,
         { surveyUrl },
@@ -107,7 +132,16 @@ export default function SuperadminSatisfactionSurvey() {
             {loading && (
               <p className="aps-hint">Loading departments…</p>
             )}
-            {!loading && departments.length === 0 && (
+            {!loading && loadError && (
+              <div className="aps-alert aps-alert--error">
+                <AlertTriangle />
+                <span>{loadError}</span>
+                <button className="aps-btn-secondary" onClick={loadConfig}>
+                  Retry
+                </button>
+              </div>
+            )}
+            {!loading && !loadError && departments.length === 0 && (
               <p className="aps-hint">No departments found.</p>
             )}
             {departments.map((dept) => (

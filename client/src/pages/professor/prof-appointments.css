@@ -876,6 +876,40 @@ html, body {
   margin: 0;
 }
 
+.appt-comment-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  font-family: inherit;
+  min-width: 0;
+}
+
+.appt-comment-toggle:hover { color: var(--text-primary); }
+
+.appt-comment-recorded {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.5rem;
+  color: #a855f7;
+  background: rgba(168, 85, 247, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+[data-theme="light"] .appt-comment-recorded { color: #7c3aed; }
+
+.appt-comment-chevron {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+.appt-comment-chevron--open { transform: rotate(180deg); }
+
+.appt-comment-body { margin-top: 0.1rem; }
+
 .appt-comment-edit-link {
   background: none;
   border: none;

@@ -126,9 +126,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             position: raw.position ?? undefined,
           };
           saveAuthData(normalized, storedToken);
-        } catch (error) {
+        } catch (error: unknown) {
           console.error("Failed to restore session:", error);
-          clearAuthData(); // Clear invalid token
+          const status = (error as { response?: { status?: number } })?.response
+            ?.status;
+          // Only a definite auth rejection means the token is bad. A network
+          // drop or server outage says nothing about the token, so keep the
+          // session and restore the user from the last saved copy instead of
+          // logging everyone out whenever the connection blips.
+          if (status === 401 || status === 403) {
+            clearAuthData();
+          } else {
+            try {
+              const cachedUser = localStorage.getItem("oams_user");
+              if (cachedUser) {
+                setUser(JSON.parse(cachedUser) as UserData);
+              } else {
+                clearAuthData();
+              }
+            } catch {
+              clearAuthData();
+            }
+          }
         } finally {
           setIsLoading(false);
         }

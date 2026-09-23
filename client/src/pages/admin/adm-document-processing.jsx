@@ -13,13 +13,6 @@ import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import useFilePreview from "../../hooks/useFilePreview";
 import FilePreviewModal from "../../components/FilePreviewModal";
 import AttachmentChip from "../../components/AttachmentChip";
-import { useLiveRefetch } from "../../hooks/useLiveRefetch";
-
-const DOCUMENT_LIVE_EVENTS = [
-  "document:new-request",
-  "document:status-updated",
-  "document:cancelled",
-];
 import { formatManilaDate, getManilaDateString, getManilaTomorrowDateString } from "../../utils/dateTime";
 import { COLLEGES } from "../../data/colleges";
 
@@ -308,9 +301,6 @@ export default function AdminDocumentProcessing() {
   useEffect(() => {
     fetchDocuments();
   }, [fetchDocuments]);
-
-  // ── Live updates (also reconciles on socket reconnect). ──
-  useLiveRefetch(DOCUMENT_LIVE_EVENTS, fetchDocuments);
 
   // ── Date buckets ──────────────────────────────────────────────────────────
   // Monday-anchored this-week/next-week windows (same pattern as

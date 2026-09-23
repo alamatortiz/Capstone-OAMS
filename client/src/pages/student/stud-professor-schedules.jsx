@@ -7,8 +7,6 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 import api from "../../utils/api";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
-import { connectSocket } from "../../utils/socket";
-import { useAuth } from "../../context/AuthContext";
 import { getManilaDateString, formatManilaDate } from "../../utils/dateTime";
 
 import "./stud-professor-schedules.css";
@@ -91,7 +89,6 @@ const Loader2Icon = () => (
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function ProfessorSchedule() {
   const location = useLocation();
-  const { token } = useAuth();
   const cameFrom = location.state?.from ?? "/student/dashboard";
   const cameFromLabel = location.state?.fromLabel ?? "Home";
 
@@ -133,24 +130,9 @@ export default function ProfessorSchedule() {
     fetchSchedules();
   }, [fetchSchedules]);
 
-  // ── Live updates: refetch when a professor toggles Available/Unavailable ──
-  useEffect(() => {
-    if (!token) return;
-
-    const socket = connectSocket(token);
-    if (!socket) return;
-
-    socket.on("faculty:availability-status-changed", fetchSchedules);
-
-    return () => {
-      socket.off("faculty:availability-status-changed", fetchSchedules);
-    };
-  }, [fetchSchedules, token]);
-
   // Fallback poll: a student browsing a professor from another college is in
-  // their own department's socket room, not the professor's, so
-  // faculty:availability-status-changed events for that professor never
-  // reach them -- this keeps availability status from drifting stale.
+  // their own department's socket room, not the professor's. Availability
+  // status is non-critical, so the poll alone (no socket listener) is enough.
   useEffect(() => {
     const interval = setInterval(() => {
       if (document.visibilityState !== "visible") return;

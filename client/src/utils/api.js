@@ -54,6 +54,16 @@ api.interceptors.response.use(
 
     const isGatewayStatus = status === 502 || status === 503 || status === 504;
     const isUnreachable = !error.response && !axios.isCancel(error);
+
+    // The user's own connection dropped -- not a system outage. Don't yank
+    // them to a full-page error (which reloads and loses whatever they were
+    // doing); the OfflineBanner tells them, and the failed call rejects
+    // normally so the page's own error handling still runs.
+    if (isUnreachable && typeof navigator !== "undefined" && navigator.onLine === false) {
+      error.isOffline = true;
+      return Promise.reject(error);
+    }
+
     if (
       (isGatewayStatus || isUnreachable) &&
       !redirectingToErrorPage &&

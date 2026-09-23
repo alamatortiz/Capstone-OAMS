@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import { ChevronLeft, FileText } from "lucide-react";
@@ -12,7 +12,6 @@ import "./adm-transactions.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
 import { getManilaDateString, formatManilaDate, formatManilaTime } from "../../utils/dateTime";
-import { useLiveRefetch } from "../../hooks/useLiveRefetch";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
 import FilterSelect from "../../components/FilterSelect";
@@ -20,6 +19,9 @@ import FilterDateRange from "../../components/FilterDateRange";
 import Pagination from "../../components/Pagination";
 import ExportMenu from "../../components/ExportMenu";
 import { exportTransactionsPdf } from "../../utils/exportPdf";
+import { downloadCsv } from "../../utils/csv";
+import { transactionStatusLabel, transactionTypeLabel } from "../../utils/transactionLabels";
+import { ClipboardListIcon, AlertCircleIcon, ChevronDownIcon } from "../../components/TransactionIcons";
 import { ADMIN_STATUSES_BY_TYPE, getStatusOptionsForType } from "../../data/transactionStatusOptions";
 
 // ── Icons (all unchanged from admin_dashboard) ──────────────────────────────
@@ -44,28 +46,6 @@ const ActivityIcon = () => (
     strokeWidth="2"
   >
     <path d="M22 12h-4l-3 9L9 3l-5 9H0"></path>
-  </svg>
-);
-const ClipboardListIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-    <line x1="8" y1="11" x2="16" y2="11"></line>
-    <line x1="8" y1="15" x2="12" y2="15"></line>
-  </svg>
-);
-const AlertCircleIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="12" cy="12" r="10"></circle>
-    <line x1="12" y1="8" x2="12" y2="12"></line>
-    <line x1="12" y1="16" x2="12.01" y2="16"></line>
   </svg>
 );
 const UserGroupIcon = () => (
@@ -130,7 +110,8 @@ const CollegeLogoIcon = ({ collegeShortName }) => {
     CHAS: collegeCHASlogo,
   };
 
-  const src = logoSrcMap[collegeShortName] ?? collegeCASlogo;
+  const src = logoSrcMap[collegeShortName];
+  if (!src) return null;
 
   return (
     <img
@@ -142,18 +123,6 @@ const CollegeLogoIcon = ({ collegeShortName }) => {
     />
   );
 };
-
-const ChevronDownIcon = ({ className = "" }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <polyline points="6 9 12 15 18 9"></polyline>
-  </svg>
-);
 
 // Scoped server-side to the logged-in admin's own department.
 
@@ -170,7 +139,7 @@ const STATUS_OPTIONS = [
   { value: "approved", label: "Approved" },
   { value: "pending", label: "Pending" },
   { value: "processing", label: "Processing" },
-  { value: "ready", label: "Ready" },
+  { value: "ready", label: "Ready for Pickup" },
   { value: "claimed", label: "Claimed" },
   { value: "rejected", label: "Rejected" },
   { value: "cancelled", label: "Cancelled" },
@@ -178,32 +147,19 @@ const STATUS_OPTIONS = [
   { value: "created", label: "Created" },
   { value: "updated", label: "Updated" },
   { value: "deleted", label: "Deleted" },
-  { value: "viewed", label: "Viewed" },
+  { value: "viewed", label: "Viewed (admin action: opened a record)" },
 ];
 // Colleges CollegeLogoIcon actually has artwork for -- used to skip the logo
 // (keeping the text label) for any transaction whose collegeAbbrev isn't one
 // of these, instead of silently falling back to the CAS logo.
 const KNOWN_COLLEGES = ["CCS", "CBAA", "COE", "COED", "CAS", "CHAS"];
 
-const TRANSACTION_LIVE_EVENTS = [
-  "queue:called",
-  "queue:served",
-  "queue:no-show",
-  "queue:student-joined",
-  "queue:student-left",
-  "queue:slot-status",
-  "appointment:status-updated",
-  "document:status-updated",
-  "document:cancelled",
-  "announcement:changed",
-  "faq:changed",
-];
-
 export default function AdminTransaction() {
   const { user: authUser } = useAuth();
 
   // ── Transaction Page State ────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [startDate, setStartDate] = useState("");
@@ -211,81 +167,71 @@ export default function AdminTransaction() {
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
 
-  // ── Live transaction data (scoped server-side to admin's department) ─────
+  // ── Transaction data (scoped + searched + paginated server-side) ─────────
   const [transactions, setTransactions] = useState([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [stats, setStats] = useState({ total: 0, queue: 0, appointments: 0, documents: 0, adminActions: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const requestIdRef = useRef(0);
 
+  // Debounce the search box; reset to page 1 together with the new term.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchQuery.trim());
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  const buildParams = () => ({
+    type: filterType,
+    status: filterStatus,
+    search: debouncedSearch || undefined,
+    startDate: startDate || undefined,
+    endDate: endDate || undefined,
+  });
+
+  // No live/socket refresh here on purpose -- this is a history log; it
+  // refetches on mount and whenever a filter/search/page changes.
   const fetchTransactions = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     try {
       setError(null);
       const res = await api.get("/admin/transactions", {
-        params: {
-          type: filterType,
-          status: filterStatus,
-          startDate: startDate || undefined,
-          endDate: endDate || undefined,
-        },
+        params: { ...buildParams(), page, limit: PAGE_SIZE },
       });
+      if (requestId !== requestIdRef.current) return;
       setTransactions(res.data.transactions ?? []);
+      setTotalPages(res.data.totalPages ?? 1);
+      if (res.data.stats) setStats(res.data.stats);
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error("Failed to fetch transactions:", err);
       setError("Could not load transaction data.");
       toast.error("Could not load transaction data");
+    } finally {
+      if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [filterType, filterStatus, startDate, endDate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterType, filterStatus, debouncedSearch, startDate, endDate, page]);
 
   useEffect(() => {
-    const init = async () => {
-      setLoading(true);
-      await fetchTransactions();
-      setLoading(false);
-    };
-    if (authUser) init();
+    if (authUser) fetchTransactions();
   }, [authUser, fetchTransactions]);
 
-  // ── Live updates (also reconciles on socket reconnect). This log just needs
-  // eventual consistency, not per-second freshness. ──
-  useLiveRefetch(TRANSACTION_LIVE_EVENTS, fetchTransactions);
-
-  // ── Filter Transactions ───────────────────────────────────────────────────
-  // type/status filters are applied server-side (re-fetched via fetchTransactions
-  // whenever they change); search is applied client-side over the current page.
-  const filteredTransactions = transactions.filter((t) => {
-    const q = searchQuery.toLowerCase();
-    if (!q) return true;
-    return (
-      t.studentName?.toLowerCase().includes(q) ||
-      t.studentId?.toLowerCase().includes(q) ||
-      t.processor?.toLowerCase().includes(q) ||
-      t.details?.toLowerCase().includes(q)
-    );
-  });
-
-  // ── Statistics ─────────────────────────────────────────────────────────────
-  // Computed client-side from filteredTransactions -- the exact set the page
-  // (and the export) actually shows -- instead of the server's separate
-  // "always the department total" stats object. That older approach meant
-  // the cards (and the exported summary, which reads this same `stats`)
-  // never moved when a type/status/search filter narrowed the list, which
-  // read as broken: "the analytics don't match what I'm looking at."
-  // Note: still bounded by /admin/transactions' own 200-row cap, so a
-  // department with more matching rows than that will under-count here too
-  // -- a pre-existing limit of that endpoint, not something this introduces.
-  const stats = useMemo(() => {
-    const total = filteredTransactions.length;
-    const queue = filteredTransactions.filter((t) => t.type === "queue").length;
-    const appointments = filteredTransactions.filter((t) => t.type === "appointment").length;
-    const documents = filteredTransactions.filter(
-      (t) => t.type === "document" || t.type === "submission",
-    ).length;
-    const adminActions = filteredTransactions.filter((t) => t.type === "admin_action").length;
-    return { total, queue, appointments, documents, adminActions };
-  }, [filteredTransactions]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const pagedTransactions = filteredTransactions.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const hasActiveFilters =
+    !!debouncedSearch || filterType !== "all" || filterStatus !== "all" || !!startDate || !!endDate;
+  const clearFilters = () => {
+    setSearchQuery("");
+    setDebouncedSearch("");
+    setFilterType("all");
+    setFilterStatus("all");
+    setStartDate("");
+    setEndDate("");
+    setPage(1);
+  };
 
   // ── Badge Helpers ─────────────────────────────────────────────────────────
   const TYPE_BADGE_CONFIG = {
@@ -307,12 +253,7 @@ export default function AdminTransaction() {
       label: "Admin Action",
     },
   };
-  // Shared by the on-screen badge below and the CSV/PDF export's Type
-  // column, so both show the same friendly label instead of the export
-  // showing a raw "document"/"submission" string.
-  const getTypeLabel = (type) =>
-    TYPE_BADGE_CONFIG[type]?.label ??
-    (type ? type.charAt(0).toUpperCase() + type.slice(1) : "Unknown");
+  const getTypeLabel = transactionTypeLabel;
 
   const getTypeBadge = (type) => {
     const config = TYPE_BADGE_CONFIG[type] || {
@@ -342,10 +283,10 @@ export default function AdminTransaction() {
         label: "Pending",
       },
       processing: { color: "admin-transaction-badge-processing", label: "Processing" },
-      ready: { color: "admin-transaction-badge-ready", label: "Ready" },
+      ready: { color: "admin-transaction-badge-ready", label: transactionStatusLabel("ready") },
       // Aliases so legacy status values still map to the "Ready" badge.
-      generated: { color: "admin-transaction-badge-ready", label: "Ready" },
-      released: { color: "admin-transaction-badge-ready", label: "Ready" },
+      generated: { color: "admin-transaction-badge-ready", label: transactionStatusLabel("ready") },
+      released: { color: "admin-transaction-badge-ready", label: transactionStatusLabel("ready") },
       claimed: { color: "admin-transaction-badge-claimed", label: "Claimed" },
       created: { color: "admin-transaction-badge-created", label: "Created" },
       updated: { color: "admin-transaction-badge-updated", label: "Updated" },
@@ -391,20 +332,46 @@ export default function AdminTransaction() {
     return `admin-transaction-id-badge ${map[type] || "admin-transaction-id-badge-document"}`;
   };
 
-  // ── Export (client-side CSV/PDF of whatever currently matches the active
-  // filters, mirroring the professor transactions page's export) ───────────
-  const exportHeader = ["Type", "Action", "Details", "Status", "College", "Student Name", "Student ID", "Processor", "Tracking #", "Timestamp"];
-  const exportRows = filteredTransactions.map((t) => [
-    getTypeLabel(t.type), t.action, t.details, t.status, t.collegeAbbrev, t.studentName, t.studentId, t.processor, t.trackingNumber, t.timestamp,
-  ]);
-  // Prefixes a leading =/+/-/@ with a straight quote so a formula-looking
-  // cell (e.g. a details string starting with "=") can't execute as one when
-  // the CSV is opened in Excel/Sheets -- matches the guard used in
-  // adm-queue-analytics.jsx's own csvEscape.
-  const csvEscape = (value) => {
-    const str = String(value ?? "");
-    const safe = /^[=+\-@]/.test(str) ? `'${str}` : str;
-    return `"${safe.replace(/"/g, '""')}"`;
+  // ── Export: CSV/PDF of EVERYTHING matching the active filters/search --
+  // pages through the same server endpoint (100/page max) rather than
+  // exporting only the rows currently on screen. ───────────────────────────
+  // "Tracking #" is meaningless on an appointment-only export -- swap in the
+  // shared comment instead (same rule as the professor/student pages).
+  const isAppointmentOnly = filterType === "appointment";
+  const exportHeader = [
+    "Type", "Action", "Details", "Status", "College", "Student Name", "Student ID", "Processor",
+    isAppointmentOnly ? "Comment" : "Tracking #",
+    "Date", "Time",
+  ];
+  const buildExportRow = (t) => [
+    getTypeLabel(t.type),
+    t.action,
+    t.details,
+    transactionStatusLabel(t.status),
+    t.collegeAbbrev,
+    t.studentName ?? "",
+    t.studentId ?? "",
+    t.processor ?? "",
+    isAppointmentOnly ? (t.sharedComment ?? "") : (t.trackingNumber ?? ""),
+    t.date ? formatManilaDate(t.date, { month: "short", day: "numeric", year: "numeric" }) : "",
+    t.date ? formatManilaTime(t.date) : "",
+  ];
+
+  const fetchAllForExport = async () => {
+    let all = [];
+    let exportStats = stats;
+    let fetchPage = 1;
+    let pages;
+    do {
+      const res = await api.get("/admin/transactions", {
+        params: { ...buildParams(), page: fetchPage, limit: 100 },
+      });
+      all = all.concat(res.data.transactions ?? []);
+      if (res.data.stats) exportStats = res.data.stats;
+      pages = res.data.totalPages ?? 1;
+      fetchPage += 1;
+    } while (fetchPage <= pages);
+    return { rows: all.map(buildExportRow), exportStats };
   };
 
   const dateRangeLabel =
@@ -412,37 +379,49 @@ export default function AdminTransaction() {
       ? `${startDate || "…"} to ${endDate || "…"}`
       : "All Time";
 
-  const summaryRows = [
+  const buildSummaryRows = (st) => [
     ["Date Range", dateRangeLabel],
-    ["Total Transactions", stats.total],
-    ["Queue", stats.queue],
-    ["Appointments", stats.appointments],
-    ["Documents", stats.documents],
-    ["Admin Actions", stats.adminActions],
+    ["Total Transactions", st.total],
+    ["Queue", st.queue],
+    ["Appointments", st.appointments],
+    ["Documents", st.documents],
+    ["Admin Actions", st.adminActions],
   ];
 
-  const handleExportCsv = () => {
-    const csv = [...summaryRows, [], exportHeader, ...exportRows]
-      .map((row) => row.map(csvEscape).join(","))
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `transactions-${getManilaDateString()}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+  const handleExportCsv = async () => {
+    setIsExporting(true);
+    try {
+      const { rows, exportStats } = await fetchAllForExport();
+      downloadCsv(
+        [...buildSummaryRows(exportStats), [], exportHeader, ...rows],
+        `transactions-${getManilaDateString()}.csv`,
+      );
+    } catch (err) {
+      console.error("Failed to export transactions:", err);
+      toast.error("Could not export transactions");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
-  const handleExportPdf = () => {
-    exportTransactionsPdf({
-      title: "Department Transaction Report",
-      subtitle: `${authUser?.departmentName ?? "Department"} — ${dateRangeLabel} — Generated ${getManilaDateString()}`,
-      columns: exportHeader,
-      rows: exportRows,
-      filename: `transactions-${getManilaDateString()}.pdf`,
-      summary: summaryRows.map(([label, value]) => ({ label, value })),
-    });
+  const handleExportPdf = async () => {
+    setIsExporting(true);
+    try {
+      const { rows, exportStats } = await fetchAllForExport();
+      exportTransactionsPdf({
+        title: "Department Transaction Report",
+        subtitle: `${authUser?.departmentName ?? "Department"} — ${dateRangeLabel} — Generated ${getManilaDateString()}`,
+        columns: exportHeader,
+        rows,
+        filename: `transactions-${getManilaDateString()}.pdf`,
+        summary: buildSummaryRows(exportStats).map(([label, value]) => ({ label, value })),
+      });
+    } catch (err) {
+      console.error("Failed to export transactions:", err);
+      toast.error("Could not export transactions");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -528,8 +507,8 @@ export default function AdminTransaction() {
               </div>
               <ExportMenu
                 triggerClassName="admin-transaction-export-btn"
-                label="Export Report"
-                disabled={filteredTransactions.length === 0}
+                label={isExporting ? "Exporting…" : "Export Report"}
+                disabled={isExporting || transactions.length === 0}
                 onExportCsv={handleExportCsv}
                 onExportPdf={handleExportPdf}
               />
@@ -545,9 +524,9 @@ export default function AdminTransaction() {
                     id="tx-search"
                     type="text"
                     className="filter-search-input"
-                    placeholder="Search by student, processor, or details..."
+                    placeholder="Search by student, processor, details, or tracking #..."
                     value={searchQuery}
-                    onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
               </div>
@@ -605,14 +584,25 @@ export default function AdminTransaction() {
                   <h3>Could not load transactions</h3>
                   <p>{error}</p>
                 </div>
-              ) : filteredTransactions.length === 0 ? (
+              ) : transactions.length === 0 ? (
                 <div className="admin-transaction-empty-state">
                   <ClipboardListIcon />
-                  <h3>No Transactions Found</h3>
-                  <p>There are no department transaction records yet.</p>
+                  {hasActiveFilters ? (
+                    <>
+                      <h3>No transactions match your filters</h3>
+                      <button type="button" className="admin-transaction-clear-btn" onClick={clearFilters}>
+                        Clear filters
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <h3>No Transactions Found</h3>
+                      <p>There are no department transaction records yet.</p>
+                    </>
+                  )}
                 </div>
               ) : (
-                pagedTransactions.map((transaction) => {
+                transactions.map((transaction) => {
                   const iconType =
                     transaction.type === "submission" ? "document" : transaction.type;
                   const refBadge =
@@ -711,9 +701,19 @@ export default function AdminTransaction() {
                             Reason: {transaction.adminReason}
                           </p>
                         )}
-                        {transaction.type === "admin_action" && transaction.details && (
+                        {transaction.type === "appointment" && transaction.serviceName && (
+                          <p className="admin-transaction-item-service-type">
+                            Service: {transaction.serviceName}
+                          </p>
+                        )}
+                        {transaction.type !== "queue" && transaction.details && (
                           <p className="admin-transaction-item-details">
                             {transaction.details}
+                          </p>
+                        )}
+                        {transaction.type === "appointment" && transaction.sharedComment && (
+                          <p className="admin-transaction-item-details">
+                            Comment: {transaction.sharedComment}
                           </p>
                         )}
                       </div>
@@ -737,7 +737,9 @@ export default function AdminTransaction() {
                 })
               )}
             </div>
-            <Pagination page={safePage} totalPages={totalPages} onPageChange={setPage} />
+            {!loading && !error && (
+              <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+            )}
         </div>
     </AdminPageShell>
   );

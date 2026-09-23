@@ -22,6 +22,7 @@ import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
 import AppointmentListItem from "../../components/AppointmentListItem";
 import { formatManilaDate, formatManilaTime } from "../../utils/dateTime";
+import { getAppointmentActions } from "../../utils/appointmentActions";
 import { filterByRange } from "../../utils/dateRange";
 import { connectSocket } from "../../utils/socket";
 import { useAuth } from "../../context/AuthContext";
@@ -91,9 +92,7 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, com
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);
   const { label: statusLabel, cls: statusCls } = getStatusMeta(appt.status);
-  const canCancel = appt.status === "pending" || appt.status === "approved";
-  const canComplete = appt.status === "approved";
-  const canReportNotServed = appt.status === "approved" && !appt.sharedComment;
+  const { canCancel, canComplete, canReportNotServed } = getAppointmentActions(appt);
 
   return (
     <div className="apst-status-container">

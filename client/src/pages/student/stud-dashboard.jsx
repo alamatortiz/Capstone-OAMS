@@ -225,7 +225,6 @@ export default function StudentDashboard() {
       "queue:no-show",
     ];
     statsEvents.forEach((event) => socket.on(event, fetchStats));
-    socket.on("announcement:changed", fetchAnnouncements);
 
     // document:cancelled is broadcast to the whole department (so the
     // admin's live list updates too), not just the affected student --
@@ -241,10 +240,9 @@ export default function StudentDashboard() {
 
     return () => {
       statsEvents.forEach((event) => socket.off(event, fetchStats));
-      socket.off("announcement:changed", fetchAnnouncements);
       socket.off("document:cancelled", handleOwnDocumentCancelled);
     };
-  }, [authUser, token, fetchStats, fetchAnnouncements]);
+  }, [authUser, token, fetchStats]);
 
   // ── Fallback poll (safety net only — sockets drive live updates) ──────────
   // Unlike QueueProvider, this page had no such safety net: if the socket

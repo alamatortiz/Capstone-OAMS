@@ -1052,7 +1052,7 @@
 
 .admin-transaction-item-details {
   font-size: 0.8rem;
-  color: var(--text-primary);
+  color: var(--text-secondary, var(--text-primary));
   margin: 0;
   transition: color 0.3s ease;
   line-height: 1.4;
@@ -1225,4 +1225,17 @@
 
 @media (max-width: 380px) {
   .admin-transaction-stats-grid { grid-template-columns: 1fr; }
+}
+
+/* Clear-filters button shown in the filtered-empty state */
+.admin-transaction-clear-btn {
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--primary-color);
+  background: transparent;
+  color: var(--primary-color);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
 }

@@ -16,36 +16,17 @@ import "./stud-transactions.css";
 import api from "../../utils/api";
 import { formatManilaDate, formatManilaTime, getManilaDateString } from "../../utils/dateTime";
 import { exportTransactionsPdf } from "../../utils/exportPdf";
-import { connectSocket } from "../../utils/socket";
+import { downloadCsv } from "../../utils/csv";
+import { transactionStatusLabel, transactionTypeLabel } from "../../utils/transactionLabels";
+import { ClipboardListIcon, AlertCircleIcon, ChevronDownIcon } from "../../components/TransactionIcons";
 import { useAuth } from "../../context/AuthContext";
 import { ChevronLeft, FileText } from "lucide-react";
 
 // ─── Icons ────────────────────────────────────────────────────────────────
-const ClipboardListIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-    <line x1="8" y1="11" x2="16" y2="11"></line>
-    <line x1="8" y1="15" x2="12" y2="15"></line>
-  </svg>
-);
-
 const SearchIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="11" cy="11" r="8"></circle>
     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-  </svg>
-);
-
-const ChevronDownIcon = ({ className = "" }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <polyline points="6 9 12 15 18 9"></polyline>
   </svg>
 );
 
@@ -63,21 +44,6 @@ const CheckCircleIcon = () => (
   </svg>
 );
 
-const AlertCircleIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="12" cy="12" r="10"></circle>
-    <line x1="12" y1="8" x2="12" y2="12"></line>
-    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-  </svg>
-);
-
 const CalendarIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -91,7 +57,7 @@ const PAGE_SIZE = 20;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function TransactionsPage() {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
 
   // ── Transaction data state ────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
@@ -210,46 +176,50 @@ export default function TransactionsPage() {
     [debouncedSearch, filterType, filterStatus, startDate, endDate, page],
   );
 
-  // ── Export (CSV/PDF of everything matching the current filters, not just
-  // the current page -- mirrors prof/admin's export, adapted for this page's
-  // server-side pagination by issuing its own request at the server's max
-  // page size instead of reading the paginated `transactions` state). Note:
-  // `limit: 100` is this endpoint's own hard cap (see studentRoutes.js), so
-  // a student with more than 100 transactions matching the active filter
-  // would still only get the first 100 -- accepted as a rare edge case
-  // rather than plumbing a raise-the-cap/paginated-export path for it. Both
-  // formats share this one fetch so a future column change only has to be
-  // made once. ──────────────────────────────────────────────────────────
-  // Appointment-only exports get an "Actions Taken" column (the shared,
-  // professor-authored comment) instead of the plain columns above, since
-  // that's the thing actually worth recalling for a past appointment.
+  // ── Export (CSV/PDF of EVERYTHING matching the current filters, not just
+  // the current page): pages through the same endpoint at its 100/page max
+  // until totalPages is exhausted. Both formats share this one fetch so a
+  // future column change only has to be made once. ──────────────────────
+  // Appointment-only exports swap in the shared, professor-authored comment
+  // (same rule as the professor/admin pages), since that's the thing
+  // actually worth recalling for a past appointment.
   const isAppointmentOnlyExport = filterType === "appointment";
   const header = isAppointmentOnlyExport
-    ? ["Type", "Title", "Details", "Status", "College", "Actions Taken", "Date", "Time"]
+    ? ["Type", "Title", "Details", "Status", "College", "Comment", "Date", "Time"]
     : ["Type", "Title", "Details", "Status", "College", "Date", "Time"];
-  const csvEscape = (value) => {
-    const str = String(value ?? "");
-    const safe = /^[=+\-@]/.test(str) ? `'${str}` : str;
-    return `"${safe.replace(/"/g, '""')}"`;
-  };
 
   const fetchExportRows = async () => {
-    const res = await api.get("/student/transactions", {
-      params: {
-        search: debouncedSearch || undefined,
-        type: filterType !== "all" ? filterType : undefined,
-        status: filterStatus !== "all" ? filterStatus : undefined,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-        limit: 100,
-        page: 1,
-      },
+    let all = [];
+    let fetchPage = 1;
+    let pages;
+    do {
+      const res = await api.get("/student/transactions", {
+        params: {
+          search: debouncedSearch || undefined,
+          type: filterType !== "all" ? filterType : undefined,
+          status: filterStatus !== "all" ? filterStatus : undefined,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+          limit: 100,
+          page: fetchPage,
+        },
+      });
+      all = all.concat(res.data.transactions ?? []);
+      pages = res.data.totalPages ?? 1;
+      fetchPage += 1;
+    } while (fetchPage <= pages);
+    return all.map((t) => {
+      const base = [
+        getTypeLabel(t.type), t.title, t.details, transactionStatusLabel(t.status), t.college,
+      ];
+      const dateTime = [
+        t.date ? formatManilaDate(t.date, { month: "short", day: "numeric", year: "numeric" }) : "",
+        t.time,
+      ];
+      return isAppointmentOnlyExport
+        ? [...base, t.sharedComment ?? "", ...dateTime]
+        : [...base, ...dateTime];
     });
-    return (res.data.transactions ?? []).map((t) =>
-      isAppointmentOnlyExport
-        ? [getTypeLabel(t.type), t.title, t.details, t.status, t.college, t.sharedComment ?? "", t.date, t.time]
-        : [getTypeLabel(t.type), t.title, t.details, t.status, t.college, t.date, t.time],
-    );
   };
 
   const dateRangeLabel =
@@ -269,14 +239,10 @@ export default function TransactionsPage() {
     setIsExporting(true);
     try {
       const rows = await fetchExportRows();
-      const csv = [...summaryRows, [], header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `transactions-${getManilaDateString()}.csv`;
-      link.click();
-      URL.revokeObjectURL(url);
+      downloadCsv(
+        [...summaryRows, [], header, ...rows],
+        `transactions-${getManilaDateString()}.csv`,
+      );
     } catch (err) {
       console.error("Failed to export transactions:", err);
       toast.error("Could not export your transaction history.");
@@ -312,55 +278,8 @@ export default function TransactionsPage() {
     fetchTransactions();
   }, [fetchTransactions]);
 
-  // Queue events (and document:cancelled) are broadcast department-wide, not
-  // just to the affected student, so they're checked against this student's
-  // own ID before refetching — otherwise this page would refetch every time
-  // ANY student in the department got called/served/etc.
-  const handleOwnQueueEvent = useCallback(
-    (payload) => {
-      if (Number(payload?.studentId) === Number(user?.userId)) {
-        fetchTransactions();
-      }
-    },
-    [fetchTransactions, user?.userId],
-  );
-
-  // ── Live updates: refetch when a document/appointment status changes, or
-  // one of this student's own queue events fires. Refetches whatever page
-  // is currently being viewed, rather than forcing the user back to page 1. ─
-  useEffect(() => {
-    if (!token) return;
-
-    const socket = connectSocket(token);
-    if (!socket) return;
-
-    const refetchCurrentPage = () => fetchTransactions();
-    const ownEvents = ["document:status-updated", "appointment:status-updated"];
-    const deptWideEvents = [
-      "queue:called",
-      "queue:served",
-      "queue:no-show",
-      "queue:student-joined",
-      "queue:student-left",
-      "document:cancelled",
-    ];
-
-    ownEvents.forEach((event) => socket.on(event, refetchCurrentPage));
-    deptWideEvents.forEach((event) => socket.on(event, handleOwnQueueEvent));
-
-    return () => {
-      ownEvents.forEach((event) => socket.off(event, refetchCurrentPage));
-      deptWideEvents.forEach((event) => socket.off(event, handleOwnQueueEvent));
-    };
-  }, [fetchTransactions, handleOwnQueueEvent, token]);
-
-  // ── Fallback poll (safety net only — sockets drive live updates) ──────────
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (document.visibilityState === "visible") fetchTransactions();
-    }, 45000);
-    return () => clearInterval(interval);
-  }, [fetchTransactions]);
+  // No live/socket/poll refresh on purpose -- this is a history log; it
+  // refetches on mount and whenever a filter/search/page changes.
 
   const getTypeIcon = (type) => {
     switch (type) {
@@ -390,22 +309,7 @@ export default function TransactionsPage() {
     }
   };
 
-  // Shared by the row badge and the CSV/PDF export's Type column, so both
-  // show a friendly label instead of the raw "document"/"submission" string.
-  const getTypeLabel = (type) => {
-    switch (type) {
-      case "queue":
-        return "Queue";
-      case "appointment":
-        return "Appointment";
-      case "document":
-        return "Document Request";
-      case "submission":
-        return "Document Submission";
-      default:
-        return type ? type.charAt(0).toUpperCase() + type.slice(1) : "Unknown";
-    }
-  };
+  const getTypeLabel = transactionTypeLabel;
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -418,6 +322,18 @@ export default function TransactionsPage() {
       default:
         return "tx-badge-default";
     }
+  };
+
+  const hasActiveFilters =
+    !!debouncedSearch || filterType !== "all" || filterStatus !== "all" || !!startDate || !!endDate;
+  const clearFilters = () => {
+    setSearchQuery("");
+    setDebouncedSearch("");
+    setFilterType("all");
+    setFilterStatus("all");
+    setStartDate("");
+    setEndDate("");
+    setPage(1);
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -554,8 +470,19 @@ export default function TransactionsPage() {
             ) : transactions.length === 0 ? (
               <div className="tx-empty-state">
                 <ClipboardListIcon />
-                <h3>No Transactions Found</h3>
-                <p>You have no transaction records yet.</p>
+                {hasActiveFilters ? (
+                  <>
+                    <h3>No transactions match your filters</h3>
+                    <button type="button" className="tx-clear-btn" onClick={clearFilters}>
+                      Clear filters
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <h3>No Transactions Found</h3>
+                    <p>You have no transaction records yet.</p>
+                  </>
+                )}
               </div>
             ) : (
               transactions.map((transaction) => {
@@ -592,11 +519,16 @@ export default function TransactionsPage() {
                             transaction.status,
                           )}`}
                         >
-                          {transaction.status}
+                          {transactionStatusLabel(transaction.status)}
                         </span>
                       </div>
                     </div>
                     <p className="transaction-college">{transaction.college}</p>
+                    {transaction.details &&
+                      transaction.details !== "No additional details provided." &&
+                      !(transaction.type === "queue" && transaction.adminReason) && (
+                        <p className="transaction-details">{transaction.details}</p>
+                      )}
                     {transaction.type === "queue" && transaction.adminReason && (
                       <p className="transaction-details">
                         Reason: {transaction.adminReason}

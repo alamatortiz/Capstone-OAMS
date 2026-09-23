@@ -237,6 +237,9 @@ export default function AppointmentsPage() {
         toast.message("A professor adjusted one of your appointment slots — check the new time and location.");
       }
       fetchMyBookings();
+      // A cancel/reject frees a spot, but only status-updated is emitted for
+      // it (not slot-updated), so refresh the slot list too.
+      fetchSlots();
     };
 
     socket.on("appointment:status-updated", handleStatusUpdate);
@@ -244,7 +247,7 @@ export default function AppointmentsPage() {
     return () => {
       socket.off("appointment:status-updated", handleStatusUpdate);
     };
-  }, [fetchMyBookings, token]);
+  }, [fetchMyBookings, fetchSlots, token]);
 
   // ── Live updates: refetch "My Bookings" when a professor leaves/edits a
   // shared comment, so the Comments box on an AppointmentListItem updates
@@ -419,8 +422,8 @@ export default function AppointmentsPage() {
     if (selectedSlot.appointmentTypes?.length > 0 && !selectedApptType) {
       toast.error("Please select an appointment type."); return;
     }
-    if (!yearProgram.trim() || !courseCode.trim()) {
-      toast.error("Please provide your year level and program, and course code."); return;
+    if (!yearProgram.trim()) {
+      toast.error("Please provide your year level and program."); return;
     }
     setSubmitting(true);
     try {
@@ -586,7 +589,7 @@ export default function AppointmentsPage() {
                     <input id="yearProgram" type="text" placeholder="e.g., 1 CS-A, 1 IT-A" value={yearProgram} onChange={(e) => setYearProgram(e.target.value)} className="textarea" />
                   </div>
                   <div className="form-group">
-                    <label htmlFor="courseCode">Course Code *</label>
+                    <label htmlFor="courseCode">Course Code (optional)</label>
                     <input id="courseCode" type="text" placeholder="e.g., CS 101" value={courseCode} onChange={(e) => setCourseCode(e.target.value)} className="textarea" />
                   </div>
                   {selectedSlot.appointmentTypes?.length > 0 && (

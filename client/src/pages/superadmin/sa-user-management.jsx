@@ -133,13 +133,14 @@ export default function SuperadminUserManagement() {
   const PAGE_SIZE = 20;
 
   // ── Handlers: CRUD ───────────────────────────────────────────────────────────
+  const errMsg = (err, fallback) => err?.response?.data?.error || fallback;
+  // Loading state only on the first load -- refetches after edits update in place.
   const fetchUsers = useCallback(async () => {
-    setLoading(true);
     try {
       const res = await api.get("/admin/users");
       setUsers(res.data.users);
-    } catch {
-      toast.error("Failed to load users");
+    } catch (err) {
+      toast.error(errMsg(err, "Failed to load users"));
     } finally {
       setLoading(false);
     }
@@ -174,8 +175,8 @@ export default function SuperadminUserManagement() {
       toast.success("User updated successfully");
       closeModal();
       fetchUsers();
-    } catch {
-      toast.error("Failed to update user");
+    } catch (err) {
+      toast.error(errMsg(err, "Failed to update user"));
     }
   };
 
@@ -184,16 +185,16 @@ export default function SuperadminUserManagement() {
       await api.delete(`/admin/users/${id}`);
       toast.success("User deleted successfully");
       fetchUsers();
-    } catch {
-      toast.error("Failed to delete user");
+    } catch (err) {
+      toast.error(errMsg(err, "Failed to delete user"));
     }
   };
   const handleResetPassword = async (u) => {
     try {
       const res = await api.post(`/admin/users/${u.id}/reset-password`);
       toast.success(`Temporary password generated: ${res.data.tempPassword}`, { duration: 10000 });
-    } catch {
-      toast.error("Failed to reset password");
+    } catch (err) {
+      toast.error(errMsg(err, "Failed to reset password"));
     }
   };
   const handleToggleSuspend = async (u) => {
@@ -202,8 +203,8 @@ export default function SuperadminUserManagement() {
       await api.patch(`/admin/users/${u.id}/status`, { status: suspending ? "suspended" : "active" });
       toast.success(`Account ${suspending ? "suspended" : "reactivated"}`);
       fetchUsers();
-    } catch {
-      toast.error("Failed to update account status");
+    } catch (err) {
+      toast.error(errMsg(err, "Failed to update account status"));
     }
   };
 

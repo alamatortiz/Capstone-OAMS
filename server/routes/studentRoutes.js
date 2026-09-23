@@ -2829,6 +2829,9 @@ router.get(
 
 // GET /api/student/transactions
 // Returns a unified history of queues, appointments, and document requests
+// Pagination: `page` (default 1) + `limit` (default 20, hard max 100); response
+// carries `totalPages` and filtered `stats`. Callers needing everything (web
+// export) loop pages. Same limit rules as admin/professor transactions.
 router.get(
   "/transactions",
   authenticateToken,
@@ -3312,19 +3315,41 @@ router.post(
         error: "availabilityId and appointmentDate are required",
       });
     }
+    if (
+      typeof appointmentDate !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate)
+    ) {
+      return res
+        .status(400)
+        .json({ error: "appointmentDate must be a YYYY-MM-DD string" });
+    }
     if (appointmentDate < getManilaDateString()) {
       return res
         .status(400)
         .json({ error: "Appointment date cannot be in the past" });
     }
-    if (typeof purpose === "string" && purpose.length > 255) {
+    // Same 30-day window GET /appointments/available-slots offers (DAYS_AHEAD
+    // there: today + 0..29).
+    {
+      const limit = new Date();
+      limit.setDate(limit.getDate() + 29);
+      if (appointmentDate > getManilaDateString(limit)) {
+        return res.status(400).json({
+          error: "Appointment date is outside the bookable 30-day window",
+        });
+      }
+    }
+    if (
+      purpose != null &&
+      (typeof purpose !== "string" || purpose.length > 255)
+    ) {
       return res
         .status(400)
-        .json({ error: "Purpose must be 255 characters or fewer" });
+        .json({ error: "Purpose must be a string of 255 characters or fewer" });
     }
-    if (!yearProgram?.trim() || !courseCode?.trim()) {
+    if (typeof yearProgram !== "string" || !yearProgram.trim()) {
       return res.status(400).json({
-        error: "Year Level and Program, and Course Code, are required",
+        error: "Year Level and Program is required",
       });
     }
     if (yearProgram.trim().length > 150) {
@@ -3332,7 +3357,7 @@ router.post(
         error: "Year Level and Program must be 150 characters or fewer",
       });
     }
-    if (courseCode.trim().length > 50) {
+    if (typeof courseCode === "string" && courseCode.trim().length > 50) {
       return res
         .status(400)
         .json({ error: "Course Code must be 50 characters or fewer" });
@@ -3494,7 +3519,7 @@ router.post(
           appointmentTime,
           purpose?.trim() || null,
           yearProgram.trim(),
-          courseCode.trim(),
+          (typeof courseCode === "string" && courseCode.trim()) || null,
         ],
       );
       const appointmentId = result.insertId;

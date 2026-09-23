@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import "./adm-queue-analytics.css";
@@ -9,7 +9,6 @@ import FilterDateRange from "../../components/FilterDateRange";
 import { toast } from "sonner";
 import api from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
-import { useLiveRefetch } from "../../hooks/useLiveRefetch";
 import { getManilaDateString, formatManilaDate, formatTimeString } from "../../utils/dateTime";
 import ExportMenu from "../../components/ExportMenu";
 import { exportTransactionsPdf } from "../../utils/exportPdf";
@@ -64,17 +63,6 @@ const ChevronDownIcon = ({ className = "" }) => (
   </svg>
 );
 
-// A queue metric moves whenever a student is called / served / no-showed or a
-// slot's lifecycle changes; useLiveRefetch also reconciles on socket reconnect.
-const ANALYTICS_LIVE_EVENTS = [
-  "queue:called",
-  "queue:served",
-  "queue:no-show",
-  "queue:slot-status",
-  "queue:student-joined",
-  "queue:student-left",
-];
-
 export default function AdminQueueAnalytics() {
   const { user: authUser } = useAuth();
   const user = authUser
@@ -111,8 +99,13 @@ export default function AdminQueueAnalytics() {
   const effectiveStart = startDate || today;
   const effectiveEnd = endDate || today;
 
+  // Monotonic request id: only the latest request may write state, so a slow
+  // Load-More (or an old filter's response) can't clobber a newer result.
+  const requestIdRef = useRef(0);
+
   const fetchSummary = useCallback(
     async (pageToFetch = 1, { append = false } = {}) => {
+      const requestId = ++requestIdRef.current;
       try {
         if (!append) setError(null);
         const res = await api.get("/admin/queue-analytics/summary", {
@@ -124,29 +117,34 @@ export default function AdminQueueAnalytics() {
             limit: 10,
           },
         });
+        if (requestId !== requestIdRef.current) return;
         setTotals(res.data.totals);
         setQueues((prev) => (append ? [...prev, ...(res.data.queues ?? [])] : (res.data.queues ?? [])));
         setPage(res.data.page ?? pageToFetch);
         setHasMore(!!res.data.hasMore);
         if (res.data.serviceTypes) setServiceTypes(res.data.serviceTypes);
       } catch (err) {
+        if (requestId !== requestIdRef.current) return;
         console.error("Queue analytics summary fetch error:", err);
-        setError("Could not load queue analytics.");
+        // A failed Load-More must not replace the rows already on screen.
+        if (append) toast.error("Could not load more queues");
+        else setError(err?.response?.data?.error || "Could not load queue analytics.");
       } finally {
-        setLoading(false);
-        setLoadingMore(false);
+        if (requestId === requestIdRef.current) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
     },
     [effectiveStart, effectiveEnd, serviceType],
   );
 
   // Initial + filter-driven fetch (fetchSummary changes identity with the
-  // date range / serviceType), plus live socket updates + reconnect
-  // reconciliation -- both always reset back to page 1.
+  // date range / serviceType). No live socket refetch: this report doesn't
+  // need to update in real time.
   useEffect(() => {
     if (authUser) fetchSummary(1);
   }, [authUser, fetchSummary]);
-  useLiveRefetch(ANALYTICS_LIVE_EVENTS, () => fetchSummary(1));
 
   const handleLoadMore = () => {
     setLoadingMore(true);

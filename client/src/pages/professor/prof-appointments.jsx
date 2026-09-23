@@ -12,13 +12,14 @@ import {
   formatManilaDate,
   formatManilaTime,
   getManilaDateString,
+  getManilaTimeString,
 } from "../../utils/dateTime";
 import { filterByRange } from "../../utils/dateRange";
-import { connectSocket } from "../../utils/socket";
 import {
   Calendar,
   Clock,
   MapPin,
+  ChevronDown,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -122,6 +123,7 @@ const CONFIRM_META = {
 function CommentBlock({ appointment, onSaved }) {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [open, setOpen] = useState(false);
   const canEdit = appointment.status === "approved";
 
   const save = async (draft) => {
@@ -143,28 +145,42 @@ function CommentBlock({ appointment, onSaved }) {
   return (
     <div className="appt-comment-section">
       <div className="appt-comment-section-header">
-        <h4 className="appt-comment-section-title">
+        <button
+          type="button"
+          className="appt-comment-toggle"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+        >
           <MessageSquare style={{ width: "1.1rem", height: "1.1rem" }} />
-          Actions Taken
-        </h4>
+          <span className="appt-comment-section-title">Actions Taken</span>
+          {appointment.sharedComment && !open && (
+            <span className="appt-comment-recorded">Recorded</span>
+          )}
+          <ChevronDown
+            className={`appt-comment-chevron${open ? " appt-comment-chevron--open" : ""}`}
+            style={{ width: "1rem", height: "1rem" }}
+          />
+        </button>
         {canEdit && (
           <button type="button" className="appt-comment-edit-link" onClick={() => setShowModal(true)}>
             {appointment.sharedComment ? "Edit Actions Taken" : "Add Actions Taken"}
           </button>
         )}
       </div>
-      {appointment.sharedComment ? (
-        <>
-          <p className="appt-comment-text">{appointment.sharedComment}</p>
-          {appointment.commentUpdatedAt && (
-            <p className="appt-comment-meta">
-              Last updated by {appointment.commentUpdatedBy === "student" ? "the student" : "you"} on{" "}
-              {formatManilaDate(appointment.commentUpdatedAt, { month: "short", day: "numeric", year: "numeric" })}
-            </p>
-          )}
-        </>
-      ) : (
-        <p className="appt-comment-empty">No actions taken recorded yet.</p>
+      {open && (
+        appointment.sharedComment ? (
+          <div className="appt-comment-body">
+            <p className="appt-comment-text">{appointment.sharedComment}</p>
+            {appointment.commentUpdatedAt && (
+              <p className="appt-comment-meta">
+                Last updated by {appointment.commentUpdatedBy === "student" ? "the student" : "you"} on{" "}
+                {formatManilaDate(appointment.commentUpdatedAt, { month: "short", day: "numeric", year: "numeric" })}
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="appt-comment-empty appt-comment-body">No actions taken recorded yet.</p>
+        )
       )}
       <QueueReasonModal
         show={showModal}
@@ -205,6 +221,20 @@ function AppointmentCard({
   // The server rejects marking a future-dated appointment as completed --
   // disable the button here too so the click doesn't just bounce off an error.
   const isFutureDate = appointment.date > getManilaDateString();
+
+  // Mirrors the server's approve rule: only on the appointment's date and
+  // within its consultation window (skipped if the window is unknown).
+  const approveBlockedReason = (() => {
+    const start = appointment.windowStartRaw?.slice(0, 5);
+    const end = appointment.windowEndRaw?.slice(0, 5);
+    if (!start || !end) return null;
+    if (appointment.date !== getManilaDateString())
+      return `You can only approve on the scheduled date (${appointment.date}).`;
+    const now = getManilaTimeString();
+    if (now < start) return `The consultation window hasn't opened yet (opens ${start}).`;
+    if (now > end) return "The consultation window has already ended.";
+    return null;
+  })();
 
   const statusLabel =
     appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1);
@@ -288,7 +318,8 @@ function AppointmentCard({
               <button
                 className="appt-btn-sm appt-btn-sm-approve"
                 onClick={() => onApprove(appointment.id)}
-                title="Approve"
+                disabled={!!approveBlockedReason}
+                title={approveBlockedReason ?? "Approve"}
               >
                 <CheckCircle2Icon /> Approve
               </button>
@@ -441,22 +472,6 @@ export default function ProfessorAppointmentsPage() {
 
   useEffect(() => {
     fetchAppointments();
-  }, [fetchAppointments]);
-
-  // ── Live updates: refetch when a student books or cancels an appointment ──
-  useEffect(() => {
-    const token = localStorage.getItem("oams_token");
-    if (!token) return;
-
-    const socket = connectSocket(token);
-    if (!socket) return;
-
-    const events = ["appointment:slot-updated", "appointment:status-updated", "appointment:comment-updated"];
-    events.forEach((event) => socket.on(event, fetchAppointments));
-
-    return () => {
-      events.forEach((event) => socket.off(event, fetchAppointments));
-    };
   }, [fetchAppointments]);
 
   const TABS = [
