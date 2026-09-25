@@ -1424,6 +1424,7 @@ router.get(
       const [rows] = await pool.query(
         `SELECT
           a.appointment_id,
+          a.tracking_number,
           a.appointment_date,
           a.appointment_time,
           a.status,
@@ -1469,6 +1470,7 @@ router.get(
 
         return {
           id: String(r.appointment_id),
+          trackingNumber: r.tracking_number ?? null,
           college: `${r.department_name} (${r.department_abbreviation})`,
           location: r.location ?? "TBA",
           studentName: r.student_name,
@@ -1514,16 +1516,17 @@ router.get(
 );
 
 // ─────────────────────────────────────────────────────────────
-// TRANSACTIONS — unified history of queues, appointments, and
-// document requests, scoped strictly to the admin's own department.
-// There is no single "transactions" table in the schema, so this
-// endpoint UNIONs the three source tables (mirrors the pattern used
-// in GET /api/student/transactions) and returns one chronological feed.
+// TRANSACTIONS — unified history of queues and document requests/
+// submissions (plus the admin's own audit actions), scoped strictly to the
+// admin's own department. Appointments are excluded on purpose (not the
+// admin's transaction). There is no single "transactions" table in the
+// schema, so this endpoint UNIONs the source tables (mirrors the pattern
+// used in GET /api/student/transactions) into one chronological feed.
 // ─────────────────────────────────────────────────────────────
 
 // GET /api/admin/transactions
 // Query params (all optional):
-//   type      = "all" | "queue" | "appointment" | "document" | "submission"
+//   type      = "all" | "queue" | "document" | "submission" | "admin_action"
 //   status    = "all" | <status string from the relevant table>
 //   startDate = "YYYY-MM-DD" -- inclusive, Manila-local
 //   endDate   = "YYYY-MM-DD" -- inclusive, Manila-local
@@ -1629,7 +1632,10 @@ router.get(
       }
       // Mirrors formatAuditTransaction's own internal statusMap exactly.
       const AUDIT_STATUS_TO_ACTION = { created: "CREATE", updated: "UPDATE", deleted: "DELETE", viewed: "READ" };
-      const REQUEST_TYPES = ["queue", "appointment", "document", "submission"];
+      // Appointments are deliberately NOT part of the admin's transactions:
+      // they're between a student and a faculty member, not the admin's own
+      // transaction (admins only have a read-only Appointments page).
+      const REQUEST_TYPES = ["queue", "document", "submission"];
 
       // Runs the 5-branch request UNION plus the admin_action audit query for
       // one (type, status[, search]) filter combination. Filtering (incl.
@@ -1721,43 +1727,6 @@ router.get(
               LEFT JOIN administrators adm ON qs.admin_id = adm.admin_id
               JOIN students st ON q.student_id = st.student_id
               WHERE s.department_id = ?
-            )
-            UNION ALL
-            (
-              SELECT
-                'appointment' AS type,
-                a.appointment_id AS id,
-                CASE a.status
-                  WHEN 'approved'  THEN 'Approved Appointment'
-                  WHEN 'completed' THEN 'Completed Appointment'
-                  WHEN 'rejected'  THEN 'Rejected Appointment'
-                  WHEN 'cancelled' THEN 'Cancelled Appointment'
-                  ELSE 'Pending Appointment'
-                END AS action,
-                d.department_abbreviation AS college_abbrev,
-                CONCAT(st.first_name, ' ', st.last_name) AS student_name,
-                st.student_number AS student_id,
-                CONCAT(f.position, ' ', f.first_name, ' ', f.last_name) AS processor,
-                CASE WHEN a.status = 'rejected' THEN COALESCE(a.rejection_reason, a.notes, 'No purpose specified')
-                     ELSE COALESCE(a.notes, 'No purpose specified') END AS details,
-                CAST(NULL AS CHAR(50) CHARACTER SET utf8mb4) AS tracking_number,
-                NULL AS queue_number,
-                svc.service_name AS raw_service_name,
-                FALSE AS is_universal,
-                CAST(NULL AS CHAR(255) CHARACTER SET utf8mb4) AS admin_reason_raw,
-                CAST(NULL AS CHAR(100) CHARACTER SET utf8mb4) AS request_type,
-                a.shared_comment AS shared_comment,
-                a.comment_updated_by AS comment_updated_by,
-                a.comment_updated_at AS comment_updated_at,
-                a.status AS raw_status,
-                a.updated_at AS event_time,
-                'student' AS requester_type
-              FROM appointments a
-              JOIN departments d ON a.department_id = d.department_id
-              JOIN students st ON a.student_id = st.student_id
-              JOIN faculty f ON a.faculty_id = f.faculty_id
-              LEFT JOIN appointment_services svc ON a.service_id = svc.service_id
-              WHERE a.department_id = ?
             )
             UNION ALL
             (
@@ -1887,7 +1856,7 @@ router.get(
           LIMIT ${Number(offset + limit)}`}
         `;
 
-        const unionParams = [deptId, deptId, deptId, deptId, deptId];
+        const unionParams = [deptId, deptId, deptId, deptId];
         unionParams.push(...dateParams);
         if (requestTypeParam) unionParams.push(requestTypeParam);
         if (requestStatusParam) unionParams.push(requestStatusParam);

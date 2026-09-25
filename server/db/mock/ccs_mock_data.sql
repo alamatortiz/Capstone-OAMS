@@ -456,11 +456,10 @@ INSERT INTO service_procedure_steps (service_id, step_number, step_title, descri
 -- recipient_type: 'students' | 'faculty' | 'both'
 -- Hosted by one department, is_cross_college marks which ones every other department can also request.
 INSERT INTO document_services (service_id, service_name, description, department_id, is_cross_college, recipient_type, status, processing_time) VALUES
-(1, 'Good Moral Certificate',       'Request for Good Moral Certificate',              1001, FALSE, 'students', 'active', '2-3 business days'),
-(2, 'Transcript of Records',        'Request for official Transcript of Records',      1001, FALSE, 'students', 'active', '5-7 business days'),
-(3, 'Certificate of Enrollment',    'Request for Certificate of Enrollment',           2001, FALSE, 'students', 'active', '1-2 business days'),
-(4, 'Clearance Processing',         'Process student clearance for graduation/leave',  3001, FALSE, 'students', 'active', '3-5 business days'),
-(5, 'Certificate of Employment',    'Official certificate of employment for faculty',  1001, TRUE,  'faculty',  'active', '2-3 business days');
+-- Every college's documents (Certificate of Enrollment, Change of Matriculation
+-- Form for students; Class List for faculty) are added by secretary_documents.sql,
+-- mounted right after this file.
+(3, 'Certificate of Enrollment',    'Request for Certificate of Enrollment',           2001, FALSE, 'students', 'active', '1-2 business days');
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 5c-REQ · DOCUMENT REQUIREMENTS
@@ -469,23 +468,9 @@ INSERT INTO document_services (service_id, service_name, description, department
 -- GET /api/professor/documents/service-types for their respective service_ids.
 -- ─────────────────────────────────────────────────────────────
 INSERT INTO document_requirements (service_id, requirement_name, description, is_mandatory) VALUES
--- Good Moral Certificate (service_id 1, students)
-(1, 'Valid Student ID',           'Current school year student ID',                                    TRUE),
-(1, 'Student Affairs Clearance',  'Clearance slip confirming no pending accountabilities',             TRUE),
--- Transcript of Records (service_id 2, students)
-(2, 'Completed TOR Request Form', 'Request form filled out in full',                                   TRUE),
-(2, 'Registrar Clearance',        'Clearance confirming no outstanding academic holds',                TRUE),
-(2, 'Official Receipt',           'Payment receipt from the cashier for the TOR processing fee',       TRUE),
 -- Certificate of Enrollment (service_id 3, students)
 (3, 'Valid Student ID',           'Current school year student ID',                                    TRUE),
-(3, 'Current Registration Form',  'Certificate of Registration for the current semester',              TRUE),
--- Clearance Processing (service_id 4, students)
-(4, 'Library Clearance',          'Sign-off from the library confirming no unreturned items or fines', TRUE),
-(4, 'Accounting Clearance',       'Sign-off from accounting confirming no outstanding balances',       TRUE),
-(4, 'Department Clearance',       'Sign-off from the student''s home department',                      TRUE),
--- Certificate of Employment (service_id 5, faculty-only)
-(5, 'Completed COE Request Form', 'Certificate of Employment request form filled out in full',         TRUE),
-(5, 'Valid Employee ID',          'Current school year faculty/employee ID',                            TRUE);
+(3, 'Current Registration Form',  'Certificate of Registration for the current semester',              TRUE);
 
 
 -- ─────────────────────────────────────────────────────────────

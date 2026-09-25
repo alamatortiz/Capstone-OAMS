@@ -393,6 +393,11 @@ CREATE TABLE faculty_availability_services (
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE appointments (
     appointment_id      INT          AUTO_INCREMENT PRIMARY KEY,
+    -- Assigned in application code at booking time via the same
+    -- nextTrackingNumber() helper document_requests/document_submissions
+    -- use ("APT-00001", ...) -- NULL only for rows booked before this
+    -- column existed.
+    tracking_number      VARCHAR(20)  NULL UNIQUE,
     student_id          INT          NOT NULL,
     faculty_id          INT          NOT NULL,
     department_id       INT          NOT NULL,

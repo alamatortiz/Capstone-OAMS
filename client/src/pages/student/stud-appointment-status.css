@@ -915,6 +915,31 @@
   line-height: 1.2;
 }
 
+/* Same "white pill, theme-colored text" treatment as the document/queue
+   status hero cards' own tracking/queue-number badge. */
+.apst-hero-badge {
+  background: white;
+  color: #9333ea;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  font-family: "Inter", sans-serif;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .apst-hero-content {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .apst-hero-badge {
+    width: 100%;
+    text-align: center;
+  }
+}
+
 /* ─── Empty state (self-contained copy) ──────────────────────────────────── */
 .apst-empty-state {
   background: var(--card-bg);

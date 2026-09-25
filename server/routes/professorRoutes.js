@@ -397,7 +397,7 @@ router.get(
     try {
       let sql = `
         SELECT
-          a.appointment_id, a.appointment_date, a.appointment_time,
+          a.appointment_id, a.tracking_number, a.appointment_date, a.appointment_time,
           a.status, a.notes, a.created_at, a.approved_at, a.completed_at,
           a.cancelled_by, a.cancel_reason,
           a.booking_year_program, a.course_code,
@@ -423,6 +423,7 @@ router.get(
       res.json(
         rows.map((r) => ({
           id: r.appointment_id,
+          trackingNumber: r.tracking_number ?? null,
           studentName: `${r.first_name} ${r.last_name}`,
           studentId: r.student_number,
           course: r.course,
@@ -745,6 +746,7 @@ router.get(
             CONCAT('Student Appointment - ', COALESCE(svc.service_name, a.notes, 'Consultation')) AS title,
             COALESCE(svc.service_name, a.notes, 'Consultation') AS details,
             a.status, a.updated_at AS date, a.updated_at AS event_time,
+            a.tracking_number AS trackingNumber,
             a.shared_comment AS sharedComment,
             a.comment_updated_by AS commentUpdatedBy,
             a.comment_updated_at AS commentUpdatedAt,

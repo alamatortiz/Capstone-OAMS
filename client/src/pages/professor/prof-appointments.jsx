@@ -261,6 +261,11 @@ function AppointmentCard({
                 {appointment.studentId}
               </span>
             )}
+            {appointment.trackingNumber && (
+              <span className="appt-card-tracking-badge">
+                {appointment.trackingNumber}
+              </span>
+            )}
             {appointment.appointmentType && (
               <span className="appt-card-appt-type-value">
                 {appointment.appointmentType}

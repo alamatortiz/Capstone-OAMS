@@ -11,6 +11,8 @@ services:
       - mysql_data:/var/lib/mysql
       - ./server/oams_db.sql:/docker-entrypoint-initdb.d/01_oams_db.sql
       - ./server/db/mock/ccs_mock_data.sql:/docker-entrypoint-initdb.d/02_ccs_mock_data.sql
+      - ./server/db/mock/secretary_services.sql:/docker-entrypoint-initdb.d/03_secretary_services.sql
+      - ./server/db/mock/secretary_documents.sql:/docker-entrypoint-initdb.d/04_secretary_documents.sql
     healthcheck:
       test: ["CMD", "mysql", "-u", "root", "-pAkosimatt123", "-e", "SELECT 1 FROM oams_db.users LIMIT 1"]
       interval: 10s

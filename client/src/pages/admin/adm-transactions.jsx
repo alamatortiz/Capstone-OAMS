@@ -129,7 +129,6 @@ const CollegeLogoIcon = ({ collegeShortName }) => {
 const TYPE_OPTIONS = [
   { value: "all", label: "All Types" },
   { value: "queue", label: "Queue" },
-  { value: "appointment", label: "Appointment" },
   { value: "document", label: "Document" },
   { value: "admin_action", label: "Admin Action" },
 ];
@@ -170,7 +169,7 @@ export default function AdminTransaction() {
   // ── Transaction data (scoped + searched + paginated server-side) ─────────
   const [transactions, setTransactions] = useState([]);
   const [totalPages, setTotalPages] = useState(1);
-  const [stats, setStats] = useState({ total: 0, queue: 0, appointments: 0, documents: 0, adminActions: 0 });
+  const [stats, setStats] = useState({ total: 0, queue: 0, documents: 0, adminActions: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -236,10 +235,6 @@ export default function AdminTransaction() {
   // ── Badge Helpers ─────────────────────────────────────────────────────────
   const TYPE_BADGE_CONFIG = {
     queue: { color: "admin-transaction-badge-queue", label: "Queue" },
-    appointment: {
-      color: "admin-transaction-badge-appointment",
-      label: "Appointment",
-    },
     document: {
       color: "admin-transaction-badge-document",
       label: "Document Request",
@@ -309,8 +304,6 @@ export default function AdminTransaction() {
     switch (type) {
       case "queue":
         return <UserGroupIcon />;
-      case "appointment":
-        return <CalendarIcon />;
       case "admin_action":
         return <SettingsIcon />;
       case "document":
@@ -325,7 +318,6 @@ export default function AdminTransaction() {
   const getIdBadgeClass = (type) => {
     const map = {
       queue: "admin-transaction-id-badge-queue",
-      appointment: "admin-transaction-id-badge-appointment",
       document: "admin-transaction-id-badge-document",
       submission: "admin-transaction-id-badge-document",
     };
@@ -335,12 +327,8 @@ export default function AdminTransaction() {
   // ── Export: CSV/PDF of EVERYTHING matching the active filters/search --
   // pages through the same server endpoint (100/page max) rather than
   // exporting only the rows currently on screen. ───────────────────────────
-  // "Tracking #" is meaningless on an appointment-only export -- swap in the
-  // shared comment instead (same rule as the professor/student pages).
-  const isAppointmentOnly = filterType === "appointment";
   const exportHeader = [
-    "Type", "Action", "Details", "Status", "College", "Student Name", "Student ID", "Processor",
-    isAppointmentOnly ? "Comment" : "Tracking #",
+    "Type", "Action", "Details", "Status", "College", "Student Name", "Student ID", "Processor", "Tracking #",
     "Date", "Time",
   ];
   const buildExportRow = (t) => [
@@ -352,7 +340,7 @@ export default function AdminTransaction() {
     t.studentName ?? "",
     t.studentId ?? "",
     t.processor ?? "",
-    isAppointmentOnly ? (t.sharedComment ?? "") : (t.trackingNumber ?? ""),
+    t.trackingNumber ?? "",
     t.date ? formatManilaDate(t.date, { month: "short", day: "numeric", year: "numeric" }) : "",
     t.date ? formatManilaTime(t.date) : "",
   ];
@@ -383,7 +371,6 @@ export default function AdminTransaction() {
     ["Date Range", dateRangeLabel],
     ["Total Transactions", st.total],
     ["Queue", st.queue],
-    ["Appointments", st.appointments],
     ["Documents", st.documents],
     ["Admin Actions", st.adminActions],
   ];
@@ -462,16 +449,6 @@ export default function AdminTransaction() {
               <p className="admin-transaction-stat-label">Queue Services</p>
               <p className="admin-transaction-stat-value admin-transaction-val-blue">
                 {loading ? "—" : stats.queue}
-              </p>
-            </div>
-
-            <div className="admin-transaction-stat-card">
-              <div className="admin-transaction-stat-icon-box admin-transaction-icon-box-purple">
-                <CalendarIcon />
-              </div>
-              <p className="admin-transaction-stat-label">Appointments</p>
-              <p className="admin-transaction-stat-value admin-transaction-val-purple">
-                {loading ? "—" : stats.appointments}
               </p>
             </div>
 
@@ -701,19 +678,9 @@ export default function AdminTransaction() {
                             Reason: {transaction.adminReason}
                           </p>
                         )}
-                        {transaction.type === "appointment" && transaction.serviceName && (
-                          <p className="admin-transaction-item-service-type">
-                            Service: {transaction.serviceName}
-                          </p>
-                        )}
                         {transaction.type !== "queue" && transaction.details && (
                           <p className="admin-transaction-item-details">
                             {transaction.details}
-                          </p>
-                        )}
-                        {transaction.type === "appointment" && transaction.sharedComment && (
-                          <p className="admin-transaction-item-details">
-                            Comment: {transaction.sharedComment}
                           </p>
                         )}
                       </div>

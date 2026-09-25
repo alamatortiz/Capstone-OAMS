@@ -13,6 +13,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
 import "./stud-transactions.css";
+import ActionsTakenToggle from "../../components/ActionsTakenToggle";
 import api from "../../utils/api";
 import { formatManilaDate, formatManilaTime, getManilaDateString } from "../../utils/dateTime";
 import { exportTransactionsPdf } from "../../utils/exportPdf";
@@ -180,13 +181,17 @@ export default function TransactionsPage() {
   // the current page): pages through the same endpoint at its 100/page max
   // until totalPages is exhausted. Both formats share this one fetch so a
   // future column change only has to be made once. ──────────────────────
-  // Appointment-only exports swap in the shared, professor-authored comment
-  // (same rule as the professor/admin pages), since that's the thing
-  // actually worth recalling for a past appointment.
+  // Appointments now carry a real tracking number (same APT-00001 scheme as
+  // documents' REQ-00001). Appointment-only exports additionally get the
+  // shared, professor-authored comment column (same rule as the
+  // professor/admin pages), since that's still worth recalling for a past
+  // appointment and has nothing to do with the tracking number.
   const isAppointmentOnlyExport = filterType === "appointment";
-  const header = isAppointmentOnlyExport
-    ? ["Type", "Title", "Details", "Status", "College", "Comment", "Date", "Time"]
-    : ["Type", "Title", "Details", "Status", "College", "Date", "Time"];
+  const header = [
+    "Type", "Title", "Details", "Status", "College", "Tracking #",
+    ...(isAppointmentOnlyExport ? ["Comment"] : []),
+    "Date", "Time",
+  ];
 
   const fetchExportRows = async () => {
     let all = [];
@@ -211,6 +216,7 @@ export default function TransactionsPage() {
     return all.map((t) => {
       const base = [
         getTypeLabel(t.type), t.title, t.details, transactionStatusLabel(t.status), t.college,
+        t.trackingNumber ?? "",
       ];
       const dateTime = [
         t.date ? formatManilaDate(t.date, { month: "short", day: "numeric", year: "numeric" }) : "",
@@ -545,15 +551,12 @@ export default function TransactionsPage() {
                       </p>
                     )}
                     {transaction.type === "appointment" && transaction.sharedComment && (
-                      <div className="transaction-comment">
-                        <p className="transaction-comment-text">{transaction.sharedComment}</p>
-                        {transaction.commentUpdatedAt && (
-                          <span className="transaction-comment-meta">
-                            — last updated by {transaction.commentUpdatedBy === "student" ? "you" : "faculty"} on{" "}
-                            {formatManilaDate(transaction.commentUpdatedAt)}
-                          </span>
-                        )}
-                      </div>
+                      <ActionsTakenToggle
+                        text={transaction.sharedComment}
+                        meta={transaction.commentUpdatedAt
+                          ? `— last updated by ${transaction.commentUpdatedBy === "student" ? "you" : "faculty"} on ${formatManilaDate(transaction.commentUpdatedAt)}`
+                          : null}
+                      />
                     )}
                     {transaction.type === "appointment" && (transaction.approvedAtRaw || transaction.completedAtRaw) && (
                       <div className="transaction-timeline">

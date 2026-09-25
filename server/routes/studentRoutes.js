@@ -2313,6 +2313,7 @@ router.get(
       const [rows] = await pool.query(
         `SELECT
            a.appointment_id,
+           a.tracking_number,
            a.availability_id,
            a.appointment_date,
            a.status,
@@ -2349,6 +2350,7 @@ router.get(
 
       const formatted = rows.map((row) => ({
         id: row.appointment_id,
+        trackingNumber: row.tracking_number ?? null,
         availabilityId: row.availability_id,
         appointmentType: row.service_name ?? null,
         college: row.college,
@@ -2910,7 +2912,7 @@ router.get(
           d.department_name AS college,
           a.status AS raw_status,
           a.notes AS details,
-          CAST(NULL AS CHAR(50) CHARACTER SET utf8mb4) AS trackingNumber,
+          a.tracking_number AS trackingNumber,
           CAST(NULL AS CHAR(255) CHARACTER SET utf8mb4) AS adminReason,
           a.shared_comment AS sharedComment,
           a.comment_updated_by AS commentUpdatedBy,
@@ -3498,14 +3500,16 @@ router.post(
       // never collides with that history -- only with a second genuinely
       // active booking for the same slot, which the dup-guard above should
       // already have caught (see the catch block below for the backstop).
+      const trackingNumber = await nextTrackingNumber(conn, "appointments", "appointment_id", "APT");
       const [result] = await conn.query(
         `INSERT INTO appointments
-           (student_id, faculty_id, department_id, service_id, availability_id,
+           (tracking_number, student_id, faculty_id, department_id, service_id, availability_id,
             location_snapshot, slot_note_snapshot, window_start_snapshot, window_end_snapshot,
             appointment_date, appointment_time, status, notes,
             booking_year_program, course_code, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, NOW())`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, NOW())`,
         [
+          trackingNumber,
           studentId,
           slot.faculty_id,
           facultyRow.department_id,
@@ -3609,6 +3613,7 @@ router.post(
         appointment: newRow
           ? {
               id: newRow.appointment_id,
+              trackingNumber,
               title: newRow.faculty_role ?? "Faculty Consultation",
               professorName: newRow.faculty_name,
               personRole: newRow.faculty_role ?? "Faculty",
@@ -3623,6 +3628,7 @@ router.post(
             }
           : {
               id: appointmentId,
+              trackingNumber,
               title: "Faculty Consultation",
               college: null,
               date: appointmentDate,

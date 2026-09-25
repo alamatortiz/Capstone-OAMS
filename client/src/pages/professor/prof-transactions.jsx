@@ -7,6 +7,7 @@ import PageHeader from "../../components/PageHeader";
 import FilterSelect from "../../components/FilterSelect";
 import FilterDateRange from "../../components/FilterDateRange";
 import ExportMenu from "../../components/ExportMenu";
+import ActionsTakenToggle from "../../components/ActionsTakenToggle";
 import Pagination from "../../components/Pagination";
 import "./prof-dashboard.css";
 import "./prof-transactions.css";
@@ -186,14 +187,15 @@ export default function ProfessorTransactionsPage() {
 
   // Exports EVERYTHING matching the current filters/search (pages through the
   // endpoint at its 100/page max), not just the page on screen.
-  // "Tracking #" is meaningless on an appointment-only export (appointments
-  // never have one, so the column would just be blank down the whole
-  // sheet) -- swap it for the shared comment instead, since that's the
-  // thing actually worth recalling for an appointment.
+  // Appointments now carry a real tracking number (same APT-00001 scheme as
+  // documents' REQ-00001), so "Tracking #" applies to every row type. An
+  // appointment-only export additionally gets the shared comment column,
+  // since that's still worth recalling and has nothing to do with the
+  // tracking number.
   const isAppointmentOnly = filterType === "appointment";
   const exportHeader = [
-    "Type", "Title", "Details", "Status", "Student Name", "Student ID",
-    isAppointmentOnly ? "Comment" : "Tracking #",
+    "Type", "Title", "Details", "Status", "Student Name", "Student ID", "Tracking #",
+    ...(isAppointmentOnly ? ["Comment"] : []),
     "Date", "Time",
   ];
   const buildExportRow = (t) => [
@@ -203,9 +205,8 @@ export default function ProfessorTransactionsPage() {
     statusLabel(t.status),
     t.studentName ?? "",
     t.studentId ?? "",
-    isAppointmentOnly
-      ? (t.sharedComment ?? "")
-      : (t.type === "document" || t.type === "submission") ? (t.trackingNumber ?? "") : "",
+    t.trackingNumber ?? "",
+    ...(isAppointmentOnly ? [t.sharedComment ?? ""] : []),
     t.dateLabel,
     t.timeLabel,
   ];
@@ -470,15 +471,12 @@ export default function ProfessorTransactionsPage() {
                       </p>
                     )}
                     {txn.type === "appointment" && txn.sharedComment && (
-                      <div className="txn-item-comment">
-                        <p className="txn-item-comment-text">{txn.sharedComment}</p>
-                        {txn.commentUpdatedAt && (
-                          <span className="txn-item-comment-meta">
-                            — last updated by {txn.commentUpdatedBy === "faculty" ? "you" : "student"} on{" "}
-                            {formatManilaDate(txn.commentUpdatedAt)}
-                          </span>
-                        )}
-                      </div>
+                      <ActionsTakenToggle
+                        text={txn.sharedComment}
+                        meta={txn.commentUpdatedAt
+                          ? `— last updated by ${txn.commentUpdatedBy === "faculty" ? "you" : "student"} on ${formatManilaDate(txn.commentUpdatedAt)}`
+                          : null}
+                      />
                     )}
                     {txn.type === "appointment" && (txn.approvedAtRaw || txn.completedAtRaw) && (
                       <div className="txn-item-timeline">

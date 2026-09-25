@@ -126,6 +126,9 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, com
                 <p className="apst-hero-service-name">{appt.person}</p>
                 <p>{appt.college}</p>
               </div>
+              {appt.trackingNumber && (
+                <div className="apst-hero-badge">{appt.trackingNumber}</div>
+              )}
             </div>
           </div>
         </div>
