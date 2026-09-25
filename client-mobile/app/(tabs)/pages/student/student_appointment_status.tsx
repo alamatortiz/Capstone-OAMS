@@ -7,6 +7,7 @@ import {
   ImageSourcePropType,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StatusBar,
@@ -118,6 +119,7 @@ type BookingStatus = 'pending' | 'approved' | 'completed' | 'rejected' | 'cancel
 
 interface Appointment {
   id: string;
+  trackingNumber?: string | null;
   person: string;
   college: string;
   collegeAbbrev?: string;
@@ -262,6 +264,7 @@ export default function StudentAppointmentStatusScreen() {
       setAppointments(
         (data.appointments ?? []).map((a: any) => ({
           id: String(a.id),
+          trackingNumber: a.trackingNumber ?? null,
           person: a.person,
           college: a.collegeAbbrev || a.college,
           collegeAbbrev: a.collegeAbbrev,
@@ -479,6 +482,11 @@ export default function StudentAppointmentStatusScreen() {
                     <Text style={styles.heroServiceName}>{selectedAppt.person}</Text>
                     <Text style={styles.heroCollegeText}>{selectedAppt.college}</Text>
                   </View>
+                  {selectedAppt.trackingNumber ? (
+                    <View style={styles.heroTrackingBadge}>
+                      <Text style={styles.heroTrackingBadgeText}>{selectedAppt.trackingNumber}</Text>
+                    </View>
+                  ) : null}
                 </View>
               </LinearGradient>
 
@@ -777,6 +785,7 @@ export default function StudentAppointmentStatusScreen() {
                           <View style={styles.listItemTitleWrap}>
                             <Text style={[styles.listItemName, isDim && styles.listItemNameDim]}>{appt.person}</Text>
                             <Text style={styles.listItemCollege}>{appt.college}</Text>
+                            {appt.trackingNumber ? <Text style={styles.listTrackingText}>{appt.trackingNumber}</Text> : null}
                           </View>
                           <View style={[styles.statusBadge, { backgroundColor: s.bg, borderColor: s.border }]}>
                             <Text style={[styles.statusBadgeText, { color: s.color }]}>{STATUS_LABELS[appt.status]}</Text>
@@ -1151,6 +1160,17 @@ function createStyles(theme: ThemePalette) {
     heroLogoImg: { width: '100%', height: '100%' },
     heroTextWrap: { flex: 1, gap: 4 },
     heroServiceName: { fontSize: 18, fontWeight: '800', color: '#ffffff' },
+    heroTrackingBadge: {
+      alignSelf: 'flex-start',
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 999,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.35)',
+    },
+    heroTrackingBadgeText: { fontSize: 12, fontWeight: '800', color: '#ffffff', fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }) },
+    listTrackingText: { marginTop: 2, fontSize: 11, fontWeight: '700', color: theme.purple, fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }) },
     heroCollegeText: { fontSize: 13, color: 'rgba(255,255,255,0.85)' },
 
     // Tabs

@@ -111,7 +111,6 @@ interface Transaction {
   details: string;
   status: TxStatus;
   trackingNumber?: string | null;
-  sharedComment?: string | null;
   timestamp: string;
 }
 
@@ -173,7 +172,6 @@ type SelectField = 'type' | 'status' | null;
 const TYPE_OPTIONS = [
   { value: 'all', label: 'All Types' },
   { value: 'queue', label: 'Queue' },
-  { value: 'appointment', label: 'Appointment' },
   { value: 'document', label: 'Document' },
   { value: 'submission', label: 'Sent Document' },
   { value: 'admin_action', label: 'Admin Action' },
@@ -257,7 +255,6 @@ export default function AdminTransactionsScreen() {
           details: t.details,
           status: t.status,
           trackingNumber: t.trackingNumber ?? null,
-          sharedComment: t.sharedComment ?? null,
           timestamp: t.timestamp,
         })),
       );
@@ -359,11 +356,9 @@ export default function AdminTransactionsScreen() {
       });
       return { items: data.transactions ?? [], totalPages: data.totalPages ?? 1 };
     }, 100);
-    const withComment = filterType === 'appointment';
-    const header = [
-      'Type', 'Action', 'Requester', 'Processor', 'Details', 'Status', 'Tracking',
-      ...(withComment ? ['Comment'] : []), 'Timestamp',
-    ];
+    // Appointments are no longer part of the admin's transactions (web
+    // 6f0acd50), so there's no appointment-only Comment column anymore.
+    const header = ['Type', 'Action', 'Requester', 'Processor', 'Details', 'Status', 'Tracking', 'Timestamp'];
     const rows = all.map((t) => [
       TYPE_META[t.type as TxType]?.label ?? DEFAULT_TYPE_META.label,
       t.action,
@@ -372,7 +367,6 @@ export default function AdminTransactionsScreen() {
       t.details,
       STATUS_META[t.status]?.label ?? DEFAULT_STATUS_META.label,
       t.trackingNumber ?? '',
-      ...(withComment ? [t.sharedComment ?? ''] : []),
       t.timestamp,
     ]);
     return { header, rows };
@@ -433,7 +427,6 @@ export default function AdminTransactionsScreen() {
   const statCards: { key: keyof typeof stats; label: string; icon: LucideIconType }[] = [
     { key: 'total', label: 'Total Transactions', icon: Activity },
     { key: 'queue', label: 'Queue Services', icon: Users },
-    { key: 'appointments', label: 'Appointments', icon: Calendar },
     { key: 'documents', label: 'Documents', icon: FileText },
     { key: 'adminActions', label: 'Admin Actions', icon: Settings },
   ];
@@ -660,9 +653,6 @@ export default function AdminTransactionsScreen() {
                     {t.trackingNumber && (
                       <Text style={styles.txTracking}>Tracking #{t.trackingNumber}</Text>
                     )}
-                    {t.type === 'appointment' && t.sharedComment ? (
-                      <Text style={styles.txDetails}>Actions taken: {t.sharedComment}</Text>
-                    ) : null}
                     <Text style={styles.txProcessor}>Processed by: {t.processor}</Text>
 
                     <View style={styles.txMetaRow}>

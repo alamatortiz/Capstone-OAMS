@@ -33,6 +33,7 @@ import { exportRowsAsPdf } from '@/utils/pdfExport';
 import { readCache, writeCache, CACHE_KEYS, fetchAllPages, isOfflineLikeError } from '@/utils/offlineCache';
 import { useIsOnline } from '@/context/NetworkContext';
 import OfflineBanner from '@/components/OfflineBanner';
+import ActionsTakenToggle from '@/components/ActionsTakenToggle';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 
 type LucideIconType = typeof ClipboardList;
@@ -98,6 +99,7 @@ interface Transaction {
   completedAtRaw?: string | null;
   cancelledBy?: string | null;
   cancelReason?: string | null;
+  trackingNumber?: string | null;
   sharedComment?: string | null;
   commentUpdatedBy?: string | null;
   commentUpdatedAt?: string | null;
@@ -496,13 +498,14 @@ export default function StudentTransactionsScreen() {
       });
       Toast.show({ type: 'info', text1: 'Offline: exporting your saved history.' });
     }
-    // Mirrors web: the Comment column only appears when exporting appointments.
+    // Mirrors web: Tracking # on every row (appointments now have APT-xxxxx
+    // numbers too); the Comment column only appears when exporting appointments.
     const withComment = filterType === 'appointment';
     const cap = (v: string) => (v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, ' ') : '');
-    const header = ['Type', 'Title', 'Details', 'Status', 'College', ...(withComment ? ['Comment'] : []), 'Date', 'Time'];
+    const header = ['Type', 'Title', 'Details', 'Status', 'College', 'Tracking #', ...(withComment ? ['Comment'] : []), 'Date', 'Time'];
     const rows = all.map((t) => [
       cap(t.type === 'submission' ? 'document submission' : t.type === 'document' ? 'document request' : t.type),
-      t.title, t.details, cap(t.status), t.college,
+      t.title, t.details, cap(t.status), t.college, t.trackingNumber ?? '',
       ...(withComment ? [t.sharedComment ?? ''] : []),
       t.date, t.time,
     ]);
@@ -777,15 +780,15 @@ export default function StudentTransactionsScreen() {
                     )}
 
                     {t.type === 'appointment' && t.sharedComment && (
-                      <View style={styles.txComment}>
-                        <Text style={styles.txCommentText}>{t.sharedComment}</Text>
-                        {t.commentUpdatedAt && (
-                          <Text style={styles.txCommentMeta}>
-                            — last updated by {t.commentUpdatedBy === 'student' ? 'you' : 'faculty'} on{' '}
-                            {formatManilaDate(t.commentUpdatedAt)}
-                          </Text>
-                        )}
-                      </View>
+                      <ActionsTakenToggle
+                        text={t.sharedComment}
+                        meta={t.commentUpdatedAt
+                          ? `— last updated by ${t.commentUpdatedBy === 'student' ? 'you' : 'faculty'} on ${formatManilaDate(t.commentUpdatedAt)}`
+                          : null}
+                        boxStyle={styles.txComment}
+                        textStyle={styles.txCommentText}
+                        metaStyle={styles.txCommentMeta}
+                      />
                     )}
 
                     {t.type === 'appointment' && (t.approvedAtRaw || t.completedAtRaw) && (

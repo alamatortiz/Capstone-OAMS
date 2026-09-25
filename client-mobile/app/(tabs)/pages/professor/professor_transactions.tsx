@@ -28,6 +28,7 @@ import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
 import ExportMenu from '@/components/ExportMenu';
+import ActionsTakenToggle from '@/components/ActionsTakenToggle';
 import QueueReasonModal from '@/components/QueueReasonModal';
 import ProfessorAvailabilityToggle from '@/components/ProfessorAvailabilityToggle';
 import { useProfessorAvailability } from '@/hooks/useProfessorAvailability';
@@ -337,12 +338,21 @@ export default function ProfessorTransactionsScreen() {
   // PDF is just a second consumer of the identical data (mirrors web's
   // exportPdf.js/ExportMenu.jsx pairing).
   const buildExportRows = () => {
-    const header = ['Type', 'Status', 'Details', 'Student/Tracking', 'Date', 'Time'];
+    // Mirrors web: Tracking # applies to every row now (appointments carry
+    // APT-xxxxx numbers); appointment-only exports also get the Comment column.
+    const withComment = filterType === 'appointment';
+    const header = [
+      'Type', 'Status', 'Details', 'Student Name', 'Student ID', 'Tracking #',
+      ...(withComment ? ['Comment'] : []), 'Date', 'Time',
+    ];
     const rows = filtered.map((t) => [
       TYPE_META[t.type].label,
       STATUS_META[t.status].label,
       t.details,
-      t.type === 'document' || t.type === 'submission' ? t.trackingNumber ?? '' : `${t.studentName ?? ''} (${t.studentId ?? ''})`,
+      t.studentName ?? '',
+      t.studentId ?? '',
+      t.trackingNumber ?? '',
+      ...(withComment ? [t.sharedComment ?? ''] : []),
       formatDateOnly(t.date),
       formatTimeOnly(t.date),
     ]);
@@ -636,6 +646,12 @@ export default function ProfessorTransactionsScreen() {
                         </View>
                       )
                     )}
+                    {txn.type === 'appointment' && txn.trackingNumber ? (
+                      <View style={styles.txnSubRow}>
+                        <Ionicons name="pricetag-outline" size={13} color={theme.tertiary} />
+                        <Text style={[styles.txnSubValue, { color: typeMeta.color }]}>{txn.trackingNumber}</Text>
+                      </View>
+                    ) : null}
 
                     {txn.details && <Text style={styles.txnDetails}>{txn.details}</Text>}
 
@@ -652,15 +668,15 @@ export default function ProfessorTransactionsScreen() {
                     )}
 
                     {txn.type === 'appointment' && txn.sharedComment && (
-                      <View style={styles.txnItemComment}>
-                        <Text style={styles.txnItemCommentText}>{txn.sharedComment}</Text>
-                        {txn.commentUpdatedAt && (
-                          <Text style={styles.txnMetaText}>
-                            — last updated by {txn.commentUpdatedBy === 'faculty' ? 'you' : 'student'} on{' '}
-                            {formatManilaDate(txn.commentUpdatedAt, { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </Text>
-                        )}
-                      </View>
+                      <ActionsTakenToggle
+                        text={txn.sharedComment}
+                        meta={txn.commentUpdatedAt
+                          ? `— last updated by ${txn.commentUpdatedBy === 'faculty' ? 'you' : 'student'} on ${formatManilaDate(txn.commentUpdatedAt, { month: 'short', day: 'numeric', year: 'numeric' })}`
+                          : null}
+                        boxStyle={styles.txnItemComment}
+                        textStyle={styles.txnItemCommentText}
+                        metaStyle={styles.txnMetaText}
+                      />
                     )}
 
                     {txn.type === 'appointment' && (txn.approvedAtRaw || txn.completedAtRaw) && (

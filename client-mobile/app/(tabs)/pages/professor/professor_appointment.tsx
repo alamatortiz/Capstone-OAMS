@@ -4,6 +4,7 @@ import {
   Alert,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StatusBar,
@@ -87,6 +88,7 @@ type AppointmentStatus = 'pending' | 'approved' | 'completed' | 'rejected' | 'ca
 
 interface Appointment {
   id: number;
+  trackingNumber?: string | null;
   studentName: string;
   studentId: string;
   course: string | null;
@@ -619,11 +621,18 @@ export default function ProfessorAppointmentScreen() {
                       </View>
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Text style={styles.studentName}>{apt.studentName}</Text>
-                        {apt.studentId && (
-                          <View style={styles.studentIdBadge}>
-                            <Text style={styles.studentIdBadgeText}>{apt.studentId}</Text>
-                          </View>
-                        )}
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                          {apt.studentId && (
+                            <View style={styles.studentIdBadge}>
+                              <Text style={styles.studentIdBadgeText}>{apt.studentId}</Text>
+                            </View>
+                          )}
+                          {apt.trackingNumber && (
+                            <View style={styles.trackingBadge}>
+                              <Text style={styles.trackingBadgeText}>{apt.trackingNumber}</Text>
+                            </View>
+                          )}
+                        </View>
                         {apt.course && <Text style={styles.studentSub}>{apt.course}</Text>}
                       </View>
                       <View style={[styles.statusBadge, { backgroundColor: statusTint.bg, borderColor: statusTint.border }]}>
@@ -1253,6 +1262,18 @@ function createStyles(theme: ThemePalette) {
       flexShrink: 0,
     },
     studentName: { fontSize: 14, fontWeight: '700', color: '#a855f7' },
+    // Appointment tracking number (APT-xxxxx), mirrors web's appt-card-tracking-badge.
+    trackingBadge: {
+      alignSelf: 'flex-start',
+      marginTop: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 999,
+      borderWidth: 1,
+      backgroundColor: 'rgba(59, 130, 246, 0.12)',
+      borderColor: 'rgba(59, 130, 246, 0.3)',
+    },
+    trackingBadgeText: { fontSize: 11, fontWeight: '700', color: '#3b82f6', fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }) },
     studentIdBadge: {
       alignSelf: 'flex-start',
       marginTop: 4,
