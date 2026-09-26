@@ -54,7 +54,7 @@ export default function PrivacyPolicy() {
           </div>
           <div>
             <h1 className="legal-title">Privacy Policy</h1>
-            <p className="legal-updated">Effective and last updated: September 12, 2026</p>
+            <p className="legal-updated">Effective and last updated: September 26, 2026</p>
           </div>
         </div>
 
@@ -89,20 +89,23 @@ export default function PrivacyPolicy() {
               and staff).
             </li>
             <li>
-              <strong>Account credentials:</strong> your password, stored only as a
-              one-way cryptographic hash — OAMS never stores or can display your actual
-              password.
+              <strong>Account credentials:</strong> your password, which is protected so
+              that no one — including system administrators — can view it.
             </li>
             <li>
-              <strong>Login and session activity:</strong> login timestamps, session
-              expiry, IP address, and browser/device information (user agent), recorded
-              for both successful and failed login attempts, for account-security
-              purposes.
+              <strong>Sign-in activity:</strong> basic records of when and how your account
+              is accessed, kept for account-security purposes.
             </li>
             <li>
-              <strong>Push notification identifiers:</strong> if you enable notifications,
-              a device- or browser-specific token used solely to deliver those
-              notifications to you.
+              <strong>Notification settings:</strong> if you enable notifications, the
+              information needed to deliver them to your device, used solely for that
+              purpose.
+            </li>
+            <li>
+              <strong>Information kept on your device:</strong> the web and mobile
+              applications may keep limited information on your device, such as your
+              sign-in and recently viewed records, so the system works smoothly. Please
+              sign out when you are done using a shared device.
             </li>
             <li>
               <strong>Activity you generate while using the system:</strong> queue entries,
@@ -119,8 +122,8 @@ export default function PrivacyPolicy() {
           </ul>
           <p>
             OAMS does not collect payment information, government IDs beyond your existing
-            university-issued student/employee number, or any data through advertising or
-            analytics trackers — the system currently uses none.
+            university-issued student/employee number, and it does not use advertising or
+            analytics trackers.
           </p>
 
           <h2>2. How We Use Your Information</h2>
@@ -137,8 +140,8 @@ export default function PrivacyPolicy() {
               appointment or document request, based on your role and department.
             </li>
             <li>
-              To detect and respond to suspicious login activity (repeated failed
-              attempts, unrecognized devices).
+              To protect accounts and to detect and respond to unusual or unauthorized
+              activity.
             </li>
             <li>
               To maintain an accountability trail of administrative actions taken on
@@ -154,17 +157,19 @@ export default function PrivacyPolicy() {
             department only. A university-wide administrator role exists solely for
             system-level account management and does not routinely view the content of
             individual requests. OAMS does not sell, rent, or share your personal data with
-            any outside company or third party. Data stays within University-operated
-            infrastructure.
+            any outside company or third party. Your data is managed by the University.
+            If OAMS shows you a link to a satisfaction survey, that survey opens in a
+            separate form outside OAMS, and what you enter there is handled by that form,
+            not stored in OAMS.
           </p>
 
           <h2>4. Data Retention</h2>
           <p>
             Your account and its associated records are retained for as long as your
             enrollment or employment with the University continues, and thereafter for as
-            long as the University's records-retention practices require. Login/session
-            logs and notification delivery tokens are kept only as long as needed for the
-            security and functional purposes described above.
+            long as the University's records-retention practices require. Sign-in records
+            and notification settings are kept only as long as needed for the security
+            and functional purposes described above.
           </p>
 
           <h2>5. Your Rights</h2>
@@ -172,21 +177,19 @@ export default function PrivacyPolicy() {
             Under the Data Privacy Act of 2012, you have the right to be informed, to
             access, to correct, and to object to the processing of your personal data, and
             to file a complaint with the National Privacy Commission. Because OAMS accounts
-            are provisioned and managed by the University (there is no public
-            self-registration for administrator- or system-managed roles), requests to
-            access, correct, or delete your data should be directed to your college
-            department office or the University's data protection contact rather than
-            through the system itself.
+            are provisioned and managed by the University (there is no self-registration),
+            requests to access, correct, or delete your data should be directed to your
+            college department office or the University's data protection contact rather
+            than through the system itself.
           </p>
 
           <h2>6. Data Security</h2>
           <p>
-            Passwords are never stored in plain text. All traffic between your device and
-            OAMS is encrypted (HTTPS). Access to every part of the system requires
-            authentication, and the system applies rate-limiting to slow down repeated
-            unauthorized login attempts. No system is perfectly secure, and this policy
-            does not represent a guarantee against every possible incident, but these
-            measures reflect the safeguards currently in place.
+            OAMS applies security measures to protect your information, both when it is
+            stored and when it is transmitted. Access is limited according to your role,
+            and inactive sessions end automatically. No system is perfectly secure, and
+            this policy does not represent a guarantee against every possible incident,
+            but the University takes reasonable steps to safeguard your data.
           </p>
 
           <h2>7. Changes to This Policy</h2>
