@@ -17,6 +17,7 @@ import ucLogo from "../assets/Pnc-Logo.png";
 import oamsLogo from "../assets/oams_logo.png";
 
 import "./AdminSidebar.css";
+import { loginPathForRole } from "../utils/loginPaths";
 
 // ─── Sidebar Icons ────────────────────────────────────────────────────────────
 const HomeIcon = () => (
@@ -217,7 +218,7 @@ export default function AdminSidebar() {
   const handleLogout = () => setShowLogoutConfirm(true);
   const confirmLogout = () => {
     logout();
-    navigate("/login");
+    navigate(loginPathForRole("admin"));
   };
 
   const toggleDarkMode = () => {

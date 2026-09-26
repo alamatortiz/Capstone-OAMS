@@ -16,16 +16,15 @@ const PORTAL_LABELS = {
   student: "Student Portal",
   faculty: "Faculty & Staff Portal",
   admin: "Administrator Portal",
+  superadmin: "Superadmin Portal",
 };
 
 // `expectedRole` locks this page to one role: /login/student,
-// /login/faculty, and /login/admin each pass their own role so a login
-// that succeeds server-side (role is always server-determined, not
+// /login/faculty, /login/admin and /login/superadmin each pass their own role
+// so a login that succeeds server-side (role is always server-determined, not
 // client-chosen) but belongs to a different role gets rejected client-side
-// instead of silently landing on the wrong dashboard. superadmin has no
-// dedicated login URL of its own (an intentionally hidden, SQL-provisioned
-// role), so it's allowed through the admin portal as an exception. The bare
-// /login (no expectedRole) stays fully ungated, unchanged.
+// instead of silently landing on the wrong dashboard. The bare /login no longer
+// renders this page at all -- it forwards to /login/student (see main.jsx).
 //
 // There is no self-registration -- student/faculty/admin accounts are
 // provisioned from the school's own records (Pinnacle Sync), not created
@@ -82,10 +81,7 @@ export default function Login({ expectedRole }) {
       if (storedUser) {
         const userData = JSON.parse(storedUser);
 
-        const roleMatches =
-          !expectedRole ||
-          userData.role === expectedRole ||
-          (expectedRole === "admin" && userData.role === "superadmin");
+        const roleMatches = !expectedRole || userData.role === expectedRole;
         if (!roleMatches) {
           await logout();
           toast.error(

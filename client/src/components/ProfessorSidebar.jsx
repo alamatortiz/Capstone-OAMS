@@ -20,6 +20,7 @@ import ucLogo from "../assets/Pnc-Logo.png";
 import oamsLogo from "../assets/oams_logo.png";
 
 import "./ProfessorSidebar.css";
+import { loginPathForRole } from "../utils/loginPaths";
 
 // ─── Sidebar Icons ────────────────────────────────────────────────────────────
 const HomeIcon = () => (
@@ -274,7 +275,7 @@ export default function ProfessorSidebar() {
   const handleLogout = () => setShowLogoutConfirm(true);
   const confirmLogout = () => {
     logout();
-    navigate("/login");
+    navigate(loginPathForRole("faculty"));
   };
 
   const toggleDarkMode = () => {

@@ -1,4 +1,5 @@
 import axios from "axios";
+import { loginPathForRole } from "./loginPaths";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
@@ -44,11 +45,17 @@ api.interceptors.response.use(
       (status === 401 || status === 403) &&
       SESSION_DEAD_MESSAGES.includes(message)
     ) {
+      let role = null;
+      try {
+        role = JSON.parse(localStorage.getItem("oams_user") || "null")?.role ?? null;
+      } catch {
+        role = null;
+      }
       localStorage.removeItem("oams_token");
       localStorage.removeItem("oams_user");
       localStorage.removeItem("oams_last_active");
       sessionStorage.setItem("oams_session_expired", "1");
-      window.location.href = "/login";
+      window.location.href = loginPathForRole(role);
       return Promise.reject(error);
     }
 

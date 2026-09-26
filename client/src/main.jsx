@@ -5,6 +5,7 @@ import {
   BrowserRouter,
   Routes,
   Route,
+  Navigate,
   useLocation,
 } from "react-router-dom";
 
@@ -152,7 +153,10 @@ createRoot(document.getElementById("root")).render(
               path="/landingpage/faculty"
               element={<App loginAudience="faculty" />}
             />
-            <Route path="/login" element={<Login />} />
+            {/* Bare /login is no longer a sign-in page for every role: it just
+                forwards to the student portal. Faculty, admin and superadmin
+                each have their own URL below. */}
+            <Route path="/login" element={<Navigate to="/login/student" replace />} />
             <Route
               path="/login/student"
               element={<Login expectedRole="student" />}
@@ -164,6 +168,10 @@ createRoot(document.getElementById("root")).render(
             <Route
               path="/login/admin"
               element={<Login expectedRole="admin" />}
+            />
+            <Route
+              path="/login/superadmin"
+              element={<Login expectedRole="superadmin" />}
             />
             <Route
               path="/privacy-policy"

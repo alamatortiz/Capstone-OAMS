@@ -1,6 +1,7 @@
 import React from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { loginPathForRole } from "../utils/loginPaths";
 
 interface ProtectedRouteProps {
   allowedRoles: Array<"student" | "faculty" | "admin" | "superadmin">;
@@ -14,7 +15,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) => {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />; // Not authenticated, redirect to login
+    // Not authenticated: send them to the sign-in page for the area they tried to reach.
+    return <Navigate to={loginPathForRole(allowedRoles[0])} replace />;
   }
 
   if (!user || !allowedRoles.includes(user.role)) {
