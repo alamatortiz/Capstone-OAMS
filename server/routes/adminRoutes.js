@@ -4969,6 +4969,237 @@ router.get(
 // PINNACLE SYNC
 // ─────────────────────────────────────────────────────────────
 
+// GET /api/admin/system-analytics?startDate&endDate&departmentId
+// University-wide (or one-college) queue / appointment / document aggregates
+// for the System Administrator analytics page + dashboard. Dates are Manila
+// calendar days; defaults to the last 30 days ending today.
+router.get(
+  "/system-analytics",
+  authenticateToken,
+  authorizeRoles("superadmin"),
+  async (req, res) => {
+    try {
+      const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+      const DAY_MS = 24 * 60 * 60 * 1000;
+      const endDate = req.query.endDate || getManilaDateString();
+      if (!DATE_RE.test(endDate) || !manilaDayStartUTC(endDate)) {
+        return res.status(400).json({ error: "Invalid endDate (expected YYYY-MM-DD)." });
+      }
+      const startDate =
+        req.query.startDate ||
+        getManilaDateString(new Date(manilaDayStartUTC(endDate).getTime() - 29 * DAY_MS));
+      if (!DATE_RE.test(startDate) || !manilaDayStartUTC(startDate)) {
+        return res.status(400).json({ error: "Invalid startDate (expected YYYY-MM-DD)." });
+      }
+      if (startDate > endDate) {
+        return res.status(400).json({ error: "startDate must be on or before endDate." });
+      }
+      let deptId = null;
+      if (req.query.departmentId !== undefined && req.query.departmentId !== "") {
+        deptId = Number(req.query.departmentId);
+        if (!Number.isInteger(deptId) || deptId <= 0) {
+          return res.status(400).json({ error: "Invalid departmentId." });
+        }
+      }
+
+      const startUTC = manilaDayStartUTC(startDate);
+      const endUTC = manilaDayEndExclusiveUTC(endDate);
+      const todayManila = getManilaDateString();
+      const MANILA_DAY = "DATE_FORMAT(CONVERT_TZ(created_at, '+00:00', '+08:00'), '%Y-%m-%d')";
+
+      // Each source is a derived table exposing normalized columns
+      // (dept_id, name, status, created_at, ...), already range/dept-filtered.
+      const queueSrc = {
+        sql: `(SELECT q.status, q.created_at, q.called_at, q.completed_at,
+                      COALESCE(qs.department_id, s.department_id) AS dept_id,
+                      COALESCE(s.service_name, 'Unspecified') AS name
+                 FROM queues q
+                 LEFT JOIN queue_slots qs ON qs.slot_id = q.slot_id
+                 LEFT JOIN services s ON s.service_id = q.service_id
+                WHERE q.created_at >= ? AND q.created_at < ?
+                  AND (? IS NULL OR COALESCE(qs.department_id, s.department_id) = ?)) t`,
+        params: [startUTC, endUTC, deptId, deptId],
+      };
+      const apptSrc = {
+        sql: `(SELECT a.status, a.created_at, a.cancelled_by, a.department_id AS dept_id,
+                      COALESCE(aps.service_name, 'Unspecified') AS name
+                 FROM appointments a
+                 LEFT JOIN appointment_services aps ON aps.service_id = a.service_id
+                WHERE a.created_at >= ? AND a.created_at < ?
+                  AND (? IS NULL OR a.department_id = ?)) t`,
+        params: [startUTC, endUTC, deptId, deptId],
+      };
+      const docSrc = {
+        sql: `(SELECT * FROM (
+                 SELECT 'request' AS source, ds.department_id AS dept_id, ds.service_name AS name,
+                        dr.status, dr.created_at, dr.claimed_at, dr.claim_by
+                   FROM document_requests dr
+                   JOIN document_services ds ON ds.service_id = dr.service_id
+                  WHERE dr.created_at >= ? AND dr.created_at < ?
+                 UNION ALL
+                 SELECT 'faculty_request', ds.department_id, ds.service_name,
+                        fr.status, fr.created_at, fr.claimed_at, fr.claim_by
+                   FROM faculty_document_requests fr
+                   JOIN document_services ds ON ds.service_id = fr.service_id
+                  WHERE fr.created_at >= ? AND fr.created_at < ?
+                 UNION ALL
+                 SELECT 'submission', sub.department_id, 'Document Submission',
+                        sub.status, sub.created_at, sub.claimed_at, sub.claim_by
+                   FROM document_submissions sub
+                  WHERE sub.created_at >= ? AND sub.created_at < ?
+               ) u WHERE (? IS NULL OR u.dept_id = ?)) t`,
+        params: [startUTC, endUTC, startUTC, endUTC, startUTC, endUTC, deptId, deptId],
+      };
+
+      const grouped = async (src, expr, limit) => {
+        const [rows] = await pool.query(
+          `SELECT ${expr} AS k, COUNT(*) AS n FROM ${src.sql}
+            GROUP BY k ORDER BY n DESC${limit ? ` LIMIT ${Number(limit)}` : ""}`,
+          src.params,
+        );
+        return rows.map((r) => ({ k: r.k, n: Number(r.n) || 0 }));
+      };
+      const rangeDays = Math.round((endUTC - startUTC) / DAY_MS);
+      const wantDaily = rangeDays <= 92;
+      const dailyOf = async (src) => {
+        if (!wantDaily) return [];
+        const rows = await grouped(src, MANILA_DAY);
+        const byDay = new Map(rows.map((r) => [r.k, r.n]));
+        const out = [];
+        for (let i = 0; i < rangeDays; i++) {
+          const date = getManilaDateString(new Date(startUTC.getTime() + i * DAY_MS));
+          out.push({ date, count: byDay.get(date) || 0 });
+        }
+        return out;
+      };
+      const round1 = (v) => (v == null ? null : Math.round(Number(v) * 10) / 10);
+
+      const [
+        [deptRows],
+        [[qSum]],
+        qPeak,
+        qByDept,
+        qTop,
+        qDaily,
+        [[aSum]],
+        aByStatus,
+        aByDept,
+        aTop,
+        aDaily,
+        [[dSum]],
+        dByStatus,
+        dByDept,
+        dTop,
+        dDaily,
+      ] = await Promise.all([
+        pool.query(
+          `SELECT department_id, department_name, department_abbreviation
+             FROM departments ORDER BY department_abbreviation`,
+        ),
+        pool.query(
+          `SELECT COUNT(*) AS joined,
+                  SUM(status = 'completed') AS completed,
+                  SUM(status = 'cancelled') AS cancelled,
+                  SUM(status = 'no_show') AS no_shows,
+                  SUM(status = 'waiting') AS waiting,
+                  AVG(CASE WHEN called_at IS NOT NULL
+                           THEN TIMESTAMPDIFF(MINUTE, created_at, called_at) END) AS avg_wait,
+                  AVG(CASE WHEN status = 'completed' AND called_at IS NOT NULL AND completed_at IS NOT NULL
+                           THEN TIMESTAMPDIFF(MINUTE, called_at, completed_at) END) AS avg_service
+             FROM ${queueSrc.sql}`,
+          queueSrc.params,
+        ),
+        grouped(queueSrc, "HOUR(CONVERT_TZ(created_at, '+00:00', '+08:00'))", 1),
+        grouped(queueSrc, "dept_id"),
+        grouped(queueSrc, "name", 5),
+        dailyOf(queueSrc),
+        pool.query(
+          `SELECT COUNT(*) AS total,
+                  SUM(cancelled_by = 'student_no_show') AS no_show_reports
+             FROM ${apptSrc.sql}`,
+          apptSrc.params,
+        ),
+        grouped(apptSrc, "status"),
+        grouped(apptSrc, "dept_id"),
+        grouped(apptSrc, "name", 5),
+        dailyOf(apptSrc),
+        pool.query(
+          `SELECT COUNT(*) AS total,
+                  AVG(CASE WHEN claimed_at IS NOT NULL
+                           THEN TIMESTAMPDIFF(HOUR, created_at, claimed_at) END) / 24 AS avg_days,
+                  SUM(status = 'ready' AND claim_by IS NOT NULL AND claim_by < ?) AS overdue
+             FROM ${docSrc.sql}`,
+          [todayManila, ...docSrc.params],
+        ),
+        grouped(docSrc, "status"),
+        grouped(docSrc, "dept_id"),
+        grouped(docSrc, "name", 5),
+        dailyOf(docSrc),
+      ]);
+
+      const colleges = deptRows.map((d) => ({
+        id: d.department_id,
+        name: d.department_name,
+        abbrev: d.department_abbreviation,
+      }));
+      const abbrevById = new Map(colleges.map((c) => [c.id, c.abbrev]));
+      const byCollege = (rows) =>
+        rows
+          .filter((r) => r.n > 0 && r.k != null)
+          .map((r) => ({ abbrev: abbrevById.get(r.k) || `Dept ${r.k}`, count: r.n }));
+      const topList = (rows) => rows.map((r) => ({ name: r.k || "Unspecified", count: r.n }));
+      const statusMap = (rows, keys) => {
+        const m = Object.fromEntries(keys.map((k) => [k, 0]));
+        for (const r of rows) if (r.k in m) m[r.k] = r.n;
+        return m;
+      };
+
+      const apptTotal = Number(aSum.total) || 0;
+      const apptByStatus = statusMap(aByStatus, ["pending", "approved", "completed", "rejected", "cancelled"]);
+
+      res.json({
+        startDate,
+        endDate,
+        departmentId: deptId,
+        colleges,
+        queues: {
+          joined: Number(qSum.joined) || 0,
+          completed: Number(qSum.completed) || 0,
+          cancelled: Number(qSum.cancelled) || 0,
+          noShows: Number(qSum.no_shows) || 0,
+          waiting: Number(qSum.waiting) || 0,
+          avgWaitMin: round1(qSum.avg_wait),
+          avgServiceMin: round1(qSum.avg_service),
+          peakHour: qPeak.length > 0 && qPeak[0].k != null ? Number(qPeak[0].k) : null,
+          byCollege: byCollege(qByDept),
+          topServices: topList(qTop),
+          daily: qDaily,
+        },
+        appointments: {
+          total: apptTotal,
+          byStatus: apptByStatus,
+          completionRate: apptTotal > 0 ? round1((apptByStatus.completed / apptTotal) * 100) : 0,
+          noShowReports: Number(aSum.no_show_reports) || 0,
+          byCollege: byCollege(aByDept),
+          topTypes: topList(aTop),
+          daily: aDaily,
+        },
+        documents: {
+          total: Number(dSum.total) || 0,
+          byStatus: statusMap(dByStatus, ["pending", "processing", "ready", "claimed", "rejected", "cancelled"]),
+          avgDaysToClaim: round1(dSum.avg_days),
+          overdue: Number(dSum.overdue) || 0,
+          byCollege: byCollege(dByDept),
+          topTypes: topList(dTop),
+          daily: dDaily,
+        },
+      });
+    } catch (error) {
+      sendServerError(res, error, "System analytics error:");
+    }
+  },
+);
+
 // GET /api/admin/pinnacle-sync/config
 router.get(
   "/pinnacle-sync/config",
@@ -5082,10 +5313,42 @@ router.post(
   authorizeRoles("superadmin"),
   async (req, res) => {
     // No code in this server consumes the saved pinnacle_* settings, so a
-    // "sync" would be fake. Refuse honestly instead of logging a false success.
+    // "sync" would be fake. Record the attempt honestly as failed (so the Sync
+    // History tab reflects it) and keep a non-2xx status: the mobile client
+    // treats any 2xx as a successful sync.
+    try {
+      await pool.query(
+        `INSERT INTO external_sync_logs (external_system, sync_type, sync_status) VALUES ('Pinnacle', 'profile', 'failed')`,
+      );
+    } catch (logError) {
+      console.error("Pinnacle sync log insert error:", logError.message);
+    }
     res.status(501).json({
-      error: "Pinnacle integration is not connected yet. The saved URL and key are stored for later use, but no sync can run.",
+      error: "No school records system is connected yet, so nothing was synced. The attempt was recorded in Sync History.",
     });
+  },
+);
+
+// POST /api/admin/pinnacle-sync/test
+// A real server round-trip for "Test Connection". There is no integration to
+// reach yet, so it reports not-connected; a future API check plugs in here.
+router.post(
+  "/pinnacle-sync/test",
+  authenticateToken,
+  authorizeRoles("superadmin"),
+  async (req, res) => {
+    try {
+      const [[row]] = await pool.query(
+        `SELECT setting_value FROM system_settings WHERE setting_key = 'pinnacle_api_url'`,
+      );
+      res.json({
+        connected: false,
+        apiUrl: row?.setting_value || null,
+        message: "No school records system is connected yet. Your settings are saved and will be used once the integration is available.",
+      });
+    } catch (error) {
+      sendServerError(res, error, "Pinnacle test error:");
+    }
   },
 );
 
@@ -5424,7 +5687,7 @@ router.put(
           return res.status(400).json({ error: "You cannot suspend or deactivate your own account" });
         }
         if (userRow.role === "superadmin") {
-          return res.status(403).json({ error: "You cannot suspend or deactivate another superadmin" });
+          return res.status(403).json({ error: "You cannot suspend or deactivate another system administrator" });
         }
       }
 
@@ -5494,7 +5757,7 @@ router.patch(
           return res.status(400).json({ error: "You cannot suspend or deactivate your own account" });
         }
         if (userRow.role === "superadmin") {
-          return res.status(403).json({ error: "You cannot suspend or deactivate another superadmin" });
+          return res.status(403).json({ error: "You cannot suspend or deactivate another system administrator" });
         }
       }
 
@@ -5525,7 +5788,7 @@ router.delete(
       const [[userRow]] = await pool.query(`SELECT role FROM users WHERE user_id = ?`, [userId]);
       if (!userRow) return res.status(404).json({ error: "User not found" });
       if (userRow.role === "superadmin") {
-        return res.status(403).json({ error: "You cannot delete another superadmin" });
+        return res.status(403).json({ error: "You cannot delete another system administrator" });
       }
 
       await pool.query(`DELETE FROM users WHERE user_id = ?`, [userId]);

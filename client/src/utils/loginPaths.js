@@ -6,7 +6,7 @@ const LOGIN_PATHS = {
   student: "/login/student",
   faculty: "/login/faculty",
   admin: "/login/admin",
-  superadmin: "/login/superadmin",
+  superadmin: "/login/system",
 };
 
 export function loginPathForRole(role) {

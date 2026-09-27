@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Star } from "lucide-react";
+import { Star, BarChart3 } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
 import LogoutConfirmModal from "./LogoutConfirmModal";
@@ -13,7 +13,7 @@ import oamsLogo from "../assets/oams_logo.png";
 // Reuses AdminSidebar.css's own classes directly rather than forking a
 // parallel stylesheet -- this sidebar is structurally the same shell
 // (logo, user card, nav list, logout), just with a narrower nav list and
-// no department/college line, since superadmin is system-wide.
+// no department/college line, since this role is system-wide.
 import "./AdminSidebar.css";
 import { loginPathForRole } from "../utils/loginPaths";
 
@@ -83,16 +83,19 @@ const MoonIcon = () => (
   </svg>
 );
 
+const ROLE_LABEL = "System Administrator";
+
 const navItems = [
-  { icon: HomeIcon, label: "Home", path: "/superadmin/dashboard" },
-  { icon: UsersIconNav, label: "User Management", path: "/superadmin/user-management" },
-  { icon: SyncIconNav, label: "Pinnacle Sync", path: "/superadmin/pinnacle-sync" },
-  { icon: Star, label: "Satisfaction Survey", path: "/superadmin/satisfaction-survey" },
+  { icon: HomeIcon, label: "Home", path: "/system/dashboard" },
+  { icon: UsersIconNav, label: "User Management", path: "/system/users" },
+  { icon: BarChart3, label: "Analytics", path: "/system/analytics" },
+  { icon: SyncIconNav, label: "Manual Sync", path: "/system/sync" },
+  { icon: Star, label: "Satisfaction Survey", path: "/system/survey" },
 ];
 
 export default function SuperadminSidebar() {
   const { user: authUser, logout } = useAuth();
-  const user = authUser ?? { name: "Superadmin" };
+  const user = authUser ?? { name: ROLE_LABEL };
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -127,7 +130,7 @@ export default function SuperadminSidebar() {
         <div className="sidebar-inner">
           <div className="sidebar-logo">
             <Link
-              to="/superadmin/dashboard"
+              to="/system/dashboard"
               className="logo-container"
               onClick={() => setSidebarOpen(false)}
             >
@@ -154,8 +157,8 @@ export default function SuperadminSidebar() {
                 <UserIcon />
               </div>
               <div className="user-info-content">
-                <p className="user-name-large">{user?.name ?? "Superadmin"}</p>
-                <span className="user-role-badge">Superadmin</span>
+                <p className="user-name-large">{user?.name ?? ROLE_LABEL}</p>
+                <span className="user-role-badge">{ROLE_LABEL}</span>
               </div>
             </div>
           </div>
@@ -188,7 +191,7 @@ export default function SuperadminSidebar() {
 
       <header className="mobile-header">
         <div className="mobile-header-content">
-          <Link to="/superadmin/dashboard" className="mobile-logo">
+          <Link to="/system/dashboard" className="mobile-logo">
             <img src={ucLogo} alt="UC Logo" className="logo-img" />
             <img
               src={oamsLogo}

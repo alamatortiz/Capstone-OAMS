@@ -8,6 +8,7 @@ import { ChevronLeft, Star, AlertTriangle } from "lucide-react";
 import "../admin/adm-dashboard.css";
 import "./sa-pinnacle-sync.css";
 import SuperadminPageShell from "../../components/SuperadminPageShell";
+import PageHeader from "../../components/PageHeader";
 import api from "../../utils/api";
 
 export default function SuperadminSatisfactionSurvey() {
@@ -86,28 +87,23 @@ export default function SuperadminSatisfactionSurvey() {
       mainClassName="admin-dashboard-main"
     >
       <div className="aps-page">
-        <div className="aps-header-block">
-          <div className="page-breadcrumb">
-            <Link to="/superadmin/dashboard" className="page-breadcrumb-link">
+        <PageHeader
+          breadcrumb={
+            <Link to="/system/dashboard" className="page-breadcrumb-link">
               <ChevronLeft />
               Home
             </Link>
-          </div>
-          <div className="aps-page-header">
-            <div className="aps-title-section">
-              <div className="aps-title-icon">
-                <Star />
-              </div>
-              <div>
-                <h1 className="aps-page-title">Satisfaction Survey</h1>
-                <p className="aps-page-subtitle">
-                  Link students to each department's own external
-                  satisfaction survey after a completed service
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+          }
+          icon={<Star />}
+          iconClassName="aps-title-icon"
+          title="Satisfaction Survey"
+          subtitle="Link students to each college's own external satisfaction survey after a completed service"
+          headerClassName="aps-header-block"
+          breadcrumbClassName="page-breadcrumb"
+          titleSectionClassName="aps-title-section"
+          titleClassName="aps-page-title"
+          subtitleClassName="aps-page-subtitle"
+        />
 
         {message && (
           <div className={`aps-alert aps-alert--${message.type}`}>

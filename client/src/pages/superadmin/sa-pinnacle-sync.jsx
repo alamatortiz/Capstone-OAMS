@@ -1,13 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
+import { toast } from "sonner";
 // Supplies the .admin-dashboard-with-sidebar / .admin-dashboard-main shell
-// classes and their <=1024px mobile-header offset (see sa-dashboard.jsx,
-// which already does this). Lazy-loaded route, so it needs its own import.
+// classes and their <=1024px mobile-header offset. Lazy-loaded route, so it
+// needs its own import.
 import "../admin/adm-dashboard.css";
 import "./sa-pinnacle-sync.css";
 import SuperadminPageShell from "../../components/SuperadminPageShell";
+import PageHeader from "../../components/PageHeader";
+import { formatManilaDateTime } from "../../utils/dateTime";
 import api from "../../utils/api";
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
@@ -37,15 +40,6 @@ const UsersIcon = () => (
     <circle cx="9" cy="7" r="4"></circle>
     <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
     <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-  </svg>
-);
-const SyncIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    style={{ width: "1.5rem", height: "1.5rem" }}
-  >
-    <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" />
   </svg>
 );
 const GearIcon = () => (
@@ -147,331 +141,303 @@ const ClockIconSm = () => (
 );
 
 const NOT_CONNECTED_TEXT =
-  "Pinnacle integration is not connected yet. The URL and key can be saved for later, but no connection test or sync can run.";
+  "No school records system is connected yet. You can save the connection settings now; Sync Now and Test Connection will report the connection status.";
+
+const LOG_STATUS_LABEL = { success: "Success", failed: "Not connected", pending: "Pending" };
 
 export default function SuperadminPinnacleSync() {
   const { user: authUser } = useAuth();
 
-  // ── PinnaCle Sync state ──────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState("configuration");
-  const [apiUrl, setApiUrl] = useState("https://pinnacle-api.pnc.edu.ph/v1");
+  const [apiUrl, setApiUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [apiKeySet, setApiKeySet] = useState(false);
   const [syncInterval, setSyncInterval] = useState(60);
   const [syncEnabled, setSyncEnabled] = useState(false);
   const [syncStats, setSyncStats] = useState({ total: 0, students: 0, professors: 0, admins: 0 });
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncMessage, setSyncMessage] = useState(null);
+  const [recentLogs, setRecentLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
-  // Load config and stats on mount
+  const loadStats = useCallback(async () => {
+    const { data: s } = await api.get("/admin/pinnacle-sync/stats");
+    setSyncStats({ total: s.total, students: s.students, professors: s.professors, admins: s.admins });
+    setRecentLogs(s.recentLogs ?? []);
+  }, []);
+
   useEffect(() => {
     if (!authUser) return;
     const load = async () => {
       try {
-        const [cfgRes, statsRes] = await Promise.all([
+        const [{ data: cfg }] = await Promise.all([
           api.get("/admin/pinnacle-sync/config"),
-          api.get("/admin/pinnacle-sync/stats"),
+          loadStats(),
         ]);
-        const cfg = cfgRes.data;
-        setApiUrl(cfg.apiUrl);
+        setApiUrl(cfg.apiUrl ?? "");
         setApiKeySet(!!cfg.apiKeySet);
-        setSyncInterval(cfg.syncInterval);
-        setSyncEnabled(cfg.syncEnabled);
-        const s = statsRes.data;
-        setSyncStats({ total: s.total, students: s.students, professors: s.professors, admins: s.admins });
+        setSyncInterval(cfg.syncInterval ?? 60);
+        setSyncEnabled(!!cfg.syncEnabled);
       } catch (err) {
-        console.error("Pinnacle sync load error:", err);
+        toast.error(err?.response?.data?.error || "Couldn't load the sync settings.");
+      } finally {
+        setLoading(false);
       }
     };
     load();
-  }, [authUser]);
+  }, [authUser, loadStats]);
 
   const handleSaveConfiguration = async () => {
+    const url = apiUrl.trim();
+    if (url && !/^https?:\/\/\S+$/i.test(url)) {
+      toast.error("Enter a valid URL starting with http:// or https://");
+      return;
+    }
+    const interval = Number(syncInterval);
+    if (!Number.isInteger(interval) || interval < 15 || interval > 1440) {
+      toast.error("Auto-sync interval must be between 15 and 1440 minutes");
+      return;
+    }
+    setSaving(true);
     try {
-      await api.post("/admin/pinnacle-sync/config", { apiUrl, apiKey, syncInterval, syncEnabled });
+      await api.post("/admin/pinnacle-sync/config", { apiUrl: url, apiKey, syncInterval: interval, syncEnabled });
       if (apiKey.trim()) setApiKeySet(true);
       setApiKey("");
-      setSyncMessage({ type: "success", text: "Configuration saved. (Pinnacle is not connected yet, so nothing will sync.)" });
+      toast.success("Sync settings saved");
     } catch (err) {
-      setSyncMessage({ type: "error", text: err?.response?.data?.error || "Failed to save configuration." });
+      toast.error(err?.response?.data?.error || "Failed to save the sync settings");
+    } finally {
+      setSaving(false);
     }
-    setTimeout(() => setSyncMessage(null), 3000);
   };
 
-  const handleTestConnection = () => {
-    setSyncMessage({ type: "warning", text: NOT_CONNECTED_TEXT });
-    setTimeout(() => setSyncMessage(null), 4000);
+  const handleTestConnection = async () => {
+    setTesting(true);
+    try {
+      const { data } = await api.post("/admin/pinnacle-sync/test");
+      if (data.connected) toast.success(data.message || "Connection successful");
+      else toast.warning(data.message || NOT_CONNECTED_TEXT);
+    } catch (err) {
+      toast.error(err?.response?.data?.error || "Couldn't test the connection");
+    } finally {
+      setTesting(false);
+    }
   };
+
+  const handleSyncNow = async () => {
+    setSyncing(true);
+    try {
+      await api.post("/admin/pinnacle-sync/trigger");
+      toast.success("Sync complete");
+    } catch (err) {
+      // 501 = no integration connected; the attempt is still logged server-side.
+      if (err?.response?.status === 501) toast.warning(err.response.data?.error || NOT_CONNECTED_TEXT);
+      else toast.error(err?.response?.data?.error || "Sync failed");
+    } finally {
+      try { await loadStats(); } catch { /* history refresh is best-effort */ }
+      setSyncing(false);
+    }
+  };
+
+  const tabs = [
+    { key: "configuration", label: "Configuration", icon: <GearIcon /> },
+    { key: "sync-control", label: "Sync Control", icon: <RefreshIcon /> },
+    { key: "history", label: "Sync History", icon: <ClockIconSm /> },
+  ];
 
   return (
-    <SuperadminPageShell
-      outerClassName="admin-dashboard-with-sidebar"
-      mainClassName="admin-dashboard-main"
-    >
-        <div className="aps-page">
-          <div className="aps-header-block">
-          <div className="page-breadcrumb"><Link to="/superadmin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link></div>
-          {/* Header */}
-          <div className="aps-page-header">
-            <div className="aps-title-section">
-              <div className="aps-title-icon">
-                <DatabaseIcon />
-              </div>
+    <SuperadminPageShell outerClassName="admin-dashboard-with-sidebar" mainClassName="admin-dashboard-main">
+      <div className="aps-page">
+        <div className="aps-page-header">
+          <PageHeader
+            breadcrumb={
+              <Link to="/system/dashboard" className="page-breadcrumb-link">
+                <ChevronLeft />Home
+              </Link>
+            }
+            icon={<DatabaseIcon />}
+            iconClassName="aps-title-icon"
+            title="Manual Sync"
+            subtitle="Sync user accounts from the school's records system"
+            headerClassName="aps-header-block"
+            breadcrumbClassName="page-breadcrumb"
+            titleSectionClassName="aps-title-section"
+            titleClassName="aps-page-title"
+            subtitleClassName="aps-page-subtitle"
+          />
+          <div className="aps-sync-badge aps-sync-badge--disabled">
+            <span className="aps-sync-dot"></span>
+            Not connected
+          </div>
+        </div>
+
+        <div className="aps-alert aps-alert--warning">
+          <AlertTriangleIcon />
+          <span>{NOT_CONNECTED_TEXT}</span>
+        </div>
+
+        <div className="aps-stats-grid">
+          {[
+            { label: "Total Accounts", value: syncStats.total, color: "aps-stat-blue" },
+            { label: "Students", value: syncStats.students, color: "aps-stat-green" },
+            { label: "Faculty", value: syncStats.professors, color: "aps-stat-purple" },
+            { label: "Admins", value: syncStats.admins, color: "aps-stat-orange" },
+          ].map((s) => (
+            <div key={s.label} className="aps-stat-card">
+              <div className={`aps-stat-icon ${s.color}`}><UsersIcon /></div>
+              <p className="aps-stat-label">{s.label}</p>
+              <p className="aps-stat-value">{loading ? "—" : s.value}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="aps-tabs">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              className={`aps-tab-btn ${activeTab === tab.key ? "aps-tab-btn--active" : ""}`}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === "configuration" && (
+          <div className="aps-panel">
+            <div className="aps-panel-header">
+              <h2 className="aps-panel-title">Connection Settings</h2>
+              <p className="aps-panel-subtitle">Saved now, used once the school's records system is connected</p>
+            </div>
+
+            <div className="aps-form-group">
+              <label className="aps-label">API URL</label>
+              <input
+                type="text"
+                className="aps-input"
+                value={apiUrl}
+                onChange={(e) => setApiUrl(e.target.value)}
+                placeholder="https://records.example.edu.ph/api"
+              />
+              <p className="aps-hint">Base address of the school's records system</p>
+            </div>
+
+            <div className="aps-form-group">
+              <label className="aps-label">API Key</label>
+              <input
+                type="password"
+                className="aps-input"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder={apiKeySet ? "Key saved — leave blank to keep it" : "Enter the access key"}
+                autoComplete="new-password"
+              />
+              <p className="aps-hint">
+                Access key provided by the school
+                {apiKeySet ? " (a key is stored; it is never shown again)" : ""}
+              </p>
+            </div>
+
+            <div className="aps-form-group">
+              <label className="aps-label">Auto-Sync Interval (minutes)</label>
+              <input
+                type="number"
+                className="aps-input aps-input--sm"
+                value={syncInterval}
+                onChange={(e) => setSyncInterval(e.target.value)}
+                min={15}
+                max={1440}
+              />
+              <p className="aps-hint">How often to sync automatically once connected (15 min – 24 hours)</p>
+            </div>
+
+            <div className="aps-toggle-card">
               <div>
-                <h1 className="aps-page-title">Pinnacle Integration</h1>
-                <p className="aps-page-subtitle">
-                  Sync user data from Pinnacle microservice
+                <p className="aps-toggle-title">Enable Automatic Sync</p>
+                <p className="aps-toggle-desc">
+                  When connected, OAMS will keep accounts up to date from the school's records. Saved with the settings above.
                 </p>
               </div>
-            </div>
-            <div className="aps-sync-badge aps-sync-badge--disabled">
-              <span className="aps-sync-dot"></span>
-              Not connected
-            </div>
-          </div>
-          </div>
-
-          <div className="aps-alert aps-alert--warning">
-            <AlertTriangleIcon />
-            <span>{NOT_CONNECTED_TEXT}</span>
-          </div>
-
-          {/* Stat Cards */}
-          <div className="aps-stats-grid">
-            {[
-              {
-                label: "Total OAMS Users",
-                value: syncStats.total,
-                color: "aps-stat-blue",
-                icon: <UsersIcon />,
-              },
-              {
-                label: "Students",
-                value: syncStats.students,
-                color: "aps-stat-green",
-                icon: <UsersIcon />,
-              },
-              {
-                label: "Professors",
-                value: syncStats.professors,
-                color: "aps-stat-purple",
-                icon: <UsersIcon />,
-              },
-              {
-                label: "Admins",
-                value: syncStats.admins,
-                color: "aps-stat-orange",
-                icon: <UsersIcon />,
-              },
-            ].map((s) => (
-              <div key={s.label} className="aps-stat-card">
-                <div className={`aps-stat-icon ${s.color}`}>{s.icon}</div>
-                <p className="aps-stat-label">{s.label}</p>
-                <p className="aps-stat-value">{s.value}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Tabs */}
-          <div className="aps-tabs">
-            {[
-              {
-                key: "configuration",
-                label: "Configuration",
-                icon: <GearIcon />,
-              },
-              {
-                key: "sync-control",
-                label: "Sync Control",
-                icon: <RefreshIcon />,
-              },
-              {
-                key: "synced-users",
-                label: "Synced Users",
-                icon: <UsersIcon />,
-              },
-            ].map((tab) => (
               <button
-                key={tab.key}
-                className={`aps-tab-btn ${activeTab === tab.key ? "aps-tab-btn--active" : ""}`}
-                onClick={() => setActiveTab(tab.key)}
+                className={`aps-toggle-btn ${syncEnabled ? "aps-toggle-btn--on" : ""}`}
+                onClick={() => setSyncEnabled((v) => !v)}
+                aria-label="Toggle automatic sync"
+                aria-pressed={syncEnabled}
               >
-                {tab.icon}
-                {tab.label}
+                <span className="aps-toggle-thumb"></span>
               </button>
-            ))}
+            </div>
+
+            <div className="aps-panel-actions">
+              <button className="aps-btn-primary" onClick={handleSaveConfiguration} disabled={saving}>
+                <GearIcon /> {saving ? "Saving…" : "Save Settings"}
+              </button>
+              <button className="aps-btn-secondary" onClick={handleTestConnection} disabled={testing}>
+                <ZapIcon /> {testing ? "Testing…" : "Test Connection"}
+              </button>
+            </div>
           </div>
+        )}
 
-          {/* Toast / Alert */}
-          {syncMessage && (
-            <div className={`aps-alert aps-alert--${syncMessage.type}`}>
-              <AlertTriangleIcon />
-              <span>{syncMessage.text}</span>
+        {activeTab === "sync-control" && (
+          <div className="aps-panel">
+            <div className="aps-panel-header">
+              <h2 className="aps-panel-title">Run a Sync</h2>
+              <p className="aps-panel-subtitle">Pull the latest user accounts from the school's records now</p>
             </div>
-          )}
 
-          {/* Tab: Configuration */}
-          {activeTab === "configuration" && (
-            <div className="aps-panel">
-              <div className="aps-panel-header">
-                <h2 className="aps-panel-title">PinnaCle API Configuration</h2>
-                <p className="aps-panel-subtitle">
-                  Configure connection to PinnaCle microservice
-                </p>
-              </div>
+            <button
+              className={`aps-sync-now-btn ${syncing ? "aps-sync-now-btn--loading" : ""}`}
+              onClick={handleSyncNow}
+              disabled={syncing}
+            >
+              <RefreshIcon />
+              {syncing ? "Syncing…" : "Sync Now"}
+            </button>
 
-              <div className="aps-form-group">
-                <label className="aps-label">
-                  API URL <span className="aps-required">*</span>
-                </label>
-                <input
-                  type="text"
-                  className="aps-input"
-                  value={apiUrl}
-                  onChange={(e) => setApiUrl(e.target.value)}
-                  placeholder="https://pinnacle-api.pnc.edu.ph/v1"
-                />
-                <p className="aps-hint">Base URL for PinnaCle API endpoints</p>
-              </div>
-
-              <div className="aps-form-group">
-                <label className="aps-label">
-                  API Key <span className="aps-required">*</span>
-                </label>
-                <input
-                  type="password"
-                  className="aps-input"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder={apiKeySet ? "Key saved — leave blank to keep it" : "Enter your PinnaCle API key"}
-                  autoComplete="new-password"
-                />
-                <p className="aps-hint">
-                  Authentication key for accessing PinnaCle API
-                  {apiKeySet ? " (a key is stored; it is never shown again)" : ""}
-                </p>
-              </div>
-
-              <div className="aps-form-group">
-                <label className="aps-label">
-                  Auto-Sync Interval (minutes)
-                </label>
-                <input
-                  type="number"
-                  className="aps-input aps-input--sm"
-                  value={syncInterval}
-                  onChange={(e) => setSyncInterval(Number(e.target.value))}
-                  min={15}
-                  max={1440}
-                />
-                <p className="aps-hint">
-                  How often to automatically sync data (15 min – 24 hours)
-                </p>
-              </div>
-
-              <div className="aps-toggle-card">
-                <div>
-                  <p className="aps-toggle-title">Enable PinnaCle Sync</p>
-                  <p className="aps-toggle-desc">
-                    When enabled, OAMS will use PinnaCle as the source of truth
-                    for user data
-                  </p>
-                </div>
-                <button
-                  className={`aps-toggle-btn ${syncEnabled ? "aps-toggle-btn--on" : ""}`}
-                  onClick={() => setSyncEnabled((v) => !v)}
-                  aria-label="Toggle PinnaCle sync"
-                >
-                  <span className="aps-toggle-thumb"></span>
-                </button>
-              </div>
-
-              <div className="aps-panel-actions">
-                <button
-                  className="aps-btn-primary"
-                  onClick={handleSaveConfiguration}
-                >
-                  <GearIcon /> Save Configuration
-                </button>
-                <button
-                  className="aps-btn-secondary"
-                  onClick={handleTestConnection}
-                >
-                  <ZapIcon /> Test Connection
-                </button>
-              </div>
+            <div className="aps-how-it-works">
+              <h3 className="aps-how-title">What a sync does</h3>
+              <ul className="aps-how-list">
+                <li><ArrowUpIcon /> Fetches the latest student, faculty and staff records</li>
+                <li><ArrowDownIcon /> Adds new accounts and updates existing ones in OAMS</li>
+                <li><RefreshIcon /> Runs automatically every {syncInterval} minutes when enabled</li>
+                <li><CheckCircleIcon /> Every attempt is recorded in Sync History</li>
+              </ul>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Tab: Sync Control */}
-          {activeTab === "sync-control" && (
-            <div className="aps-panel">
-              <div className="aps-panel-header">
-                <h2 className="aps-panel-title">Data Synchronization</h2>
-                <p className="aps-panel-subtitle">
-                  Sync user data from PinnaCle to OAMS
-                </p>
-              </div>
-
-              <button
-                className="aps-sync-now-btn"
-                disabled
-                title="Pinnacle integration is not connected yet"
-              >
-                <RefreshIcon />
-                Sync Now from PinnaCle
-              </button>
-
-              <div className="aps-alert aps-alert--warning">
-                <AlertTriangleIcon />
-                <span>{NOT_CONNECTED_TEXT}</span>
-              </div>
-
-              <div className="aps-how-it-works">
-                <h3 className="aps-how-title">How PinnaCle Sync Works</h3>
-                <ul className="aps-how-list">
-                  <li>
-                    <ArrowUpIcon /> Fetches latest user data from PinnaCle
-                    microservice
-                  </li>
-                  <li>
-                    <ArrowDownIcon /> Updates OAMS user accounts with PinnaCle
-                    information
-                  </li>
-                  <li>
-                    <RefreshIcon /> Automatically syncs every {syncInterval}{" "}
-                    minutes when enabled
-                  </li>
-                  <li>
-                    <CheckCircleIcon /> PinnaCle becomes the single source of
-                    truth for user authentication
-                  </li>
-                </ul>
-              </div>
+        {activeTab === "history" && (
+          <div className="aps-panel">
+            <div className="aps-panel-header">
+              <h2 className="aps-panel-title">Sync History</h2>
+              <p className="aps-panel-subtitle">The 10 most recent sync attempts</p>
             </div>
-          )}
 
-          {/* Tab: Synced Users */}
-          {activeTab === "synced-users" && (
-            <div className="aps-panel">
-              <div className="aps-panel-header">
-                <h2 className="aps-panel-title">Users from PinnaCle</h2>
-                <p className="aps-panel-subtitle">
-                  User accounts synced from PinnaCle microservice
-                </p>
-              </div>
-
+            {recentLogs.length === 0 ? (
               <div className="aps-empty-state">
                 <DatabaseIcon />
-                <h3 className="aps-empty-title">No Synced Users</h3>
-                <p className="aps-empty-desc">
-                  Nothing has been imported from Pinnacle. The integration is
-                  not connected yet.
-                </p>
+                <h3 className="aps-empty-title">No sync attempts yet</h3>
+                <p className="aps-empty-desc">Run Sync Now from the Sync Control tab and the attempt will appear here.</p>
               </div>
-            </div>
-          )}
-        </div>
+            ) : (
+              <ul className="aps-log-list">
+                {recentLogs.map((log) => (
+                  <li key={log.id} className="aps-log-item">
+                    <span className={`aps-log-status aps-log-status--${log.status}`}>
+                      {LOG_STATUS_LABEL[log.status] ?? log.status}
+                    </span>
+                    <span className="aps-log-type">{log.type === "profile" ? "User accounts" : log.type}</span>
+                    <span className="aps-log-time">{log.syncedAt ? formatManilaDateTime(log.syncedAt) : "—"}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
     </SuperadminPageShell>
   );
 }

@@ -88,6 +88,9 @@ const SuperadminPinnacleSync = React.lazy(
 const SuperadminSatisfactionSurvey = React.lazy(
   () => import("./pages/superadmin/sa-satisfaction-survey.jsx"),
 );
+const SuperadminAnalytics = React.lazy(
+  () => import("./pages/superadmin/sa-analytics.jsx"),
+);
 
 import AppointmentsPage from "./pages/student/stud-appointments.jsx";
 import DocumentsPage from "./pages/student/stud-documents.jsx";
@@ -170,7 +173,7 @@ createRoot(document.getElementById("root")).render(
               element={<Login expectedRole="admin" />}
             />
             <Route
-              path="/login/superadmin"
+              path="/login/system"
               element={<Login expectedRole="superadmin" />}
             />
             <Route
@@ -407,9 +410,10 @@ createRoot(document.getElementById("root")).render(
                 System-wide role, deliberately kept separate from /admin/* --
                 never shown in any admin nav/tool-card, provisioned by direct
                 SQL only. ─────────────────────────────────────────────────── */}
+            {/* URLs deliberately say "system", not the internal role name. */}
             <Route element={<ProtectedRoute allowedRoles={["superadmin"]} />}>
               <Route
-                path="/superadmin/dashboard"
+                path="/system/dashboard"
                 element={
                   <Suspense fallback={<LoadingFallback />}>
                     <SuperadminDashboard />
@@ -417,7 +421,7 @@ createRoot(document.getElementById("root")).render(
                 }
               />
               <Route
-                path="/superadmin/user-management"
+                path="/system/users"
                 element={
                   <Suspense fallback={<LoadingFallback />}>
                     <SuperadminUserManagement />
@@ -425,7 +429,15 @@ createRoot(document.getElementById("root")).render(
                 }
               />
               <Route
-                path="/superadmin/pinnacle-sync"
+                path="/system/analytics"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <SuperadminAnalytics />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/system/sync"
                 element={
                   <Suspense fallback={<LoadingFallback />}>
                     <SuperadminPinnacleSync />
@@ -433,7 +445,7 @@ createRoot(document.getElementById("root")).render(
                 }
               />
               <Route
-                path="/superadmin/satisfaction-survey"
+                path="/system/survey"
                 element={
                   <Suspense fallback={<LoadingFallback />}>
                     <SuperadminSatisfactionSurvey />

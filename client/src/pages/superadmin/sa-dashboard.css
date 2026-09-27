@@ -1,0 +1,35 @@
+/* System Administrator dashboard -- additions on top of adm-dashboard.css
+   (which supplies the banner, stat-card and quick-action styles). */
+.sad-dashboard .sad-banner-subtitle {
+  margin: 0.35rem 0 0;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 1rem;
+  text-align: left;
+}
+
+.sad-dashboard .sad-stat-clickable {
+  cursor: pointer;
+}
+
+.sad-dashboard .sad-stat-clickable:focus-visible,
+.sad-dashboard .quick-action-card:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.sad-dashboard .sad-retry-btn {
+  margin-left: 0.5rem;
+  padding: 0.2rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: transparent;
+  color: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.sad-dashboard .sad-retry-btn:hover {
+  background: rgba(239, 68, 68, 0.12);
+}

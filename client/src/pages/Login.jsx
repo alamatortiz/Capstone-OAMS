@@ -16,11 +16,11 @@ const PORTAL_LABELS = {
   student: "Student Portal",
   faculty: "Faculty & Staff Portal",
   admin: "Administrator Portal",
-  superadmin: "Superadmin Portal",
+  superadmin: "System Administrator Portal",
 };
 
 // `expectedRole` locks this page to one role: /login/student,
-// /login/faculty, /login/admin and /login/superadmin each pass their own role
+// /login/faculty, /login/admin and /login/system each pass their own role
 // so a login that succeeds server-side (role is always server-determined, not
 // client-chosen) but belongs to a different role gets rejected client-side
 // instead of silently landing on the wrong dashboard. The bare /login no longer
@@ -97,7 +97,7 @@ export default function Login({ expectedRole }) {
             student: "/student/dashboard",
             faculty: "/professor/dashboard",
             admin: "/admin/dashboard",
-            superadmin: "/superadmin/dashboard",
+            superadmin: "/system/dashboard",
           };
           navigate(roleRoutes[userData.role] ?? "/dashboard");
         }, 500);

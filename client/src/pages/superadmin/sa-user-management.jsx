@@ -2,30 +2,20 @@ import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 // Supplies the .admin-dashboard-with-sidebar / .admin-dashboard-main shell
-// classes and their <=1024px mobile-header offset (see sa-dashboard.jsx,
-// which already does this). Lazy-loaded route, so it needs its own import.
+// classes and their <=1024px mobile-header offset. Lazy-loaded route, so it
+// needs its own import.
 import "../admin/adm-dashboard.css";
 import "./sa-user-management.css";
 import { toast } from "sonner";
 import SuperadminPageShell from "../../components/SuperadminPageShell";
 import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
-import useLockBodyScroll from "../../hooks/useLockBodyScroll";
-import { formatManilaDate, formatManilaDateTime, getManilaDateString } from "../../utils/dateTime";
-import { COLLEGES } from "../../data/colleges";
-import { formatCollegeLabel } from "../../utils/formatCollege";
-import api from "../../utils/api";
 import Pagination from "../../components/Pagination";
+import { formatManilaDate, formatManilaDateTime, getManilaDateString } from "../../utils/dateTime";
+import { downloadCsv } from "../../utils/csv";
+import api from "../../utils/api";
 
-// ─── Shared Layout Icons ──────────────────────────────────────────────────────
-const CloseIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="18" y1="6" x2="6" y2="18" />
-    <line x1="6" y1="6" x2="18" y2="18" />
-  </svg>
-);
-
-// ─── Page-specific Icons ──────────────────────────────────────────────────────
+// ─── Icons ────────────────────────────────────────────────────────────────────
 const UsersHeaderIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -52,35 +42,11 @@ const DownloadIcon = () => (
     <line x1="12" y1="15" x2="12" y2="3" />
   </svg>
 );
-const UploadIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13">
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-    <polyline points="17 8 12 3 7 8" />
-    <line x1="12" y1="3" x2="12" y2="15" />
-  </svg>
-);
 const RefreshIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13">
     <polyline points="23 4 23 10 17 10" />
     <polyline points="1 20 1 14 7 14" />
     <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-  </svg>
-);
-const EditIconSvg = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15">
-    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-  </svg>
-);
-const KeyIconSvg = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15">
-    <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
-  </svg>
-);
-const TrashIconSvg = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15">
-    <polyline points="3 6 5 6 21 6" />
-    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
   </svg>
 );
 const BanIconSvg = () => (
@@ -96,403 +62,281 @@ const CheckCircleIconSvg = () => (
   </svg>
 );
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-const COLLEGE_OPTIONS = COLLEGES.map((c) => ({
-  value: c.abbreviation,
-  label: formatCollegeLabel(c.abbreviation, c.name),
-}));
+const PAGE_SIZE = 20;
+const ROLE_LABELS = { student: "Student", professor: "Faculty", admin: "Admin" };
 
-const BLANK_FORM = { name: "", email: "", role: "student", college: "", employeeId: "", studentId: "", status: "active" };
-
-// Matches the working CSV pattern already used by prof-transactions.jsx /
-// adm-transactions.jsx -- client-side generation, no backend export route.
-// Prefixes a leading =/+/-/@ with a single quote so spreadsheet apps
-// (Excel, Sheets) treat the cell as literal text instead of a formula --
-// user-entered fields like names have no format restriction at registration.
-const csvEscape = (value) => {
-  let str = String(value ?? "");
-  if (/^[=+\-@]/.test(str)) str = `'${str}`;
-  return `"${str.replace(/"/g, '""')}"`;
-};
-
-// ─── Component ────────────────────────────────────────────────────────────────
+// Accounts are provisioned from the school's records, so this page only views
+// accounts and suspends/reactivates them -- no editing, password resets, or
+// deletion from here.
 export default function SuperadminUserManagement() {
-  // ── User-management state ────────────────────────────────────────────────────
-  const [users, setUsers]           = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [showModal, setShowModal]   = useState(false);
-  useLockBodyScroll(showModal);
-  const [editingUser, setEditingUser] = useState(null);
-  const [form, setForm]             = useState(BLANK_FORM);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [activeTab, setActiveTab]   = useState("all");
-  const [confirmAction, setConfirmAction] = useState(null); // { type: "delete" | "reset" | "suspend", user }
+  const [activeTab, setActiveTab] = useState("all");
+  const [confirmUser, setConfirmUser] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 20;
 
-  // ── Handlers: CRUD ───────────────────────────────────────────────────────────
   const errMsg = (err, fallback) => err?.response?.data?.error || fallback;
-  // Loading state only on the first load -- refetches after edits update in place.
+
   const fetchUsers = useCallback(async () => {
     try {
       const res = await api.get("/admin/users");
-      setUsers(res.data.users);
+      setUsers(res.data.users ?? []);
+      return true;
     } catch (err) {
       toast.error(errMsg(err, "Failed to load users"));
+      return false;
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    const init = async () => {
-      await fetchUsers();
-    };
-    init();
+    fetchUsers();
   }, [fetchUsers]);
 
-  const setField = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
-
-  const openEditModal = (u) => {
-    setEditingUser(u);
-    setForm({ name: u.name, email: u.email, role: u.role, college: u.college, employeeId: u.employeeId || "", studentId: u.studentId || "", status: u.status });
-    setShowModal(true);
-  };
-  const closeModal = () => { setShowModal(false); setEditingUser(null); setForm(BLANK_FORM); };
-
-  const handleSave = async () => {
-    if (!form.name)   return toast.error("Please enter a name");
-    if (!form.email)  return toast.error("Please enter an email");
-    if (!form.college) return toast.error("Please select a college");
-    if (!form.email.endsWith("@pnc.edu.ph"))        return toast.error("Email must use @pnc.edu.ph domain");
-    if (form.role === "student" && !form.studentId)  return toast.error("Student ID is required for students");
-    if (form.role !== "student" && !form.employeeId) return toast.error("Employee ID is required for professors and admins");
-
-    try {
-      await api.put(`/admin/users/${editingUser.id}`, form);
-      toast.success("User updated successfully");
-      closeModal();
-      fetchUsers();
-    } catch (err) {
-      toast.error(errMsg(err, "Failed to update user"));
-    }
+  const handleRefresh = async () => {
+    if (await fetchUsers()) toast.success("User list refreshed");
   };
 
-  const handleDelete = async (id) => {
+  const handleToggleSuspend = async () => {
+    if (!confirmUser) return;
+    const suspending = confirmUser.status !== "suspended";
+    setSaving(true);
     try {
-      await api.delete(`/admin/users/${id}`);
-      toast.success("User deleted successfully");
-      fetchUsers();
-    } catch (err) {
-      toast.error(errMsg(err, "Failed to delete user"));
-    }
-  };
-  const handleResetPassword = async (u) => {
-    try {
-      const res = await api.post(`/admin/users/${u.id}/reset-password`);
-      toast.success(`Temporary password generated: ${res.data.tempPassword}`, { duration: 10000 });
-    } catch (err) {
-      toast.error(errMsg(err, "Failed to reset password"));
-    }
-  };
-  const handleToggleSuspend = async (u) => {
-    const suspending = u.status !== "suspended";
-    try {
-      await api.patch(`/admin/users/${u.id}/status`, { status: suspending ? "suspended" : "active" });
-      toast.success(`Account ${suspending ? "suspended" : "reactivated"}`);
+      await api.patch(`/admin/users/${confirmUser.id}/status`, {
+        status: suspending ? "suspended" : "active",
+      });
+      toast.success(`${confirmUser.name}'s account ${suspending ? "suspended" : "reactivated"}`);
+      setConfirmUser(null);
       fetchUsers();
     } catch (err) {
       toast.error(errMsg(err, "Failed to update account status"));
+    } finally {
+      setSaving(false);
     }
   };
 
-  const runConfirmAction = () => {
-    if (!confirmAction) return;
-    const { type, user } = confirmAction;
-    if (type === "delete") handleDelete(user.id);
-    else if (type === "reset") handleResetPassword(user);
-    else if (type === "suspend") handleToggleSuspend(user);
-    setConfirmAction(null);
+  // ── Filtering ────────────────────────────────────────────────────────────────
+  const filtered = users.filter((u) => {
+    const q = searchTerm.trim().toLowerCase();
+    const matchSearch =
+      !q ||
+      u.name.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      (u.studentId || "").toLowerCase().includes(q) ||
+      (u.employeeId || "").toLowerCase().includes(q);
+    return (
+      matchSearch &&
+      (filterRole === "all" || u.role === filterRole) &&
+      (filterStatus === "all" || u.status === filterStatus)
+    );
+  });
+  const byTab = {
+    all: filtered,
+    students: filtered.filter((u) => u.role === "student"),
+    professors: filtered.filter((u) => u.role === "professor"),
+    admins: filtered.filter((u) => u.role === "admin"),
+  };
+  const tabMeta = {
+    all: { title: "All Users", desc: "Every account across all colleges" },
+    students: { title: "Student Accounts", desc: "Student accounts across all colleges" },
+    professors: { title: "Faculty Accounts", desc: "Faculty accounts across all colleges" },
+    admins: { title: "Admin Accounts", desc: "College office administrator accounts" },
   };
 
-  // ── Filtered / grouped users ─────────────────────────────────────────────────
-  const filtered = users.filter((u) => {
-    const q = searchTerm.toLowerCase();
-    const matchSearch = u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.studentId || "").toLowerCase().includes(q) || (u.employeeId || "").toLowerCase().includes(q);
-    return matchSearch && (filterRole === "all" || u.role === filterRole) && (filterStatus === "all" || u.status === filterStatus);
-  });
-  const students   = filtered.filter((u) => u.role === "student");
-  const professors = filtered.filter((u) => u.role === "professor");
-  const admins     = filtered.filter((u) => u.role === "admin");
-
-  const displayUsersAll = activeTab === "students" ? students : activeTab === "professors" ? professors : activeTab === "admins" ? admins : filtered;
-  const tabMeta = { all: { title: "All Users", desc: "Complete list of all user accounts" }, students: { title: "Student Accounts", desc: "Manage student user accounts" }, professors: { title: "Professor Accounts", desc: "Manage professor/faculty user accounts" }, admins: { title: "Admin Accounts", desc: "Manage administrator user accounts" } };
-
-  const totalPages = Math.max(1, Math.ceil(displayUsersAll.length / PAGE_SIZE));
+  const listAll = byTab[activeTab];
+  const totalPages = Math.max(1, Math.ceil(listAll.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-  const displayUsers = displayUsersAll.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const displayUsers = listAll.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  // Exports the currently-filtered list (respects search/role/status filters),
-  // matching the CSV pattern already used by prof-transactions.jsx / adm-transactions.jsx.
+  const stats = [
+    { label: "Total Accounts", value: users.length, tone: "primary" },
+    { label: "Students", value: users.filter((u) => u.role === "student").length, tone: "blue" },
+    { label: "Faculty", value: users.filter((u) => u.role === "professor").length, tone: "purple" },
+    { label: "Admins", value: users.filter((u) => u.role === "admin").length, tone: "orange" },
+    { label: "Suspended", value: users.filter((u) => u.status === "suspended").length, tone: "danger" },
+  ];
+
   const handleExport = () => {
+    if (filtered.length === 0) {
+      toast.error("No users match the current filters");
+      return;
+    }
     const header = ["Name", "Email", "Role", "College", "Student ID", "Employee ID", "Status", "Last Login", "Created Date"];
     const rows = filtered.map((u) => [
-      u.name, u.email, u.role, u.college, u.studentId || "", u.employeeId || "", u.status,
+      u.name, u.email, ROLE_LABELS[u.role] ?? u.role, u.college, u.studentId || "", u.employeeId || "", u.status,
       u.lastLogin ? formatManilaDateTime(u.lastLogin) : "",
       u.createdDate ? formatManilaDate(u.createdDate) : "",
     ]);
-    const csv = [header, ...rows].map((r) => r.map(csvEscape).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `users-${getManilaDateString()}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.success("Export complete");
+    downloadCsv([header, ...rows], `users-${getManilaDateString()}.csv`);
+    toast.success(`Exported ${filtered.length} user${filtered.length === 1 ? "" : "s"}`);
   };
 
-  // ── Confirm-modal copy, derived from the pending action ──────────────────────
-  const confirmSuspending = confirmAction?.user.status !== "suspended";
-  const confirmMeta = confirmAction && {
-    delete: {
-      title: "Delete User?",
-      message: <>Delete <strong>{confirmAction.user.name}</strong>? This action cannot be undone.</>,
-      confirmText: "Delete",
-      icon: <TrashIconSvg />,
-    },
-    reset: {
-      title: "Reset Password?",
-      message: <>Reset password for <strong>{confirmAction.user.name}</strong>? A temporary password will be generated for you to relay to them manually.</>,
-      confirmText: "Reset Password",
-      icon: <KeyIconSvg />,
-    },
-    suspend: {
-      title: confirmSuspending ? "Suspend Account?" : "Reactivate Account?",
-      message: <>{confirmSuspending ? "Suspend" : "Reactivate"} <strong>{confirmAction.user.name}</strong>'s account?</>,
-      confirmText: confirmSuspending ? "Suspend" : "Reactivate",
-      icon: confirmSuspending ? <BanIconSvg /> : <CheckCircleIconSvg />,
-      variant: confirmSuspending ? "danger" : "success",
-    },
-  }[confirmAction.type];
+  const confirmSuspending = confirmUser?.status !== "suspended";
 
-  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <SuperadminPageShell
       outerClassName="admin-dashboard-with-sidebar"
       mainClassName="admin-dashboard-main"
       overlay={
-        <>
-          {/* ── Add / Edit Modal ───────────────────────────────────────────────── */}
-          {showModal && (
-            <div className="aum-modal-overlay">
-              <div className="aum-modal">
-                <div className="aum-modal-header">
-                  <div>
-                    <h2 className="aum-modal-title">Edit User Account</h2>
-                    <p className="aum-modal-desc">Update user account information</p>
-                  </div>
-                  <button className="aum-modal-close" onClick={closeModal} aria-label="Close modal"><CloseIcon /></button>
-                </div>
-                <div className="aum-modal-body">
-                  <div className="aum-form-grid">
-                    <div className="aum-form-group">
-                      <label className="aum-form-label">Full Name *</label>
-                      <input type="text" className="aum-form-input" placeholder="e.g., Juan Dela Cruz" value={form.name} onChange={setField("name")} />
-                    </div>
-                    <div className="aum-form-group">
-                      <label className="aum-form-label">Email Address *</label>
-                      <input type="email" className="aum-form-input" placeholder="user@pnc.edu.ph" value={form.email} onChange={setField("email")} />
-                    </div>
-                  </div>
-                  <div className="aum-form-grid">
-                    <div className="aum-form-group">
-                      <label className="aum-form-label">Role</label>
-                      <select className="aum-form-select" value={form.role} disabled title="Role changes aren't supported — delete and recreate the account under a different role instead.">
-                        <option value="student">Student</option>
-                        <option value="professor">Professor</option>
-                        <option value="admin">Admin</option>
-                      </select>
-                    </div>
-                    <div className="aum-form-group">
-                      <label className="aum-form-label">College *</label>
-                      <select className="aum-form-select" value={form.college} onChange={setField("college")}>
-                        <option value="">Select college</option>
-                        {COLLEGE_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="aum-form-grid">
-                    <div className="aum-form-group">
-                      {form.role === "student" ? (
-                        <>
-                          <label className="aum-form-label">Student ID *</label>
-                          <input type="text" className="aum-form-input" placeholder="e.g., 2312345" value={form.studentId} onChange={setField("studentId")} />
-                        </>
-                      ) : (
-                        <>
-                          <label className="aum-form-label">Employee ID *</label>
-                          <input type="text" className="aum-form-input" placeholder="e.g., EMP-2020-045" value={form.employeeId} onChange={setField("employeeId")} />
-                        </>
-                      )}
-                    </div>
-                    <div className="aum-form-group">
-                      <label className="aum-form-label">Status *</label>
-                      <select className="aum-form-select" value={form.status} onChange={setField("status")}>
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                        <option value="suspended">Suspended</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-                <div className="aum-modal-footer">
-                  <button className="aum-btn-cancel" onClick={closeModal}>Cancel</button>
-                  <button className="aum-btn-submit" onClick={handleSave}>Update User</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <ActionConfirmModal
-            show={!!confirmAction}
-            onCancel={() => setConfirmAction(null)}
-            onConfirm={runConfirmAction}
-            title={confirmMeta?.title}
-            message={confirmMeta?.message}
-            icon={confirmMeta?.icon}
-            confirmText={confirmMeta?.confirmText}
-            variant={confirmMeta?.variant ?? "danger"}
-          />
-        </>
+        <ActionConfirmModal
+          show={!!confirmUser}
+          onCancel={() => !saving && setConfirmUser(null)}
+          onConfirm={handleToggleSuspend}
+          confirmDisabled={saving}
+          title={confirmSuspending ? "Suspend Account?" : "Reactivate Account?"}
+          message={
+            confirmUser && (
+              <>
+                {confirmSuspending
+                  ? <>Suspend <strong>{confirmUser.name}</strong>'s account? They won't be able to sign in until it's reactivated.</>
+                  : <>Reactivate <strong>{confirmUser.name}</strong>'s account? They'll be able to sign in again.</>}
+              </>
+            )
+          }
+          icon={confirmSuspending ? <BanIconSvg /> : <CheckCircleIconSvg />}
+          confirmText={saving ? "Saving…" : confirmSuspending ? "Suspend" : "Reactivate"}
+          variant={confirmSuspending ? "danger" : "success"}
+        />
       }
     >
-        <div className="aum-content">
-          <PageHeader
-            breadcrumb={
-              <Link to="/superadmin/dashboard" className="page-breadcrumb-link">
-                <ChevronLeft />Home
-              </Link>
-            }
-            icon={<UsersHeaderIcon />}
-            iconClassName="aum-title-icon"
-            title="User Account Management"
-            subtitle="Manage all user accounts across the OAMS system"
-            headerClassName="aum-page-header"
-            breadcrumbClassName="page-breadcrumb"
-            titleSectionClassName="aum-title-section"
-            titleClassName="aum-page-title"
-            subtitleClassName="aum-page-subtitle"
-          />
+      <div className="aum-content">
+        <PageHeader
+          breadcrumb={
+            <Link to="/system/dashboard" className="page-breadcrumb-link">
+              <ChevronLeft />Home
+            </Link>
+          }
+          icon={<UsersHeaderIcon />}
+          iconClassName="aum-title-icon"
+          title="User Management"
+          subtitle="View accounts across all colleges and suspend or reactivate access."
+          headerClassName="aum-page-header"
+          breadcrumbClassName="page-breadcrumb"
+          titleSectionClassName="aum-title-section"
+          titleClassName="aum-page-title"
+          subtitleClassName="aum-page-subtitle"
+        />
 
-          {/* Filter & Search */}
-          <div className="aum-filter-section">
-            <div className="aum-filter-header">
-              <div className="aum-filter-title-group">
-                <FilterIcon />
-                <div>
-                  <h3 className="aum-filter-title">Filter &amp; Search</h3>
-                  <p className="aum-filter-subtitle">Find and filter user accounts</p>
-                </div>
-              </div>
-              <div className="aum-filter-actions">
-                <button className="aum-sm-btn" onClick={handleExport}><DownloadIcon /> Export</button>
-                <button className="aum-sm-btn" disabled title="Coming soon"><UploadIcon /> Import</button>
-                <button className="aum-sm-btn" onClick={() => { fetchUsers(); toast.success("Data refreshed"); }}><RefreshIcon /> Refresh</button>
+        <div className="aum-stats-grid">
+          {stats.map((s) => (
+            <div key={s.label} className={`aum-stat-card aum-stat-${s.tone}`}>
+              <p className="aum-stat-label">{s.label}</p>
+              <p className="aum-stat-value">{loading ? "—" : s.value}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="aum-filter-section">
+          <div className="aum-filter-header">
+            <div className="aum-filter-title-group">
+              <FilterIcon />
+              <div>
+                <h3 className="aum-filter-title">Filter &amp; Search</h3>
+                <p className="aum-filter-subtitle">Accounts are created from the school's records</p>
               </div>
             </div>
-            <div className="aum-filter-inputs">
-              <div className="aum-search-wrapper">
-                <SearchIcon />
-                <input
-                  type="text"
-                  className="aum-search-input"
-                  placeholder="Search by name, email, or ID..."
-                  value={searchTerm}
-                  onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
-                />
-              </div>
-              <select className="aum-select" value={filterRole} onChange={(e) => { setFilterRole(e.target.value); setPage(1); }}>
-                <option value="all">All Roles</option>
-                <option value="student">Students</option>
-                <option value="professor">Professors</option>
-                <option value="admin">Admins</option>
-              </select>
-              <select className="aum-select" value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}>
-                <option value="all">All Statuses</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="suspended">Suspended</option>
-              </select>
+            <div className="aum-filter-actions">
+              <button className="aum-sm-btn" onClick={handleExport}><DownloadIcon /> Export</button>
+              <button className="aum-sm-btn" onClick={handleRefresh}><RefreshIcon /> Refresh</button>
             </div>
           </div>
-
-          {/* Tabs + User List */}
-          <div className="aum-tabs-wrapper">
-            <div className="aum-tab-list">
-              {[
-                { key: "all",        label: "All Users" },
-                { key: "students",   label: "Students" },
-                { key: "professors", label: "Professors" },
-                { key: "admins",     label: "Admins" },
-              ].map((t) => (
-                <button key={t.key} className={`aum-tab-btn ${activeTab === t.key ? "aum-tab-active" : ""}`} onClick={() => { setActiveTab(t.key); setPage(1); }}>
-                  {t.label}
-                </button>
-              ))}
+          <div className="aum-filter-inputs">
+            <div className="aum-search-wrapper">
+              <SearchIcon />
+              <input
+                type="text"
+                className="aum-search-input"
+                placeholder="Search by name, email, or ID..."
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+              />
             </div>
+            <select className="aum-select" value={filterRole} onChange={(e) => { setFilterRole(e.target.value); setPage(1); }}>
+              <option value="all">All Roles</option>
+              <option value="student">Students</option>
+              <option value="professor">Faculty</option>
+              <option value="admin">Admins</option>
+            </select>
+            <select className="aum-select" value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}>
+              <option value="all">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="suspended">Suspended</option>
+            </select>
+          </div>
+        </div>
 
-            <div className="aum-users-section">
-              <div className="aum-users-section-header">
-                <h3 className="aum-users-title">{tabMeta[activeTab].title}</h3>
-                <p className="aum-users-subtitle">{tabMeta[activeTab].desc}</p>
-              </div>
-              <div className="aum-users-list">
-                {loading ? (
-                  <div className="aum-empty">Loading users…</div>
-                ) : displayUsers.length === 0 ? (
-                  <div className="aum-empty">No users found matching your filters.</div>
-                ) : (
-                  displayUsers.map((u) => (
+        <div className="aum-tabs-wrapper">
+          <div className="aum-tab-list">
+            {[
+              { key: "all", label: "All Users" },
+              { key: "students", label: "Students" },
+              { key: "professors", label: "Faculty" },
+              { key: "admins", label: "Admins" },
+            ].map((t) => (
+              <button
+                key={t.key}
+                className={`aum-tab-btn ${activeTab === t.key ? "aum-tab-active" : ""}`}
+                onClick={() => { setActiveTab(t.key); setPage(1); }}
+              >
+                {t.label} <span className="aum-tab-count">{loading ? "—" : byTab[t.key].length}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="aum-users-section">
+            <div className="aum-users-section-header">
+              <h3 className="aum-users-title">{tabMeta[activeTab].title}</h3>
+              <p className="aum-users-subtitle">{tabMeta[activeTab].desc}</p>
+            </div>
+            <div className="aum-users-list">
+              {loading ? (
+                <div className="aum-empty">Loading users…</div>
+              ) : displayUsers.length === 0 ? (
+                <div className="aum-empty">No users found matching your filters.</div>
+              ) : (
+                displayUsers.map((u) => {
+                  const suspended = u.status === "suspended";
+                  return (
                     <div key={u.id} className="aum-user-card">
                       <div className="aum-user-info">
                         <div className="aum-user-name-row">
                           <span className="aum-user-name">{u.name}</span>
-                          <span className={`aum-badge aum-badge-role-${u.role}`}>{u.role}</span>
+                          <span className={`aum-badge aum-badge-role-${u.role}`}>{ROLE_LABELS[u.role] ?? u.role}</span>
                           <span className={`aum-badge aum-badge-status-${u.status}`}>{u.status}</span>
                         </div>
                         <p className="aum-user-email">{u.email}</p>
                         <div className="aum-user-meta">
                           <span className="aum-college-badge">{u.college}</span>
-                          {u.studentId  && <span className="aum-meta-text">ID: {u.studentId}</span>}
+                          {u.studentId && <span className="aum-meta-text">ID: {u.studentId}</span>}
                           {u.employeeId && <span className="aum-meta-text">ID: {u.employeeId}</span>}
-                          {u.lastLogin  && <span className="aum-meta-text">Last login: {formatManilaDateTime(u.lastLogin)}</span>}
-                          <span className="aum-meta-text">Created: {formatManilaDate(u.createdDate)}</span>
+                          {u.lastLogin && <span className="aum-meta-text">Last login: {formatManilaDateTime(u.lastLogin)}</span>}
+                          {u.createdDate && <span className="aum-meta-text">Created: {formatManilaDate(u.createdDate)}</span>}
                         </div>
                       </div>
                       <div className="aum-user-actions">
-                        <button className="aum-icon-btn aum-icon-btn-edit"   onClick={() => openEditModal(u)}      title="Edit user"><EditIconSvg /></button>
                         <button
-                          className={`aum-icon-btn ${u.status === "suspended" ? "aum-icon-btn-reactivate" : "aum-icon-btn-suspend"}`}
-                          onClick={() => setConfirmAction({ type: "suspend", user: u })}
-                          title={u.status === "suspended" ? "Reactivate account" : "Suspend account"}
+                          className={`aum-status-btn ${suspended ? "aum-status-btn-reactivate" : "aum-status-btn-suspend"}`}
+                          onClick={() => setConfirmUser(u)}
                         >
-                          {u.status === "suspended" ? <CheckCircleIconSvg /> : <BanIconSvg />}
+                          {suspended ? <CheckCircleIconSvg /> : <BanIconSvg />}
+                          {suspended ? "Reactivate" : "Suspend"}
                         </button>
-                        <button className="aum-icon-btn aum-icon-btn-key"    onClick={() => setConfirmAction({ type: "reset", user: u })} title="Reset password"><KeyIconSvg /></button>
-                        <button className="aum-icon-btn aum-icon-btn-delete" onClick={() => setConfirmAction({ type: "delete", user: u })} title="Delete user"><TrashIconSvg /></button>
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
-              <Pagination page={safePage} totalPages={totalPages} onPageChange={setPage} />
+                  );
+                })
+              )}
             </div>
+            <Pagination page={safePage} totalPages={totalPages} onPageChange={setPage} />
           </div>
-
         </div>
+      </div>
     </SuperadminPageShell>
   );
 }

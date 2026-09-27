@@ -227,7 +227,7 @@ INSERT INTO users (user_id, password, role, status) VALUES
 -- SECTION 1e · SUPERADMIN (child profile)
 -- ─────────────────────────────────────────────────────────────
 INSERT INTO superadmins (superadmin_id, employee_id, first_name, last_name, email) VALUES
-(100, 'SA-2026-001', 'Super', 'Admin', 'superadmin.oams@pnc.edu.ph');
+(100, 'SA-2026-001', 'System', 'Administrator', 'superadmin.oams@pnc.edu.ph');
 
 
 -- ─────────────────────────────────────────────────────────────
