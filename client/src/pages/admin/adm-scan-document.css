@@ -241,7 +241,7 @@
   width: 100%;
   padding: 0.85rem;
   background: #22c55e;
-  color: #000;
+  color: #fff;
   border: none;
   border-radius: 0.5rem;
   font-size: 0.95rem;
@@ -408,10 +408,12 @@
 }
 
 /* ── Status badges ───────────────────────────────────────────────────────── */
+/* Label text ("Valid"/"Expired") already comes capitalized from
+   SCAN_STATUS_LABELS in the component -- no text-transform here, so CSS
+   doesn't silently force it back to lowercase regardless of what JS sends. */
 .asd-status-badge {
   font-size: 0.7rem;
   font-weight: 700;
-  text-transform: lowercase;
   padding: 0.15rem 0.5rem;
   border-radius: 9999px;
 }

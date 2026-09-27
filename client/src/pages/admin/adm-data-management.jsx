@@ -10,7 +10,6 @@ import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
-import { getManilaDateString } from "../../utils/dateTime";
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18" />
@@ -29,20 +28,6 @@ const ServiceClockIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10" />
     <polyline points="12 6 12 12 16 14" />
-  </svg>
-);
-const AuditHistoryIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="12 8 12 12 14 14" />
-    <path d="M3.05 11a9 9 0 1 0 .5-4" />
-    <polyline points="3 3 3 7 7 7" />
-  </svg>
-);
-const DownloadIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-    <polyline points="7 10 12 15 17 10" />
-    <line x1="12" y1="15" x2="12" y2="3" />
   </svg>
 );
 const PlusIcon = () => (
@@ -147,11 +132,6 @@ export default function AdminDataManagement() {
   // Fixed premises fetched once for the Location dropdown
   const [locations, setLocations] = useState([]);
 
-  // ── Audit Logs ─────────────────────────────────────────────
-  const [auditLogs, setAuditLogs] = useState([]);
-  const [auditLoading, setAuditLoading] = useState(false);
-  const [auditActionFilter, setAuditActionFilter] = useState("all");
-
   // ── Delete confirmations ────────────────────────────────────
   const [deleteDocTarget, setDeleteDocTarget] = useState(null);
   const [deleteServiceTarget, setDeleteServiceTarget] = useState(null);
@@ -191,19 +171,6 @@ export default function AdminDataManagement() {
     }
   }, []);
 
-  const fetchAuditLogs = useCallback(async (action = "all") => {
-    setAuditLoading(true);
-    try {
-      const params = action !== "all" ? { action } : {};
-      const { data } = await api.get("/admin/data-management/audit-logs", { params });
-      setAuditLogs(data.auditLogs || []);
-    } catch {
-      toast.error("Failed to load audit logs.");
-    } finally {
-      setAuditLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     if (activeTab === "documents") fetchDocumentTypes(docStatusFilter);
   }, [activeTab, docStatusFilter, fetchDocumentTypes]);
@@ -214,10 +181,6 @@ export default function AdminDataManagement() {
       fetchLocations();
     }
   }, [activeTab, fetchServiceTypes, fetchLocations]);
-
-  useEffect(() => {
-    if (activeTab === "audit") fetchAuditLogs(auditActionFilter);
-  }, [activeTab, auditActionFilter, fetchAuditLogs]);
 
   // ── Handlers: Document Types ───────────────────────────────
   const openAddDocModal = () => {
@@ -523,86 +486,6 @@ export default function AdminDataManagement() {
     { value: "active", label: "Active" },
     { value: "inactive", label: "Inactive" },
   ];
-
-  const AUDIT_ACTION_FILTERS = [
-    { value: "all", label: "All" },
-    { value: "CREATE", label: "Create" },
-    { value: "UPDATE", label: "Update" },
-    { value: "DELETE", label: "Delete" },
-    { value: "LOGIN", label: "Login" },
-    { value: "LOGOUT", label: "Logout" },
-    { value: "EXPORT", label: "Export" },
-    { value: "READ", label: "Read" },
-  ];
-
-  const formatTargetLabel = (log) => {
-    if (!log.targetTable) return "System";
-    const tableMap = {
-      document_services: "Document Type",
-      services: "Service Type",
-      users: "User Account",
-      students: "Student",
-      faculty: "Faculty",
-      document_requests: "Document Request",
-      faculty_document_requests: "Faculty Document Request",
-      document_submissions: "Sent Document",
-      generated_files: "Generated File",
-      system_settings: "System Setting",
-      service_requirements: "Service Requirement",
-      service_procedure_steps: "Service Procedure Step",
-    };
-    const label = tableMap[log.targetTable] || log.targetTable;
-    return log.targetRecordId ? `${label} #${log.targetRecordId}` : label;
-  };
-
-  const formatChangeSummary = (log) => {
-    if (log.action === "CREATE" && log.newValues) {
-      const v = typeof log.newValues === "string" ? JSON.parse(log.newValues) : log.newValues;
-      return `Created: ${v.name || ""}${v.status ? ` (${v.status})` : ""}`;
-    }
-    if (log.action === "UPDATE" && log.oldValues && log.newValues) {
-      const o = typeof log.oldValues === "string" ? JSON.parse(log.oldValues) : log.oldValues;
-      const n = typeof log.newValues === "string" ? JSON.parse(log.newValues) : log.newValues;
-      const parts = [];
-      if (o.name !== n.name) parts.push(`name: "${o.name}" → "${n.name}"`);
-      if (o.status !== n.status) parts.push(`status: ${o.status} → ${n.status}`);
-      return parts.length ? parts.join(", ") : "Updated record";
-    }
-    if (log.action === "DELETE" && log.oldValues) {
-      const v = typeof log.oldValues === "string" ? JSON.parse(log.oldValues) : log.oldValues;
-      return `Deleted: ${v.name || "record"}`;
-    }
-    return "";
-  };
-
-  // Prefixes a leading =/+/-/@ with a single quote so spreadsheet apps
-  // (Excel, Sheets) treat the cell as literal text instead of a formula --
-  // user-entered fields like names have no format restriction at registration.
-  const csvEscape = (value) => {
-    let str = String(value ?? "");
-    if (/^[=+\-@]/.test(str)) str = `'${str}`;
-    return `"${str.replace(/"/g, '""')}"`;
-  };
-  const handleExportLogs = () => {
-    const header = ["Timestamp", "Action", "Admin", "Admin Email", "Target", "Change Summary"];
-    const rows = auditLogs.map((log) => [
-      log.timestamp,
-      log.action,
-      log.adminName,
-      log.adminEmail,
-      formatTargetLabel(log),
-      formatChangeSummary(log),
-    ]);
-    const csv = [header, ...rows].map((r) => r.map(csvEscape).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `audit-logs-${getManilaDateString()}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.success("Export complete");
-  };
 
   // ── Render ─────────────────────────────────────────────────
   return (
@@ -1044,13 +927,6 @@ export default function AdminDataManagement() {
                 <span className="adm-tab-icon"><ServiceClockIcon /></span>
                 Service Settings
               </button>
-              <button
-                className={`adm-tab-btn ${activeTab === "audit" ? "adm-tab-active" : ""}`}
-                onClick={() => setActiveTab("audit")}
-              >
-                <span className="adm-tab-icon"><AuditHistoryIcon /></span>
-                Audit Logs
-              </button>
             </div>
 
             {/* ── Document Settings Tab ── */}
@@ -1169,54 +1045,6 @@ export default function AdminDataManagement() {
               </div>
             )}
 
-            {/* ── Audit Logs Tab ── */}
-            {activeTab === "audit" && (
-              <div className="adm-tab-content">
-                <div className="adm-card-header">
-                  <div>
-                    <h2 className="adm-card-title">System Audit Logs</h2>
-                    <p className="adm-card-desc">Track all administrative actions for {user?.departmentAbbrev}.</p>
-                  </div>
-                  <button className="adm-btn-outline" onClick={handleExportLogs}>
-                    <DownloadIcon />
-                    Export Logs
-                  </button>
-                </div>
-
-                {/* Action filter pills */}
-                <div className="adm-filter-bar adm-filter-bar-wrap">
-                  {AUDIT_ACTION_FILTERS.map((f) => (
-                    <button
-                      key={f.value}
-                      className={`adm-filter-pill adm-filter-pill-action-${f.value.toLowerCase()} ${auditActionFilter === f.value ? "adm-filter-pill-active" : ""}`}
-                      onClick={() => setAuditActionFilter(f.value)}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="adm-items-list">
-                  {auditLoading && <div className="adm-loading">Loading audit logs...</div>}
-                  {!auditLoading && auditLogs.length === 0 && (
-                    <p className="adm-empty-state">No audit log entries found.</p>
-                  )}
-                  {!auditLoading && auditLogs.map((log) => (
-                    <div key={log.id} className="adm-log-item">
-                      <div className="adm-log-top-row">
-                        <span className={`adm-badge adm-badge-${log.action.toLowerCase()}`}>{log.action}</span>
-                        <span className="adm-log-user">{log.adminName} ({log.adminEmail})</span>
-                      </div>
-                      <p className="adm-log-target">{formatTargetLabel(log)}</p>
-                      {formatChangeSummary(log) && (
-                        <p className="adm-log-details">{formatChangeSummary(log)}</p>
-                      )}
-                      <p className="adm-log-timestamp">{log.timestamp}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
     </AdminPageShell>

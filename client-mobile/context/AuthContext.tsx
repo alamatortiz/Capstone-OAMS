@@ -108,7 +108,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // than bouncing a signed-in-but-temporarily-offline user to the
           // login screen. A later successful /auth/me (reconnect, next
           // foreground) resyncs normally and overwrites this.
-          const serverRejectedToken = !!error?.response;
+          // Only 401/403 is a real rejection (matches web's AuthContext). A
+          // 5xx/429 -- e.g. Render's 502/503 while the server redeploys -- says
+          // nothing about the token, so it's treated like being offline.
+          const status = error?.response?.status;
+          const serverRejectedToken = status === 401 || status === 403;
           if (serverRejectedToken) {
             console.error("Failed to restore session:", error);
             await clearAuthData();

@@ -32,13 +32,19 @@ async function sweepExpiredSlots() {
     const manilaToday = getManilaDateString();
     const manilaNow = getManilaTimeString();
 
+    // A slot from a date strictly before today is always past its hours,
+    // regardless of end_time -- without that first branch, a slot that
+    // somehow survived past midnight (a missed sweep, a server restart at
+    // just the wrong moment, etc.) would never match `slot_date = today`
+    // again on any later sweep and would stay stuck at 'open'/'paused'
+    // forever. Today's own slots still need the end_time check so ones
+    // still within their posted hours are left alone.
     const [candidates] = await pool.query(
       `SELECT qs.slot_id
        FROM queue_slots qs
        WHERE qs.status IN ('open', 'paused')
-         AND qs.slot_date = ?
-         AND qs.end_time <= ?`,
-      [manilaToday, manilaNow],
+         AND (qs.slot_date < ? OR (qs.slot_date = ? AND qs.end_time <= ?))`,
+      [manilaToday, manilaToday, manilaNow],
     );
 
     if (candidates.length === 0) return;

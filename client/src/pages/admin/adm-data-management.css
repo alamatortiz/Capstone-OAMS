@@ -233,25 +233,6 @@ html, body {
   white-space: nowrap;
 }
 
-/* Action badges */
-.adm-badge-create {
-  background: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
-  border: 1px solid rgba(34, 197, 94, 0.35);
-}
-
-.adm-badge-update {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
-  border: 1px solid rgba(59, 130, 246, 0.35);
-}
-
-.adm-badge-delete {
-  background: rgba(239, 68, 68, 0.15);
-  color: #f87171;
-  border: 1px solid rgba(239, 68, 68, 0.35);
-}
-
 /* Status badges */
 .adm-badge-status-active {
   background: rgba(34, 197, 94, 0.15);
@@ -384,56 +365,6 @@ html, body {
 }
 
 /* ===== Audit Log Items ===== */
-.adm-log-item {
-  background: var(--input-background);
-  border: 1px solid var(--card-border);
-  border-radius: 0.75rem;
-  padding: 1.25rem;
-  transition: all 0.2s ease;
-}
-
-.adm-log-item:hover {
-  border-color: rgba(34, 197, 94, 0.25);
-}
-
-.adm-log-top-row {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  margin-bottom: 0.5rem;
-}
-
-.adm-log-user {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  text-align: left;
-  transition: color 0.3s ease;
-}
-
-.adm-log-target {
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: var(--text-primary);
-  margin: 0 0 0.25rem 0;
-  text-align: left;
-  transition: color 0.3s ease;
-}
-
-.adm-log-details {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin: 0 0 0.25rem 0;
-  text-align: left;
-  transition: color 0.3s ease;
-}
-
-.adm-log-timestamp {
-  font-size: 0.75rem;
-  color: var(--text-tertiary);
-  text-align: left;
-  transition: color 0.3s ease;
-}
-
 /* ===== Empty State ===== */
 .adm-empty-state {
   text-align: center;
@@ -688,15 +619,6 @@ html, body {
   background: var(--pill-accent, var(--primary-color));
 }
 
-/* Action-specific pill accent colors when active */
-.adm-filter-pill-action-create { --pill-accent: #22c55e; }
-.adm-filter-pill-action-update { --pill-accent: #60a5fa; }
-.adm-filter-pill-action-delete { --pill-accent: #f87171; }
-.adm-filter-pill-action-login,
-.adm-filter-pill-action-logout { --pill-accent: #c084fc; }
-.adm-filter-pill-action-export { --pill-accent: #fbbf24; }
-.adm-filter-pill-action-read   { --pill-accent: #2dd4bf; }
-
 /* ===== Loading State ===== */
 .adm-loading {
   text-align: center;
@@ -862,31 +784,6 @@ html, body {
 /* ===== Wider modal for document type (with requirements) ===== */
 .adm-modal-wide {
   max-width: 52rem;
-}
-
-/* ===== Additional audit log badges ===== */
-.adm-badge-login {
-  background: rgba(168, 85, 247, 0.15);
-  color: #c084fc;
-  border: 1px solid rgba(168, 85, 247, 0.35);
-}
-
-.adm-badge-logout {
-  background: rgba(168, 85, 247, 0.1);
-  color: #a78bfa;
-  border: 1px solid rgba(168, 85, 247, 0.25);
-}
-
-.adm-badge-export {
-  background: rgba(251, 191, 36, 0.15);
-  color: #fbbf24;
-  border: 1px solid rgba(251, 191, 36, 0.35);
-}
-
-.adm-badge-read {
-  background: rgba(20, 184, 166, 0.15);
-  color: #2dd4bf;
-  border: 1px solid rgba(20, 184, 166, 0.35);
 }
 
 /* ===== Responsive ===== */
