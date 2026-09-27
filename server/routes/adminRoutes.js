@@ -4900,7 +4900,10 @@ router.get(
              AND qs.status IN ('completed', 'closed')
              AND qs.slot_date BETWEEN ? AND ?
              AND (? IS NULL OR (CASE WHEN qs.is_universal THEN 'Universal Service Queue' ELSE s.service_name END) = ?)
-           GROUP BY qs.slot_id
+           -- s.service_name listed explicitly: MySQL infers it's fixed per
+           -- slot (via the service_id join), but TiDB's only_full_group_by
+           -- check doesn't follow a LEFT JOIN and rejects the whole query.
+           GROUP BY qs.slot_id, s.service_name
            ORDER BY qs.slot_date DESC, qs.start_time DESC
            LIMIT ? OFFSET ?`,
           [deptId, startDate, endDate, service, service, limit + 1, offset],
