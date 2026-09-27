@@ -24,7 +24,6 @@ function defaultRange() {
 }
 
 const fmtHour = (h) => (h == null ? "—" : `${h % 12 || 12}:00 ${h < 12 ? "AM" : "PM"}`);
-const fmtNum = (v, suffix = "") => (v == null ? "—" : `${v}${suffix}`);
 const fmtDay = (d) => formatManilaDate(`${d}T00:00:00+08:00`, { year: undefined });
 
 const TABS = [
@@ -74,29 +73,189 @@ function BarList({ items, loading, emptyText }) {
   );
 }
 
-function DailyChart({ daily, loading, emptyText }) {
+// Status colors shared by the donut and the stacked bars, so a status is the
+// same color everywhere on the page.
+const STATUS_COLORS = {
+  completed: "#10b981", claimed: "#10b981",
+  approved: "#3b82f6", processing: "#3b82f6", serving: "#3b82f6",
+  pending: "#f59e0b", waiting: "#f59e0b",
+  ready: "#8b5cf6",
+  rejected: "#ef4444", no_show: "#ef4444",
+  cancelled: "#94a3b8",
+};
+const STATUS_LABELS = {
+  completed: "Completed", claimed: "Claimed", approved: "Approved", processing: "Processing",
+  serving: "Serving", pending: "Pending", waiting: "Waiting", ready: "Ready for Pickup",
+  rejected: "Rejected", no_show: "No-Show", cancelled: "Cancelled",
+};
+
+// Hours → a readable duration ("35 min", "5.2 hrs", "3.1 days").
+function fmtDuration(hours) {
+  if (hours == null) return "—";
+  if (hours < 1) return `${Math.round(hours * 60)} min`;
+  if (hours < 48) return `${Math.round(hours * 10) / 10} hrs`;
+  return `${Math.round((hours / 24) * 10) / 10} days`;
+}
+
+// Pie/donut drawn with a CSS conic-gradient -- no chart library.
+function DonutChart({ segments, loading, emptyText }) {
+  if (loading) return <p className="saa-chart-empty">Loading…</p>;
+  const shown = segments.filter((s) => s.count > 0);
+  const total = shown.reduce((sum, s) => sum + s.count, 0);
+  if (total === 0) return <p className="saa-chart-empty">{emptyText}</p>;
+  let acc = 0;
+  const stops = shown.map((s) => {
+    const from = (acc / total) * 360;
+    acc += s.count;
+    return `${s.color} ${from}deg ${(acc / total) * 360}deg`;
+  });
+  return (
+    <div className="saa-donut-wrap">
+      <div className="saa-donut" style={{ background: `conic-gradient(${stops.join(", ")})` }}>
+        <div className="saa-donut-hole">
+          <span className="saa-donut-total">{total}</span>
+          <span className="saa-donut-caption">Total</span>
+        </div>
+      </div>
+      <ul className="saa-legend">
+        {shown.map((s) => (
+          <li key={s.label}>
+            <span className="saa-legend-dot" style={{ background: s.color }} />
+            <span className="saa-legend-label">{s.label}</span>
+            <span className="saa-legend-value">
+              {s.count} <em>({Math.round((s.count / total) * 100)}%)</em>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// Line + area trend drawn as inline SVG.
+function LineChart({ daily, loading, emptyText }) {
   if (loading) return <p className="saa-chart-empty">Loading…</p>;
   if (!daily || daily.length === 0) {
     return <p className="saa-chart-empty">Daily breakdown is available for ranges of 92 days or less.</p>;
   }
   const max = Math.max(...daily.map((d) => d.count));
   if (max === 0) return <p className="saa-chart-empty">{emptyText}</p>;
+  const W = 300, H = 120, PAD = 6;
+  const x = (i) => (daily.length === 1 ? W / 2 : PAD + (i * (W - PAD * 2)) / (daily.length - 1));
+  const y = (v) => H - PAD - (v / max) * (H - PAD * 2);
+  const pts = daily.map((d, i) => `${x(i)},${y(d.count)}`).join(" ");
+  const area = `${x(0)},${H - PAD} ${pts} ${x(daily.length - 1)},${H - PAD}`;
+  const peak = daily.reduce((a, b) => (b.count > a.count ? b : a));
+  return (
+    <div className="saa-line">
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="saa-line-svg" role="img"
+        aria-label={`Daily activity, peak ${peak.count} on ${fmtDay(peak.date)}`}>
+        <polygon points={area} className="saa-line-area" />
+        <polyline points={pts} className="saa-line-stroke" />
+        {daily.map((d, i) => d.count > 0 && (
+          <circle key={d.date} cx={x(i)} cy={y(d.count)} r="2.2" className="saa-line-dot">
+            <title>{`${fmtDay(d.date)}: ${d.count}`}</title>
+          </circle>
+        ))}
+      </svg>
+      <div className="saa-daily-axis">
+        <span>{fmtDay(daily[0].date)}</span>
+        <span className="saa-line-peak">Peak: {peak.count} on {fmtDay(peak.date)}</span>
+        {daily.length > 1 && <span>{fmtDay(daily[daily.length - 1].date)}</span>}
+      </div>
+    </div>
+  );
+}
+
+// 24 columns, one per hour of the day (Manila time).
+function HourlyChart({ hourly, loading, emptyText }) {
+  if (loading) return <p className="saa-chart-empty">Loading…</p>;
+  const max = Math.max(0, ...(hourly || []).map((h) => h.count));
+  if (max === 0) return <p className="saa-chart-empty">{emptyText}</p>;
   return (
     <div className="saa-daily">
       <div className="saa-daily-bars">
-        {daily.map((d) => (
-          <div key={d.date} className="saa-daily-col" title={`${fmtDay(d.date)}: ${d.count}`}>
-            <div
-              className="saa-daily-bar"
-              style={{ height: `${d.count > 0 ? Math.max((d.count / max) * 100, 4) : 0}%` }}
-            />
+        {hourly.map((h) => (
+          <div key={h.hour} className="saa-daily-col" title={`${fmtHour(h.hour)}: ${h.count}`}>
+            <div className="saa-daily-bar" style={{ height: `${h.count > 0 ? Math.max((h.count / max) * 100, 4) : 0}%` }} />
           </div>
         ))}
       </div>
       <div className="saa-daily-axis">
-        <span>{fmtDay(daily[0].date)}</span>
-        {daily.length > 1 && <span>{fmtDay(daily[daily.length - 1].date)}</span>}
+        <span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>11 PM</span>
       </div>
+    </div>
+  );
+}
+
+// One bar per college, split into status segments.
+function StackedBars({ rows, loading, emptyText }) {
+  if (loading) return <p className="saa-chart-empty">Loading…</p>;
+  if (!rows || rows.length === 0) return <p className="saa-chart-empty">{emptyText}</p>;
+  const max = Math.max(...rows.map((r) => r.total));
+  const used = [...new Set(rows.flatMap((r) => Object.keys(r.segments)))];
+  return (
+    <div>
+      <ul className="saa-bar-list">
+        {rows.map((r) => (
+          <li key={r.abbrev} className="saa-bar-row">
+            <div className="saa-bar-meta">
+              <span className="saa-bar-label">{r.abbrev}</span>
+              <span className="saa-bar-count">{r.total}</span>
+            </div>
+            <div className="saa-bar-track">
+              <div className="saa-stack" style={{ width: `${(r.total / max) * 100}%` }}>
+                {Object.entries(r.segments).map(([st, n]) => (
+                  <div key={st} className="saa-stack-seg"
+                    style={{ flex: n, background: STATUS_COLORS[st] || "#94a3b8" }}
+                    title={`${STATUS_LABELS[st] || st}: ${n}`} />
+                ))}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <ul className="saa-legend saa-legend-inline">
+        {used.map((st) => (
+          <li key={st}>
+            <span className="saa-legend-dot" style={{ background: STATUS_COLORS[st] || "#94a3b8" }} />
+            <span className="saa-legend-label">{STATUS_LABELS[st] || st}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// Circular progress ring for a single percentage.
+function ProgressRing({ percent, label, sub, loading }) {
+  if (loading) return <p className="saa-chart-empty">Loading…</p>;
+  const p = Math.max(0, Math.min(100, Number(percent) || 0));
+  const R = 52, C = 2 * Math.PI * R;
+  return (
+    <div className="saa-ring-wrap">
+      <svg viewBox="0 0 120 120" className="saa-ring" role="img" aria-label={`${label}: ${p}%`}>
+        <circle cx="60" cy="60" r={R} className="saa-ring-track" />
+        <circle cx="60" cy="60" r={R} className="saa-ring-fill"
+          strokeDasharray={C} strokeDashoffset={C - (p / 100) * C} transform="rotate(-90 60 60)" />
+        <text x="60" y="58" textAnchor="middle" className="saa-ring-value">{p}%</text>
+        <text x="60" y="76" textAnchor="middle" className="saa-ring-caption">{label}</text>
+      </svg>
+      {sub && <p className="saa-ring-sub">{sub}</p>}
+    </div>
+  );
+}
+
+function TimeStats({ items, loading }) {
+  return (
+    <div className="saa-time-grid">
+      {items.map((t) => (
+        <div key={t.label} className="saa-time-card">
+          <span className="saa-time-label">{t.label}</span>
+          <span className="saa-time-value">{loading ? "—" : t.value}</span>
+          <span className="saa-time-hint">{t.hint}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -104,24 +263,37 @@ function DailyChart({ daily, loading, emptyText }) {
 // ── Per-tab view model: tiles, charts, export rows ───────────────────────────
 function buildTab(tab, d) {
   const toBars = (arr, key = "name") => (arr || []).map((r) => ({ label: r[key], count: r.count }));
+  const seg = (key, count) => ({ label: STATUS_LABELS[key], count: count || 0, color: STATUS_COLORS[key] });
   if (tab === "queues") {
     const q = d?.queues || {};
     const statusBars = [
-      { label: "Completed", count: q.completed || 0 },
-      { label: "Cancelled", count: q.cancelled || 0 },
-      { label: "No-Show", count: q.noShows || 0 },
-      { label: "Waiting", count: q.waiting || 0 },
+      seg("completed", q.completed),
+      seg("cancelled", q.cancelled),
+      seg("no_show", q.noShows),
+      seg("waiting", q.waiting),
     ];
+    const finished = (q.completed || 0) + (q.noShows || 0);
     return {
+      timeStats: [
+        { label: "Avg Wait", value: q.avgWaitMin == null ? "—" : `${q.avgWaitMin} min`, hint: "Joined → called" },
+        { label: "Avg Service Time", value: q.avgServiceMin == null ? "—" : `${q.avgServiceMin} min`, hint: "Called → done" },
+        { label: "Busiest Hour", value: fmtHour(q.peakHour), hint: "Most students joining" },
+      ],
+      stacked: q.byCollegeStatus,
+      hourly: q.hourly,
+      ring: {
+        percent: finished > 0 ? Math.round(((q.completed || 0) / finished) * 100) : 0,
+        label: "Served", title: "Served Rate",
+        sub: finished > 0 ? `${q.completed || 0} of ${finished} called students were served` : "No students called yet",
+      },
       title: "Queue Activity",
       empty: "No queue activity in this range",
       tiles: [
         { label: "Joined", value: q.joined ?? 0 },
         { label: "Completed", value: q.completed ?? 0 },
         { label: "No-Shows", value: q.noShows ?? 0 },
-        { label: "Avg Wait (min)", value: fmtNum(q.avgWaitMin) },
-        { label: "Avg Service (min)", value: fmtNum(q.avgServiceMin) },
-        { label: "Peak Hour", value: fmtHour(q.peakHour), text: true },
+        { label: "Cancelled", value: q.cancelled ?? 0 },
+        { label: "Still Waiting", value: q.waiting ?? 0 },
       ],
       byCollege: toBars(q.byCollege, "abbrev"),
       byStatus: statusBars,
@@ -134,23 +306,28 @@ function buildTab(tab, d) {
     const a = d?.appointments || {};
     const s = a.byStatus || {};
     return {
+      timeStats: [
+        { label: "Avg Response Time", value: fmtDuration(a.avgResponseHours), hint: "Requested → approved" },
+        { label: "Avg Time to Complete", value: fmtDuration(a.avgApprovedToCompletedHours), hint: "Approved → completed" },
+        { label: "Avg Turnaround", value: fmtDuration(a.avgTurnaroundHours), hint: "Requested → completed" },
+      ],
+      stacked: a.byCollegeStatus,
+      ring: {
+        percent: a.completionRate ?? 0,
+        label: "Completed", title: "Completion Rate",
+        sub: a.total ? `${s.completed || 0} of ${a.total} appointments completed` : "No appointments yet",
+      },
       title: "Appointment Activity",
       empty: "No appointment activity in this range",
       tiles: [
         { label: "Total", value: a.total ?? 0 },
         { label: "Completed", value: s.completed ?? 0 },
         { label: "Pending", value: s.pending ?? 0 },
-        { label: "Completion Rate", value: fmtNum(a.completionRate, "%") },
+        { label: "Approved", value: s.approved ?? 0 },
         { label: "No-Show Reports", value: a.noShowReports ?? 0 },
       ],
       byCollege: toBars(a.byCollege, "abbrev"),
-      byStatus: [
-        { label: "Pending", count: s.pending || 0 },
-        { label: "Approved", count: s.approved || 0 },
-        { label: "Completed", count: s.completed || 0 },
-        { label: "Rejected", count: s.rejected || 0 },
-        { label: "Cancelled", count: s.cancelled || 0 },
-      ],
+      byStatus: ["pending", "approved", "completed", "rejected", "cancelled"].map((k) => seg(k, s[k])),
       top: toBars(a.topTypes),
       topTitle: "Top Appointment Types",
       daily: a.daily,
@@ -158,7 +335,19 @@ function buildTab(tab, d) {
   }
   const doc = d?.documents || {};
   const s = doc.byStatus || {};
+  const decided = (s.claimed || 0) + (s.rejected || 0) + (s.cancelled || 0);
   return {
+    timeStats: [
+      { label: "Avg Processing Time", value: fmtDuration(doc.avgProcessingHours), hint: "Requested → ready for pickup" },
+      { label: "Avg Pickup Wait", value: fmtDuration(doc.avgPickupWaitHours), hint: "Ready → claimed" },
+      { label: "Avg Total Time", value: doc.avgDaysToClaim == null ? "—" : fmtDuration(doc.avgDaysToClaim * 24), hint: "Requested → claimed" },
+    ],
+    stacked: doc.byCollegeStatus,
+    ring: {
+      percent: decided > 0 ? Math.round(((s.claimed || 0) / decided) * 100) : 0,
+      label: "Claimed", title: "Claim Rate",
+      sub: decided > 0 ? `${s.claimed || 0} of ${decided} finished requests were claimed` : "No finished requests yet",
+    },
     title: "Document Activity",
     empty: "No document activity in this range",
     tiles: [
@@ -166,17 +355,10 @@ function buildTab(tab, d) {
       { label: "Claimed", value: s.claimed ?? 0 },
       { label: "Ready for Pickup", value: s.ready ?? 0 },
       { label: "Overdue", value: doc.overdue ?? 0 },
-      { label: "Avg Days to Claim", value: fmtNum(doc.avgDaysToClaim) },
+      { label: "In Progress", value: (s.pending || 0) + (s.processing || 0) },
     ],
     byCollege: toBars(doc.byCollege, "abbrev"),
-    byStatus: [
-      { label: "Pending", count: s.pending || 0 },
-      { label: "Processing", count: s.processing || 0 },
-      { label: "Ready", count: s.ready || 0 },
-      { label: "Claimed", count: s.claimed || 0 },
-      { label: "Rejected", count: s.rejected || 0 },
-      { label: "Cancelled", count: s.cancelled || 0 },
-    ],
+    byStatus: ["pending", "processing", "ready", "claimed", "rejected", "cancelled"].map((k) => seg(k, s[k])),
     top: toBars(doc.topTypes),
     topTitle: "Top Document Types",
     daily: doc.daily,
@@ -237,6 +419,8 @@ export default function SystemAnalytics() {
 
   const exportRows = () => {
     const rows = view.tiles.map((t) => ["Summary", t.label, String(t.value)]);
+    view.timeStats.forEach((t) => rows.push(["Time Statistics", `${t.label} (${t.hint})`, String(t.value)]));
+    rows.push(["Rate", view.ring.title, `${view.ring.percent}%`]);
     view.byCollege.forEach((b) => rows.push(["By College", b.label, String(b.count)]));
     view.byStatus.forEach((b) => rows.push(["By Status", b.label, String(b.count)]));
     view.top.forEach((b) => rows.push([view.topTitle, b.label, String(b.count)]));
@@ -354,19 +538,30 @@ export default function SystemAnalytics() {
               ))}
             </div>
 
+            <h3 className="saa-section-title">Time Statistics</h3>
+            <TimeStats items={view.timeStats} loading={busy} />
+
             <div className="saa-charts-grid">
-              <ChartCard title="By College">
-                <BarList items={view.byCollege} loading={busy} emptyText={view.empty} />
-              </ChartCard>
               <ChartCard title="By Status">
-                <BarList items={view.byStatus} loading={busy} emptyText={view.empty} />
+                <DonutChart segments={view.byStatus} loading={busy} emptyText={view.empty} />
+              </ChartCard>
+              <ChartCard title={view.ring.title}>
+                <ProgressRing percent={view.ring.percent} label={view.ring.label} sub={view.ring.sub} loading={busy} />
+              </ChartCard>
+              <ChartCard title="By College (by status)">
+                <StackedBars rows={view.stacked} loading={busy} emptyText={view.empty} />
               </ChartCard>
               <ChartCard title={view.topTitle}>
                 <BarList items={view.top} loading={busy} emptyText={view.empty} />
               </ChartCard>
-              <ChartCard title="Daily Activity">
-                <DailyChart daily={view.daily} loading={busy} emptyText={view.empty} />
+              <ChartCard title="Daily Trend">
+                <LineChart daily={view.daily} loading={busy} emptyText={view.empty} />
               </ChartCard>
+              {tab === "queues" && (
+                <ChartCard title="Busiest Hours of the Day">
+                  <HourlyChart hourly={view.hourly} loading={busy} emptyText={view.empty} />
+                </ChartCard>
+              )}
             </div>
           </>
         )}

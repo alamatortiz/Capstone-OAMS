@@ -2415,7 +2415,7 @@ router.patch(
         if (budgetError) return fail(400, budgetError);
       }
 
-      const timestampClause = dbStatus === "claimed" ? ", claimed_at = NOW()" : "";
+      const timestampClause = dbStatus === "claimed" ? ", claimed_at = NOW()" : dbStatus === "ready" ? ", ready_at = COALESCE(ready_at, NOW())" : "";
       const notesClause = notes !== undefined ? ", notes = ?" : "";
       const codeClause = needsCode ? ", official_code = ?" : "";
       // Optional office-set claim-by date, only settable on the ready transition.
@@ -2596,7 +2596,7 @@ router.patch(
         if (budgetError) return fail(400, budgetError);
       }
 
-      const timestampClause = dbStatus === "claimed" ? ", claimed_at = NOW()" : "";
+      const timestampClause = dbStatus === "claimed" ? ", claimed_at = NOW()" : dbStatus === "ready" ? ", ready_at = COALESCE(ready_at, NOW())" : "";
       const notesClause = notes !== undefined ? ", notes = ?" : "";
       const codeClause = needsCode ? ", official_code = ?" : "";
       // Optional office-set claim-by date, only settable on the ready transition.
@@ -2893,7 +2893,7 @@ router.patch(
         }
       }
 
-      const timestampClause = dbStatus === "claimed" ? ", claimed_at = NOW()" : "";
+      const timestampClause = dbStatus === "claimed" ? ", claimed_at = NOW()" : dbStatus === "ready" ? ", ready_at = COALESCE(ready_at, NOW())" : "";
       const notesClause = notes !== undefined ? ", notes = ?" : "";
       const setClaimBy =
         dbStatus === "ready" && claimBy != null && String(claimBy).trim() !== "";
@@ -5021,7 +5021,7 @@ router.get(
         params: [startUTC, endUTC, deptId, deptId],
       };
       const apptSrc = {
-        sql: `(SELECT a.status, a.created_at, a.cancelled_by, a.department_id AS dept_id,
+        sql: `(SELECT a.status, a.created_at, a.approved_at, a.completed_at, a.cancelled_by, a.department_id AS dept_id,
                       COALESCE(aps.service_name, 'Unspecified') AS name
                  FROM appointments a
                  LEFT JOIN appointment_services aps ON aps.service_id = a.service_id
@@ -5032,19 +5032,19 @@ router.get(
       const docSrc = {
         sql: `(SELECT * FROM (
                  SELECT 'request' AS source, ds.department_id AS dept_id, ds.service_name AS name,
-                        dr.status, dr.created_at, dr.claimed_at, dr.claim_by
+                        dr.status, dr.created_at, dr.claimed_at, dr.claim_by, dr.ready_at
                    FROM document_requests dr
                    JOIN document_services ds ON ds.service_id = dr.service_id
                   WHERE dr.created_at >= ? AND dr.created_at < ?
                  UNION ALL
                  SELECT 'faculty_request', ds.department_id, ds.service_name,
-                        fr.status, fr.created_at, fr.claimed_at, fr.claim_by
+                        fr.status, fr.created_at, fr.claimed_at, fr.claim_by, fr.ready_at
                    FROM faculty_document_requests fr
                    JOIN document_services ds ON ds.service_id = fr.service_id
                   WHERE fr.created_at >= ? AND fr.created_at < ?
                  UNION ALL
                  SELECT 'submission', sub.department_id, 'Document Submission',
-                        sub.status, sub.created_at, sub.claimed_at, sub.claim_by
+                        sub.status, sub.created_at, sub.claimed_at, sub.claim_by, sub.ready_at
                    FROM document_submissions sub
                   WHERE sub.created_at >= ? AND sub.created_at < ?
                ) u WHERE (? IS NULL OR u.dept_id = ?)) t`,
@@ -5073,6 +5073,14 @@ router.get(
         return out;
       };
       const round1 = (v) => (v == null ? null : Math.round(Number(v) * 10) / 10);
+      // Per-college counts split by status, for stacked bars.
+      const collegeStatus = async (src) => {
+        const [rows] = await pool.query(
+          `SELECT dept_id AS k, status AS st, COUNT(*) AS n FROM ${src.sql} GROUP BY dept_id, status`,
+          src.params,
+        );
+        return rows;
+      };
 
       const [
         [deptRows],
@@ -5091,6 +5099,10 @@ router.get(
         dByDept,
         dTop,
         dDaily,
+        qHourly,
+        qCollegeStatus,
+        aCollegeStatus,
+        dCollegeStatus,
       ] = await Promise.all([
         pool.query(
           `SELECT department_id, department_name, department_abbreviation
@@ -5115,7 +5127,13 @@ router.get(
         dailyOf(queueSrc),
         pool.query(
           `SELECT COUNT(*) AS total,
-                  SUM(cancelled_by = 'student_no_show') AS no_show_reports
+                  SUM(cancelled_by = 'student_no_show') AS no_show_reports,
+                  AVG(CASE WHEN approved_at IS NOT NULL
+                           THEN TIMESTAMPDIFF(MINUTE, created_at, approved_at) END) / 60 AS avg_response_h,
+                  AVG(CASE WHEN approved_at IS NOT NULL AND completed_at IS NOT NULL
+                           THEN TIMESTAMPDIFF(MINUTE, approved_at, completed_at) END) / 60 AS avg_approved_to_done_h,
+                  AVG(CASE WHEN status = 'completed' AND completed_at IS NOT NULL
+                           THEN TIMESTAMPDIFF(MINUTE, created_at, completed_at) END) / 60 AS avg_turnaround_h
              FROM ${apptSrc.sql}`,
           apptSrc.params,
         ),
@@ -5127,6 +5145,10 @@ router.get(
           `SELECT COUNT(*) AS total,
                   AVG(CASE WHEN claimed_at IS NOT NULL
                            THEN TIMESTAMPDIFF(HOUR, created_at, claimed_at) END) / 24 AS avg_days,
+                  AVG(CASE WHEN ready_at IS NOT NULL
+                           THEN TIMESTAMPDIFF(MINUTE, created_at, ready_at) END) / 60 AS avg_processing_h,
+                  AVG(CASE WHEN ready_at IS NOT NULL AND claimed_at IS NOT NULL
+                           THEN TIMESTAMPDIFF(MINUTE, ready_at, claimed_at) END) / 60 AS avg_pickup_wait_h,
                   SUM(status = 'ready' AND claim_by IS NOT NULL AND claim_by < ?) AS overdue
              FROM ${docSrc.sql}`,
           [todayManila, ...docSrc.params],
@@ -5135,6 +5157,10 @@ router.get(
         grouped(docSrc, "dept_id"),
         grouped(docSrc, "name", 5),
         dailyOf(docSrc),
+        grouped(queueSrc, "HOUR(CONVERT_TZ(created_at, '+00:00', '+08:00'))"),
+        collegeStatus(queueSrc),
+        collegeStatus(apptSrc),
+        collegeStatus(docSrc),
       ]);
 
       const colleges = deptRows.map((d) => ({
@@ -5154,6 +5180,23 @@ router.get(
         return m;
       };
 
+      // [{abbrev, total, segments:{status:count}}] sorted by total desc.
+      const stacked = (rows) => {
+        const m = new Map();
+        for (const r of rows) {
+          if (r.k == null) continue;
+          const abbrev = abbrevById.get(r.k) || `Dept ${r.k}`;
+          const e = m.get(abbrev) || { abbrev, total: 0, segments: {} };
+          const n = Number(r.n) || 0;
+          e.segments[r.st] = (e.segments[r.st] || 0) + n;
+          e.total += n;
+          m.set(abbrev, e);
+        }
+        return [...m.values()].sort((a, b) => b.total - a.total);
+      };
+      const hourMap = new Map(qHourly.map((r) => [Number(r.k), r.n]));
+      const hourly = Array.from({ length: 24 }, (_, h) => ({ hour: h, count: hourMap.get(h) || 0 }));
+
       const apptTotal = Number(aSum.total) || 0;
       const apptByStatus = statusMap(aByStatus, ["pending", "approved", "completed", "rejected", "cancelled"]);
 
@@ -5172,6 +5215,8 @@ router.get(
           avgServiceMin: round1(qSum.avg_service),
           peakHour: qPeak.length > 0 && qPeak[0].k != null ? Number(qPeak[0].k) : null,
           byCollege: byCollege(qByDept),
+          byCollegeStatus: stacked(qCollegeStatus),
+          hourly,
           topServices: topList(qTop),
           daily: qDaily,
         },
@@ -5180,7 +5225,11 @@ router.get(
           byStatus: apptByStatus,
           completionRate: apptTotal > 0 ? round1((apptByStatus.completed / apptTotal) * 100) : 0,
           noShowReports: Number(aSum.no_show_reports) || 0,
+          avgResponseHours: round1(aSum.avg_response_h),
+          avgApprovedToCompletedHours: round1(aSum.avg_approved_to_done_h),
+          avgTurnaroundHours: round1(aSum.avg_turnaround_h),
           byCollege: byCollege(aByDept),
+          byCollegeStatus: stacked(aCollegeStatus),
           topTypes: topList(aTop),
           daily: aDaily,
         },
@@ -5188,8 +5237,11 @@ router.get(
           total: Number(dSum.total) || 0,
           byStatus: statusMap(dByStatus, ["pending", "processing", "ready", "claimed", "rejected", "cancelled"]),
           avgDaysToClaim: round1(dSum.avg_days),
+          avgProcessingHours: round1(dSum.avg_processing_h),
+          avgPickupWaitHours: round1(dSum.avg_pickup_wait_h),
           overdue: Number(dSum.overdue) || 0,
           byCollege: byCollege(dByDept),
+          byCollegeStatus: stacked(dCollegeStatus),
           topTypes: topList(dTop),
           daily: dDaily,
         },

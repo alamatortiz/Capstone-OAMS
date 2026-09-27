@@ -542,6 +542,7 @@ CREATE TABLE document_requests (
     -- wish-date). Past this date the requester is nudged once (overdue_notified_at)
     -- and the admin list flags it -- see documentPickupSweeper.js notifyOverdueClaims.
     claim_by                DATE         NULL,
+    ready_at                TIMESTAMP    NULL DEFAULT NULL, -- when it became ready for pickup (first time); feeds processing-time analytics
     -- Legacy column: the old Ready -> Released -> Claimed flow was collapsed to
     -- Ready -> Claimed. No longer written or read; kept only so existing rows
     -- and mock seeds don't error. Safe to drop in a later migration.
@@ -648,6 +649,7 @@ CREATE TABLE document_submissions (
     needed_by       DATE         NULL,
     -- Optional office-set "collect it by" date -- see document_requests.claim_by.
     claim_by        DATE         NULL,
+    ready_at        TIMESTAMP    NULL DEFAULT NULL, -- see document_requests.ready_at
     notes           TEXT         NULL, -- admin processing/rejection notes, mirrors document_requests.notes
     claimed_at      TIMESTAMP    NULL,
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
@@ -831,6 +833,7 @@ CREATE TABLE IF NOT EXISTS faculty_document_requests (
     needed_by            DATE         NULL,
     -- Optional office-set "collect it by" date -- see document_requests.claim_by.
     claim_by             DATE         NULL,
+    ready_at             TIMESTAMP    NULL DEFAULT NULL, -- see document_requests.ready_at
     -- Legacy column (see document_requests.released_at) -- no longer written/read.
     released_at          TIMESTAMP    NULL,
     claimed_at           TIMESTAMP    NULL,

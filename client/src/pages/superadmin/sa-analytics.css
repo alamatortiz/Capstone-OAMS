@@ -544,3 +544,143 @@
   cursor: pointer;
 }
 .saa-retry-btn:hover { background: rgba(var(--saa-accent-rgb), 0.1); }
+
+/* ── Time statistics ──────────────────────────────────────── */
+.saa-content .saa-section-title {
+  margin: 0.25rem 0 -0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: left;
+}
+.saa-content .saa-time-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+@media (max-width: 768px) {
+  .saa-content .saa-time-grid { grid-template-columns: 1fr; }
+}
+.saa-content .saa-time-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 1rem 1.25rem;
+  border-radius: 0.875rem;
+  background: linear-gradient(135deg, rgba(var(--saa-accent-rgb), 0.12), rgba(var(--saa-accent-rgb), 0.03));
+  border: 1px solid rgba(var(--saa-accent-rgb), 0.25);
+  text-align: left;
+}
+.saa-content .saa-time-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-tertiary);
+}
+.saa-content .saa-time-value {
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--saa-accent);
+}
+.saa-content .saa-time-hint { font-size: 0.75rem; color: var(--text-tertiary); }
+
+/* ── Donut ────────────────────────────────────────────────── */
+.saa-content .saa-donut-wrap {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+.saa-content .saa-donut {
+  width: 9rem;
+  height: 9rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.saa-content .saa-donut-hole {
+  width: 62%;
+  height: 62%;
+  border-radius: 50%;
+  background: var(--card-bg, var(--card));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.saa-content .saa-donut-total { font-size: 1.5rem; font-weight: 800; color: var(--text-primary); line-height: 1; }
+.saa-content .saa-donut-caption { font-size: 0.7rem; color: var(--text-tertiary); text-transform: uppercase; }
+.saa-content .saa-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1;
+  min-width: 10rem;
+}
+.saa-content .saa-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+}
+.saa-content .saa-legend-dot { width: 0.7rem; height: 0.7rem; border-radius: 50%; flex-shrink: 0; }
+.saa-content .saa-legend-label { flex: 1; text-align: left; }
+.saa-content .saa-legend-value { font-weight: 700; }
+.saa-content .saa-legend-value em { font-style: normal; font-weight: 500; color: var(--text-tertiary); }
+.saa-content .saa-legend-inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  margin-top: 0.75rem;
+}
+.saa-content .saa-legend-inline li { font-size: 0.75rem; }
+
+/* ── Stacked bars ─────────────────────────────────────────── */
+.saa-content .saa-stack {
+  display: flex;
+  height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+}
+.saa-content .saa-stack-seg { height: 100%; min-width: 3px; }
+
+/* ── Line / area trend ────────────────────────────────────── */
+.saa-content .saa-line-svg { width: 100%; height: 9rem; display: block; overflow: visible; }
+.saa-content .saa-line-area { fill: rgba(var(--saa-accent-rgb), 0.15); stroke: none; }
+.saa-content .saa-line-stroke {
+  fill: none;
+  stroke: var(--saa-accent);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+}
+.saa-content .saa-line-dot { fill: var(--saa-accent); }
+.saa-content .saa-line-peak { font-weight: 600; color: var(--saa-accent); }
+
+/* ── Progress ring ────────────────────────────────────────── */
+.saa-content .saa-ring-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+.saa-content .saa-ring { width: 9.5rem; height: 9.5rem; }
+.saa-content .saa-ring-track { fill: none; stroke: rgba(var(--saa-accent-rgb), 0.15); stroke-width: 12; }
+.saa-content .saa-ring-fill {
+  fill: none;
+  stroke: var(--saa-accent);
+  stroke-width: 12;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.6s ease;
+}
+.saa-content .saa-ring-value { font-size: 1.6rem; font-weight: 800; fill: var(--text-primary); }
+.saa-content .saa-ring-caption { font-size: 0.6rem; font-weight: 600; fill: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; }
+.saa-content .saa-ring-sub { margin: 0; font-size: 0.8rem; color: var(--text-tertiary); text-align: center; }
