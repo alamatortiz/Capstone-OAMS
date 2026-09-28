@@ -11,6 +11,7 @@ import "./adm-dashboard.css";
 import "./adm-scan-document.css";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
+import ActionConfirmModal from "../../components/ActionConfirmModal";
 import api from "../../utils/api";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import { toast } from "sonner";
@@ -95,6 +96,9 @@ export default function AdminScanDocument() {
   const [errorMsg, setErrorMsg] = useState("");
   const [recentScans, setRecentScans] = useState([]);
   const [claiming, setClaiming] = useState(false);
+  // Claiming is final, so it goes through the same confirm step as every other
+  // "Mark as Claimed" button in the app instead of firing on a single tap.
+  const [confirmClaimOpen, setConfirmClaimOpen] = useState(false);
 
   // Live camera scanner refs -- video element the camera stream is attached
   // to, an offscreen canvas used to sample frames for jsQR, the active
@@ -230,6 +234,7 @@ export default function AdminScanDocument() {
       toast.error(err?.response?.data?.error || "Failed to mark document as claimed");
     } finally {
       setClaiming(false);
+      setConfirmClaimOpen(false);
     }
   };
 
@@ -386,7 +391,7 @@ export default function AdminScanDocument() {
                   {["ready", "generated", "released"].includes(verifiedDoc.documentStatus) && (
                     <button
                       className="asd-btn-claim"
-                      onClick={handleMarkClaimed}
+                      onClick={() => setConfirmClaimOpen(true)}
                       disabled={claiming}
                     >
                       <CheckCircleIcon /> {claiming ? "Marking…" : "Mark as Claimed"}
@@ -673,6 +678,27 @@ export default function AdminScanDocument() {
             </div>
           </div>
         </div>
+
+      {/* Mark as Claimed Confirm Dialog -- portaled above the scan result modal */}
+      <ActionConfirmModal
+        show={confirmClaimOpen && !!verifiedDoc}
+        variant="success"
+        onCancel={() => setConfirmClaimOpen(false)}
+        onConfirm={handleMarkClaimed}
+        title="Mark Document as Claimed?"
+        message={
+          <>
+            Mark <strong>{verifiedDoc?.documentType}</strong> (
+            {verifiedDoc?.trackingNumber}) for{" "}
+            <strong>{verifiedDoc?.studentName}</strong> as claimed? Only do this
+            once the document has been handed over.
+          </>
+        }
+        icon={<CheckCircleIcon />}
+        cancelText="Not Yet"
+        confirmText={claiming ? "Marking…" : "Mark as Claimed"}
+        confirmDisabled={claiming}
+      />
     </AdminPageShell>
   );
 }

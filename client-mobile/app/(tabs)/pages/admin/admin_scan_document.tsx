@@ -168,6 +168,9 @@ export default function AdminScanDocumentScreen() {
   const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
   const [scanToast, setScanToast] = useState(false);
   const [claiming, setClaiming] = useState(false);
+  // Claiming is final, so it goes through the same confirm step as every other
+  // "Mark as Claimed" button in the app instead of firing on a single tap.
+  const [confirmClaimOpen, setConfirmClaimOpen] = useState(false);
 
   const [showCamera, setShowCamera] = useState(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
@@ -303,7 +306,10 @@ export default function AdminScanDocumentScreen() {
     processCode(code);
   };
 
-  const handleCloseModal = () => setScannedDoc(null);
+  const handleCloseModal = () => {
+    setConfirmClaimOpen(false);
+    setScannedDoc(null);
+  };
 
   const handleMarkClaimed = async () => {
     if (!scannedDoc?.requestId) return;
@@ -316,6 +322,7 @@ export default function AdminScanDocumentScreen() {
       Alert.alert('Error', 'Failed to mark document as claimed.');
     } finally {
       setClaiming(false);
+      setConfirmClaimOpen(false);
     }
   };
 
@@ -648,7 +655,7 @@ export default function AdminScanDocumentScreen() {
 
               <View style={styles.docModalActions}>
                 {['ready', 'generated', 'released'].includes(scannedDocument.documentStatus) && (
-                  <Pressable style={styles.claimBtn} onPress={handleMarkClaimed} disabled={claiming}>
+                  <Pressable style={styles.claimBtn} onPress={() => setConfirmClaimOpen(true)} disabled={claiming}>
                     <CheckCircle size={15} color="#10b981" />
                     <Text style={styles.claimBtnText}>{claiming ? 'Marking…' : 'Mark as Claimed'}</Text>
                   </Pressable>
@@ -666,6 +673,39 @@ export default function AdminScanDocumentScreen() {
                 </Pressable>
               </View>
             </View>
+
+            {/* Mark as Claimed confirm -- an overlay inside this Modal, not a
+                second <Modal>: two stacked native Modals break touch delivery
+                under the new architecture (same fix pattern as
+                admin_queue_hosting.tsx / student_documents.tsx). */}
+            {confirmClaimOpen && (
+              <View style={[StyleSheet.absoluteFill, styles.modalOverlay]}>
+                <View style={styles.confirmModalCard}>
+                  <View style={[styles.confirmIconCircle, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
+                    <CheckCircle size={26} color="#10b981" />
+                  </View>
+                  <Text style={styles.confirmTitle}>Mark Document as Claimed?</Text>
+                  <Text style={styles.confirmDescription}>
+                    Mark {scannedDocument.documentType} ({scannedDocument.trackingNumber}) for{' '}
+                    {scannedDocument.studentName} as claimed? Only do this once the document has
+                    been handed over.
+                  </Text>
+                  <View style={styles.confirmActionsRow}>
+                    <Pressable
+                      style={styles.cancelBtn}
+                      onPress={() => setConfirmClaimOpen(false)}
+                      disabled={claiming}
+                    >
+                      <Text style={styles.cancelBtnText}>Not Yet</Text>
+                    </Pressable>
+                    <Pressable style={styles.claimConfirmBtn} onPress={handleMarkClaimed} disabled={claiming}>
+                      <CheckCircle size={16} color="#ffffff" />
+                      <Text style={styles.confirmBtnText}>{claiming ? 'Marking…' : 'Mark as Claimed'}</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            )}
           </View>
         )}
       </Modal>
@@ -1232,6 +1272,16 @@ function createStyles(theme: ThemePalette) {
       paddingVertical: 12,
       borderRadius: 12,
       backgroundColor: '#ef4444',
+    },
+    claimConfirmBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 12,
+      borderRadius: 12,
+      backgroundColor: '#10b981',
     },
   });
 }
