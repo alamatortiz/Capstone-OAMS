@@ -1557,8 +1557,9 @@ function createStyles(theme: ThemePalette) {
       borderWidth: 1,
       borderColor: 'rgba(34, 197, 94, 0.35)',
       backgroundColor: 'rgba(34, 197, 94, 0.05)',
+      paddingHorizontal: 10,
     },
-    claimBtnFullText: { fontSize: 12.5, fontWeight: '700', color: '#22c55e' },
+    claimBtnFullText: { fontSize: 12.5, fontWeight: '700', color: '#22c55e', flexShrink: 1, textAlign: 'center' },
 
     docInfoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     docInfoField: { width: '46%', gap: 2 },
@@ -1587,8 +1588,9 @@ function createStyles(theme: ThemePalette) {
       borderRadius: 12,
       borderWidth: 1,
       borderColor: 'rgba(239, 68, 68, 0.35)',
+      paddingHorizontal: 10,
     },
-    cancelBtnFullText: { fontSize: 12.5, fontWeight: '700', color: '#ef4444' },
+    cancelBtnFullText: { fontSize: 12.5, fontWeight: '700', color: '#ef4444', flexShrink: 1, textAlign: 'center' },
 
     // Request dialog
     modalOverlay: {

@@ -1574,7 +1574,7 @@ function createStyles(theme: ThemePalette) {
       paddingHorizontal: 20,
       borderRadius: 14,
     },
-    openQueueBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+    openQueueBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff', flexShrink: 1, textAlign: 'center' },
 
     // Summary stats (stacked full-width cards)
     statsGrid: { gap: 12 },
@@ -1700,11 +1700,12 @@ function createStyles(theme: ThemePalette) {
       paddingVertical: 10,
       borderRadius: 10,
       borderWidth: 1,
+      paddingHorizontal: 10,
     },
     queueActionBtnWarning: { borderColor: 'rgba(245, 158, 11, 0.4)' },
     queueActionBtnDanger: { borderColor: 'rgba(239, 68, 68, 0.4)' },
     queueActionBtnSuccess: { backgroundColor: 'rgba(59, 130, 246, 0.15)', borderColor: 'rgba(59, 130, 246, 0.4)' },
-    queueActionBtnText: { fontSize: 12, fontWeight: '700' },
+    queueActionBtnText: { fontSize: 12, fontWeight: '700', flexShrink: 1, textAlign: 'center' },
 
     closedMeta: { fontSize: 11, color: theme.tertiary, marginTop: -2 },
 

@@ -799,7 +799,7 @@ function createStyles(theme: ThemePalette) {
       minWidth: '30%',
     },
     tabBtnActive: { backgroundColor: theme.primary },
-    tabBtnText: { fontSize: 12, fontWeight: '600', color: theme.subtext },
+    tabBtnText: { fontSize: 12, fontWeight: '600', color: theme.subtext, flexShrink: 1, textAlign: 'center' },
     tabBtnTextActive: { color: '#ffffff' },
 
     // Alert
@@ -890,7 +890,7 @@ function createStyles(theme: ThemePalette) {
       borderRadius: 10,
       backgroundColor: theme.primary,
     },
-    primaryBtnText: { fontSize: 13.5, fontWeight: '700', color: '#ffffff' },
+    primaryBtnText: { fontSize: 13.5, fontWeight: '700', color: '#ffffff', flexShrink: 1, textAlign: 'center' },
     secondaryBtn: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -902,7 +902,7 @@ function createStyles(theme: ThemePalette) {
       borderWidth: 1,
       borderColor: theme.border,
     },
-    secondaryBtnText: { fontSize: 13.5, fontWeight: '700', color: theme.text },
+    secondaryBtnText: { fontSize: 13.5, fontWeight: '700', color: theme.text, flexShrink: 1, textAlign: 'center' },
 
     // Sync Now button — flat .aps-sync-now-btn fill, dimmed while syncing/disabled
     syncNowBtn: {
@@ -913,9 +913,10 @@ function createStyles(theme: ThemePalette) {
       paddingVertical: 14,
       borderRadius: 12,
       backgroundColor: theme.primary,
+      paddingHorizontal: 10,
     },
     syncNowBtnLoading: { opacity: 0.65 },
-    syncNowBtnText: { fontSize: 14.5, fontWeight: '700', color: '#ffffff' },
+    syncNowBtnText: { fontSize: 14.5, fontWeight: '700', color: '#ffffff', flexShrink: 1, textAlign: 'center' },
 
     // How it works
     howItWorks: {

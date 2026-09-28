@@ -1816,8 +1816,9 @@ function createStyles(theme: ThemePalette) {
       gap: 6,
       paddingVertical: 13,
       borderRadius: 12,
+      paddingHorizontal: 10,
     },
-    addBtnFullText: { fontSize: 13.5, fontWeight: '700', color: '#ffffff' },
+    addBtnFullText: { fontSize: 13.5, fontWeight: '700', color: '#ffffff', flexShrink: 1, textAlign: 'center' },
 
     exportBtn: {
       flexDirection: 'row',
@@ -1828,8 +1829,9 @@ function createStyles(theme: ThemePalette) {
       borderRadius: 12,
       borderWidth: 1,
       borderColor: theme.border,
+      paddingHorizontal: 10,
     },
-    exportBtnText: { fontSize: 13, fontWeight: '600', color: theme.text },
+    exportBtnText: { fontSize: 13, fontWeight: '600', color: theme.text, flexShrink: 1, textAlign: 'center' },
 
     // Status filter pills (documents)
     filterPillsRow: { flexDirection: 'row', borderBottomWidth: 2, borderBottomColor: theme.border },
@@ -1919,7 +1921,7 @@ function createStyles(theme: ThemePalette) {
       alignSelf: 'flex-start',
       paddingHorizontal: 14,
     },
-    reqAddBtnText: { fontSize: 12, fontWeight: '700', color: theme.primary },
+    reqAddBtnText: { fontSize: 12, fontWeight: '700', color: theme.primary, flexShrink: 1, textAlign: 'center' },
 
     checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     checkboxLabel: { fontSize: 13, color: theme.text },

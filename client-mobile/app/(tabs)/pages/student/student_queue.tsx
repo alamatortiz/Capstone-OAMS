@@ -1344,11 +1344,14 @@ function createStyles(theme: ThemePalette) {
       borderWidth: 1.5,
       borderColor: 'rgba(239, 68, 68, 0.35)',
       backgroundColor: 'rgba(239, 68, 68, 0.05)',
+      paddingHorizontal: 10,
     },
     leaveBtnText: {
       fontSize: 13,
       fontWeight: '700',
       color: '#ef4444',
+      flexShrink: 1,
+      textAlign: 'center',
     },
 
     // Empty state
@@ -1716,11 +1719,14 @@ function createStyles(theme: ThemePalette) {
       paddingVertical: 12,
       borderRadius: 12,
       backgroundColor: '#ef4444',
+      paddingHorizontal: 10,
     },
     logoutConfirmBtnText: {
       fontSize: 14,
       fontWeight: '700',
       color: '#ffffff',
+      flexShrink: 1,
+      textAlign: 'center',
     },
     concernInput: {
       width: '100%',
@@ -1809,7 +1815,7 @@ function createStyles(theme: ThemePalette) {
     // Procedure Steps are backend-configured, open-ended text). Combined with
     // dialogCard's maxHeight + overflow: 'hidden' above, that clips
     // dialogActions -- including the primary "Join Queue" button -- off the
-    // bottom of the card once content gets long enough. flexShrink: 1 sizes
+    // bottom of the card once content gets long enough., flexShrink: 1 sizes
     // this normally and only compresses (becoming internally scrollable) once
     // the card's maxHeight cap is actually hit, keeping the footer visible.
     dialogBody: { flexShrink: 1, padding: 18 },

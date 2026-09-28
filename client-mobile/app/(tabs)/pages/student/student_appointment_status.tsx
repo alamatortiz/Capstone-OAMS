@@ -1289,24 +1289,27 @@ function createStyles(theme: ThemePalette) {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
       paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: 'rgba(239, 68, 68, 0.35)',
       backgroundColor: 'rgba(239, 68, 68, 0.05)',
+      paddingHorizontal: 10,
     },
-    cancelBtnText: { fontSize: 13, fontWeight: '700', color: '#ef4444' },
+    cancelBtnText: { fontSize: 13, fontWeight: '700', color: '#ef4444', flexShrink: 1, textAlign: 'center' },
     completeCard: { borderColor: 'rgba(34, 197, 94, 0.25)', backgroundColor: 'rgba(34, 197, 94, 0.04)' },
     completeCardHeader: { borderBottomColor: 'rgba(34, 197, 94, 0.15)' },
     completeBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
       paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: 'rgba(34, 197, 94, 0.35)',
       backgroundColor: 'rgba(34, 197, 94, 0.05)',
+      paddingHorizontal: 10,
     },
-    completeBtnText: { fontSize: 13, fontWeight: '700', color: '#22c55e' },
+    completeBtnText: { fontSize: 13, fontWeight: '700', color: '#22c55e', flexShrink: 1, textAlign: 'center' },
     reportCard: { borderColor: 'rgba(245, 158, 11, 0.25)', backgroundColor: 'rgba(245, 158, 11, 0.04)' },
     reportCardHeader: { borderBottomColor: 'rgba(245, 158, 11, 0.15)' },
     reportBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
       paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: 'rgba(245, 158, 11, 0.35)',
       backgroundColor: 'rgba(245, 158, 11, 0.05)',
+      paddingHorizontal: 10,
     },
-    reportBtnText: { fontSize: 13, fontWeight: '700', color: '#f59e0b' },
+    reportBtnText: { fontSize: 13, fontWeight: '700', color: '#f59e0b', flexShrink: 1, textAlign: 'center' },
     // Adapter styles for QueueReasonModal's fixed style-key contract, reusing
     // the same visual chrome as the existing logout*/cancel*/complete*
     // confirm modals rather than duplicating a whole second modal-chrome
@@ -1371,7 +1374,8 @@ function createStyles(theme: ThemePalette) {
     logoutConfirmBtn: {
       flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
       paddingVertical: 12, borderRadius: 12, backgroundColor: '#ef4444',
+      paddingHorizontal: 10,
     },
-    logoutConfirmBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+    logoutConfirmBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff', flexShrink: 1, textAlign: 'center' },
   });
 }

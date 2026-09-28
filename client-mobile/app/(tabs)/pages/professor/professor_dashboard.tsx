@@ -1705,11 +1705,14 @@ function createStyles(theme: ThemePalette) {
       paddingVertical: 12,
       borderRadius: 12,
       backgroundColor: '#ef4444',
+      paddingHorizontal: 10,
     },
     logoutConfirmBtnText: {
       fontSize: 14,
       fontWeight: '700',
       color: '#ffffff',
+      flexShrink: 1,
+      textAlign: 'center',
     },
 
     // Availability-reason modal chrome (shared shape with QueueReasonModal's

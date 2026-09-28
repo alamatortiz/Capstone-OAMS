@@ -1591,8 +1591,9 @@ function createStyles(theme: ThemePalette) {
       paddingVertical: 12,
       borderRadius: 12,
       backgroundColor: '#3b82f6',
+      paddingHorizontal: 10,
     },
-    monitorBtnText: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
+    monitorBtnText: { fontSize: 13, fontWeight: '700', color: '#ffffff', flexShrink: 1, textAlign: 'center' },
 
     // Monitor: 3-stat grid
     statsGrid3: { flexDirection: 'row', gap: 10 },
@@ -1638,8 +1639,9 @@ function createStyles(theme: ThemePalette) {
       paddingVertical: 12,
       borderRadius: 12,
       borderWidth: 1,
+      paddingHorizontal: 10,
     },
-    actionBtnText: { fontSize: 12, fontWeight: '700' },
+    actionBtnText: { fontSize: 12, fontWeight: '700', flexShrink: 1, textAlign: 'center' },
     actionBtnPrimary: { borderColor: 'rgba(59, 130, 246, 0.4)' },
     actionBtnSuccess: { borderColor: 'rgba(34, 197, 94, 0.4)' },
     actionBtnWarning: { borderColor: 'rgba(245, 158, 11, 0.4)' },
@@ -1656,11 +1658,12 @@ function createStyles(theme: ThemePalette) {
       gap: 8,
       paddingVertical: 13,
       borderRadius: 12,
+      paddingHorizontal: 10,
     },
     wideBtnPrimary: { backgroundColor: '#3b82f6' },
     wideBtnSuccess: { backgroundColor: '#22c55e' },
     wideBtnDanger: { backgroundColor: '#ef4444' },
-    wideBtnText: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
+    wideBtnText: { fontSize: 13, fontWeight: '700', color: '#ffffff', flexShrink: 1, textAlign: 'center' },
 
     // Queue entries
     emptyInlineText: { fontSize: 12, color: theme.tertiary, textAlign: 'center', paddingVertical: 12 },

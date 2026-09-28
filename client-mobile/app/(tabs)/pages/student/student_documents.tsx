@@ -1251,12 +1251,12 @@ function createStyles(theme: ThemePalette) {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
       paddingVertical: 14, borderRadius: 14, alignSelf: 'flex-start', paddingHorizontal: 20,
     },
-    requestBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+    requestBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff', flexShrink: 1, textAlign: 'center' },
     sendBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
       paddingVertical: 14, borderRadius: 14, alignSelf: 'flex-start', paddingHorizontal: 20,
     },
-    sendBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+    sendBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff', flexShrink: 1, textAlign: 'center' },
 
     // Attachments (Send a Document)
     attachBudgetText: { fontSize: 11, fontWeight: '400', color: theme.tertiary, textTransform: 'none' },
@@ -1352,8 +1352,9 @@ function createStyles(theme: ThemePalette) {
     claimBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
       paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(34, 197, 94, 0.35)',
+      paddingHorizontal: 10,
     },
-    claimBtnText: { fontSize: 12.5, fontWeight: '700', color: theme.primary },
+    claimBtnText: { fontSize: 12.5, fontWeight: '700', color: theme.primary, flexShrink: 1, textAlign: 'center' },
 
     // Ready card: "View Pickup Details" + "Mark Document as Claimed" side by side.
     docActionsRow: { flexDirection: 'row', gap: 8 },
@@ -1362,8 +1363,9 @@ function createStyles(theme: ThemePalette) {
     cancelBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
       paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)',
+      paddingHorizontal: 10,
     },
-    cancelBtnText: { fontSize: 12.5, fontWeight: '700', color: '#ef4444' },
+    cancelBtnText: { fontSize: 12.5, fontWeight: '700', color: '#ef4444', flexShrink: 1, textAlign: 'center' },
 
     // Processing times info card
     infoCard: {
@@ -1497,8 +1499,9 @@ function createStyles(theme: ThemePalette) {
     logoutConfirmBtn: {
       flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
       paddingVertical: 12, borderRadius: 12, backgroundColor: '#ef4444',
+      paddingHorizontal: 10,
     },
-    logoutConfirmBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+    logoutConfirmBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff', flexShrink: 1, textAlign: 'center' },
 
     // College / document type select modal
     filterModalCard: {

@@ -1438,8 +1438,9 @@ function createStyles(theme: ThemePalette) {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
       paddingVertical: 12, borderRadius: 12,
       borderWidth: 1.5, borderColor: 'rgba(34, 197, 94, 0.35)', backgroundColor: 'rgba(34, 197, 94, 0.05)',
+      paddingHorizontal: 10,
     },
-    claimActionBtnText: { fontSize: 13, fontWeight: '700', color: '#22c55e' },
+    claimActionBtnText: { fontSize: 13, fontWeight: '700', color: '#22c55e', flexShrink: 1, textAlign: 'center' },
 
     // Digital Pickup Code card (QR + text code)
     qrWrap: { alignItems: 'center', paddingVertical: 8, gap: 12 },
@@ -1564,7 +1565,8 @@ function createStyles(theme: ThemePalette) {
     logoutConfirmBtn: {
       flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
       paddingVertical: 12, borderRadius: 12, backgroundColor: '#ef4444',
+      paddingHorizontal: 10,
     },
-    logoutConfirmBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+    logoutConfirmBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff', flexShrink: 1, textAlign: 'center' },
   });
 }

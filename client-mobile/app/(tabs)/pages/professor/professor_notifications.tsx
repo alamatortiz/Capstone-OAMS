@@ -646,8 +646,9 @@ function createStyles(theme: ThemePalette) {
       borderRadius: 10,
       borderWidth: 1,
       borderColor: theme.primary,
+      paddingHorizontal: 10,
     },
-    markAllBtnText: { fontSize: 13, fontWeight: '700', color: theme.primary },
+    markAllBtnText: { fontSize: 13, fontWeight: '700', color: theme.primary, flexShrink: 1, textAlign: 'center' },
 
     loadMoreBtn: {
       alignItems: 'center',
@@ -887,8 +888,9 @@ function createStyles(theme: ThemePalette) {
       paddingVertical: 12,
       borderRadius: 12,
       backgroundColor: '#ef4444',
+      paddingHorizontal: 10,
     },
-    logoutConfirmBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+    logoutConfirmBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff', flexShrink: 1, textAlign: 'center' },
 
     // Filter options modal
     filterModalCard: {
