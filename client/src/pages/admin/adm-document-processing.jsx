@@ -11,10 +11,22 @@ import QueueReasonModal from "../../components/QueueReasonModal";
 import FilterSelect from "../../components/FilterSelect";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import useFilePreview from "../../hooks/useFilePreview";
+import { useLiveRefetch } from "../../hooks/useLiveRefetch";
 import FilePreviewModal from "../../components/FilePreviewModal";
 import AttachmentChip from "../../components/AttachmentChip";
 import { formatManilaDate, getManilaDateString, getManilaTomorrowDateString } from "../../utils/dateTime";
 import { COLLEGES } from "../../data/colleges";
+
+// The secretary/admin is the receiving side for every one of these: a new
+// request or sent document needs to appear the moment it's submitted (this
+// page IS their work queue), and a student/faculty cancellation needs to
+// disappear live too -- unlike a "nicety" refresh, a stale list here directly
+// means the request goes unnoticed until someone happens to reload.
+const DOCUMENT_LIVE_EVENTS = [
+  "document:new-request",
+  "document:status-updated",
+  "document:cancelled",
+];
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const CloseIcon = () => (
@@ -301,6 +313,9 @@ export default function AdminDocumentProcessing() {
   useEffect(() => {
     fetchDocuments();
   }, [fetchDocuments]);
+
+  // Live updates (also reconciles on socket reconnect).
+  useLiveRefetch(DOCUMENT_LIVE_EVENTS, fetchDocuments);
 
   // ── Date buckets ──────────────────────────────────────────────────────────
   // Monday-anchored this-week/next-week windows (same pattern as

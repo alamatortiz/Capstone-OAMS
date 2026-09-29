@@ -9,6 +9,7 @@ import FilterDateRange from "../../components/FilterDateRange";
 import ExportMenu from "../../components/ExportMenu";
 import ActionsTakenToggle from "../../components/ActionsTakenToggle";
 import Pagination from "../../components/Pagination";
+import RefreshButton from "../../components/RefreshButton";
 import "./prof-dashboard.css";
 import "./prof-transactions.css";
 import api from "../../utils/api";
@@ -285,23 +286,30 @@ export default function ProfessorTransactionsPage() {
         <div className="transactions-page">
 
           {/* Page header */}
-          <PageHeader
-            breadcrumb={
-              <Link to="/professor/dashboard" className="breadcrumb-link">
-                <ChevronLeft className="breadcrumb-icon" />
-                Home
-              </Link>
-            }
-            icon={<ClipboardListIcon />}
-            iconClassName="txn-title-icon"
-            title="Transaction History"
-            subtitle="View all your activities and transactions."
-            headerClassName="txn-header"
-            breadcrumbClassName="page-breadcrumb"
-            titleSectionClassName="txn-title-section"
-            titleClassName="txn-title"
-            subtitleClassName="txn-subtitle"
-          />
+          <div className="refresh-header-row">
+            <PageHeader
+              breadcrumb={
+                <Link to="/professor/dashboard" className="breadcrumb-link">
+                  <ChevronLeft className="breadcrumb-icon" />
+                  Home
+                </Link>
+              }
+              icon={<ClipboardListIcon />}
+              iconClassName="txn-title-icon"
+              title="Transaction History"
+              subtitle="View all your activities and transactions."
+              headerClassName="txn-header"
+              breadcrumbClassName="page-breadcrumb"
+              titleSectionClassName="txn-title-section"
+              titleClassName="txn-title"
+              subtitleClassName="txn-subtitle"
+            />
+            <RefreshButton
+              onClick={fetchTransactions}
+              loading={loading}
+              label="Refresh transactions"
+            />
+          </div>
 
           {/* Stats */}
           <div className="transactions-stats-grid">

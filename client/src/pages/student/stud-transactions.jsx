@@ -9,6 +9,7 @@ import FilterDateRange from "../../components/FilterDateRange";
 import PageHeader from "../../components/PageHeader";
 import Pagination from "../../components/Pagination";
 import ExportMenu from "../../components/ExportMenu";
+import RefreshButton from "../../components/RefreshButton";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -350,23 +351,30 @@ export default function TransactionsPage() {
     >
         <div className="transactions-container">
           {/* Header */}
-          <PageHeader
-            breadcrumb={
-              <Link to="/student/dashboard" className="breadcrumb-link">
-                <ChevronLeft className="breadcrumb-icon" />
-                Home
-              </Link>
-            }
-            icon={<ClipboardListIcon />}
-            iconClassName="tx-title-icon"
-            title="Transaction History"
-            subtitle="View all your activities and transactions."
-            headerClassName="tx-header"
-            breadcrumbClassName="page-breadcrumb"
-            titleSectionClassName="tx-title-section"
-            titleClassName="tx-title"
-            subtitleClassName="tx-subtitle"
-          />
+          <div className="refresh-header-row">
+            <PageHeader
+              breadcrumb={
+                <Link to="/student/dashboard" className="breadcrumb-link">
+                  <ChevronLeft className="breadcrumb-icon" />
+                  Home
+                </Link>
+              }
+              icon={<ClipboardListIcon />}
+              iconClassName="tx-title-icon"
+              title="Transaction History"
+              subtitle="View all your activities and transactions."
+              headerClassName="tx-header"
+              breadcrumbClassName="page-breadcrumb"
+              titleSectionClassName="tx-title-section"
+              titleClassName="tx-title"
+              subtitleClassName="tx-subtitle"
+            />
+            <RefreshButton
+              onClick={fetchTransactions}
+              loading={txLoading}
+              label="Refresh transactions"
+            />
+          </div>
 
           {/* Stats Grid */}
           <div className="tx-stats-grid">

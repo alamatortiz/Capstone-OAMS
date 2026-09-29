@@ -4,6 +4,7 @@ import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import QueueReasonModal from "../../components/QueueReasonModal";
+import RefreshButton from "../../components/RefreshButton";
 import "./prof-dashboard.css";
 import "./prof-appointments.css";
 import { toast } from "sonner";
@@ -611,23 +612,30 @@ export default function ProfessorAppointmentsPage() {
     >
       <div className="appt-page-content">
         {/* Header */}
-        <PageHeader
-          breadcrumb={
-            <Link to="/professor/dashboard" className="breadcrumb-link">
-              <ChevronLeft className="breadcrumb-icon" />
-              Home
-            </Link>
-          }
-          icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
-          iconClassName="appt-title-icon"
-          title="Appointment Manager"
-          subtitle="Review and manage student appointment requests."
-          headerClassName="appt-header"
-          breadcrumbClassName="page-breadcrumb"
-          titleSectionClassName="appt-title-section"
-          titleClassName="appt-title"
-          subtitleClassName="appt-subtitle"
-        />
+        <div className="refresh-header-row">
+          <PageHeader
+            breadcrumb={
+              <Link to="/professor/dashboard" className="breadcrumb-link">
+                <ChevronLeft className="breadcrumb-icon" />
+                Home
+              </Link>
+            }
+            icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
+            iconClassName="appt-title-icon"
+            title="Appointment Manager"
+            subtitle="Review and manage student appointment requests."
+            headerClassName="appt-header"
+            breadcrumbClassName="page-breadcrumb"
+            titleSectionClassName="appt-title-section"
+            titleClassName="appt-title"
+            subtitleClassName="appt-subtitle"
+          />
+          <RefreshButton
+            onClick={fetchAppointments}
+            loading={loading}
+            label="Refresh appointments"
+          />
+        </div>
 
         {/* Schedule Manager card */}
         <Link

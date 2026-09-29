@@ -28,6 +28,7 @@ export const NOTIFICATION_EVENTS = [
   "appointment:slot-updated",
   "appointment:comment-updated",
   "document:status-updated",
+  "document:new-request",
   "announcement:changed",
 ];
 

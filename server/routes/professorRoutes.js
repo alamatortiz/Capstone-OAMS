@@ -1926,15 +1926,17 @@ router.post(
         [result.insertId],
       );
 
-      emitToDept(svc.department_id, "document:new-request", {
-        requestId: newRequest.request_id,
-      });
-
-      notifyDepartmentAdmins(
+      // Awaited before the socket emit -- otherwise a client's live-refetch
+      // (triggered the instant it receives the event) can beat this INSERT
+      // to the table and render a stale, one-behind notification list.
+      await notifyDepartmentAdmins(
         svc.department_id,
         `New faculty document request: ${request_type ?? "General"} (${newRequest.tracking_number})`,
         "document",
       );
+      emitToDept(svc.department_id, "document:new-request", {
+        requestId: newRequest.request_id,
+      });
 
       res.status(201).json({
         request_id: newRequest.request_id,
@@ -2178,15 +2180,16 @@ router.post(
           "student_upload",
         );
 
-        emitToDept(departmentId, "document:new-request", {
-          requestId: newSub.submission_id,
-        });
-
-        notifyDepartmentAdmins(
+        // Awaited before the socket emit -- see the identical comment on the
+        // faculty document-request path above.
+        await notifyDepartmentAdmins(
           departmentId,
           `New document sent by faculty: ${newSub.title} (${newSub.tracking_number})`,
           "document",
         );
+        emitToDept(departmentId, "document:new-request", {
+          requestId: newSub.submission_id,
+        });
 
         res.status(201).json({
           message: "Document sent successfully",

@@ -18,6 +18,7 @@ import FilterSelect from "../../components/FilterSelect";
 import FilterDateRange from "../../components/FilterDateRange";
 import Pagination from "../../components/Pagination";
 import ExportMenu from "../../components/ExportMenu";
+import RefreshButton from "../../components/RefreshButton";
 import { exportTransactionsPdf } from "../../utils/exportPdf";
 import { downloadCsv } from "../../utils/csv";
 import { transactionStatusLabel, transactionTypeLabel } from "../../utils/transactionLabels";
@@ -417,18 +418,25 @@ export default function AdminTransaction() {
       mainClassName="admin-transaction-main"
     >
         <div className="admin-transaction-container">
-          <PageHeader
-            breadcrumb={<Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link>}
-            icon={<ClipboardListIcon />}
-            iconClassName="admin-transaction-title-icon"
-            title="Transaction History"
-            subtitle="View all recent transactions within the office."
-            headerClassName="admin-transaction-header"
-            breadcrumbClassName="page-breadcrumb"
-            titleSectionClassName="admin-transaction-title-section"
-            titleClassName="admin-transaction-title"
-            subtitleClassName="admin-transaction-subtitle"
-          />
+          <div className="refresh-header-row">
+            <PageHeader
+              breadcrumb={<Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link>}
+              icon={<ClipboardListIcon />}
+              iconClassName="admin-transaction-title-icon"
+              title="Transaction History"
+              subtitle="View all recent transactions within the office."
+              headerClassName="admin-transaction-header"
+              breadcrumbClassName="page-breadcrumb"
+              titleSectionClassName="admin-transaction-title-section"
+              titleClassName="admin-transaction-title"
+              subtitleClassName="admin-transaction-subtitle"
+            />
+            <RefreshButton
+              onClick={fetchTransactions}
+              loading={loading}
+              label="Refresh transactions"
+            />
+          </div>
 
           {/* Department Statistics */}
           <div className="admin-transaction-stats-grid">
