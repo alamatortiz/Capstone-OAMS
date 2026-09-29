@@ -255,12 +255,7 @@ export default function LoginScreen() {
                     size={20}
                     color={keepLoggedIn ? '#22c55e' : theme.inputIcon}
                   />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.keepLabel}>Keep me logged in</Text>
-                    <Text style={styles.keepHint}>
-                      Stay signed in for 30 days and read your FAQs, announcements and transactions offline.
-                    </Text>
-                  </View>
+                  <Text style={styles.keepLabel}>Keep me logged in</Text>
                 </Pressable>
               )}
 
@@ -454,9 +449,8 @@ function createStyles(theme: ThemePalette) {
       fontWeight: '600',
       color: theme.text,
     },
-    keepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    keepRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     keepLabel: { fontSize: 13, fontWeight: '600', color: theme.text },
-    keepHint: { fontSize: 11, color: theme.subtext, marginTop: 2 },
     inputWrap: {
       position: 'relative',
       justifyContent: 'center',

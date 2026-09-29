@@ -32,7 +32,8 @@ import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/ut
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
-import { readCache, writeCache, CACHE_KEYS, fetchAllPages, isOfflineLikeError } from '@/utils/offlineCache';
+import { readCache, CACHE_KEYS, isOfflineLikeError } from '@/utils/offlineCache';
+import { syncStudentAnnouncements } from '@/utils/offlineSync';
 import { useIsOnline } from '@/context/NetworkContext';
 import OfflineBanner from '@/components/OfflineBanner';
 
@@ -245,11 +246,7 @@ export default function StudentAnnouncementScreen() {
     if (Date.now() - lastSyncRef.current < 60000) return;
     lastSyncRef.current = Date.now();
     try {
-      const all = await fetchAllPages<Announcement>(async (p) => {
-        const { data } = await api.get('/student/announcements', { params: { category: 'all', page: p } });
-        return { items: data.announcements ?? [], totalPages: data.totalPages ?? 1 };
-      }, 30);
-      await writeCache(CACHE_KEYS.studentAnnouncementsAll, all);
+      await syncStudentAnnouncements();
     } catch (err) {
       lastSyncRef.current = 0;
       console.error('Offline announcements sync failed:', err);

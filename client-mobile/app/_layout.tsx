@@ -10,6 +10,14 @@ import { ThemeProvider, useTheme } from '../context/ThemeContext';
 import { NetworkProvider } from '../context/NetworkContext';
 import { emitDrawerSwipeOpen } from '../utils/drawerSwipeBus';
 import { isRouteRoleAllowedInThisApp, DASHBOARD_PATH_BY_ROUTE_ROLE } from '../utils/appVariant';
+import { useStudentOfflinePrefetch } from '../hooks/useStudentOfflinePrefetch';
+
+// Renders nothing -- just keeps the student's offline copies filled for the
+// whole app lifetime (needs Auth + Network context, so it sits inside both).
+function StudentOfflinePrefetch() {
+  useStudentOfflinePrefetch();
+  return null;
+}
 
 // A swipe starting within this many px of the left edge counts as an
 // edge-swipe attempt; standard iOS/Android back-gesture width, narrow enough
@@ -121,6 +129,7 @@ export default function RootLayout() {
                     <Stack screenOptions={{ headerShown: false }} />
                   </AuthGate>
                   <Toast />
+                  <StudentOfflinePrefetch />
                 </QueueProvider>
               </AuthProvider>
             </NetworkProvider>

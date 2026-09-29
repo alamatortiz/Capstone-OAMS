@@ -31,7 +31,8 @@ import RefreshButton from '@/components/RefreshButton';
 import ExportMenu from '@/components/ExportMenu';
 import { exportRowsAsCsv } from '@/utils/csvExport';
 import { exportRowsAsPdf } from '@/utils/pdfExport';
-import { readCache, writeCache, CACHE_KEYS, fetchAllPages, isOfflineLikeError } from '@/utils/offlineCache';
+import { readCache, CACHE_KEYS, fetchAllPages, isOfflineLikeError } from '@/utils/offlineCache';
+import { syncStudentTransactions } from '@/utils/offlineSync';
 import { useIsOnline } from '@/context/NetworkContext';
 import OfflineBanner from '@/components/OfflineBanner';
 import ActionsTakenToggle from '@/components/ActionsTakenToggle';
@@ -268,11 +269,7 @@ export default function StudentTransactionsScreen() {
     if (Date.now() - lastSyncRef.current < 60000) return;
     lastSyncRef.current = Date.now();
     try {
-      const all = await fetchAllPages<Transaction>(async (p) => {
-        const { data } = await api.get('/student/transactions', { params: { limit: 100, page: p } });
-        return { items: data.transactions ?? [], totalPages: data.totalPages ?? 1 };
-      }, 30);
-      await writeCache(CACHE_KEYS.studentTransactionsAll, all);
+      await syncStudentTransactions();
     } catch (err) {
       lastSyncRef.current = 0;
       console.error('Offline history sync failed:', err);
