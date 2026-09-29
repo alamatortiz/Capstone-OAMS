@@ -18,34 +18,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth, getRouteRole } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import {
+  APP_VARIANT,
+  VARIANT_LABELS,
+  isRouteRoleAllowedInThisApp,
+  DASHBOARD_PATH_BY_ROUTE_ROLE,
+} from '@/utils/appVariant';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
-
-// Unset in the original combined build (local dev, and any eas.json profile
-// that doesn't set it) -- every role redirects normally there, same as
-// before the split. Set only in the 3 role-specific eas.json build profiles
-// (see metro.config.js), where each variant's bundle genuinely doesn't
-// contain the other roles' route files any more -- routing there would 404
-// instead of failing cleanly, so those roles must be rejected before ever
-// attempting the redirect.
-const APP_VARIANT = process.env.EXPO_PUBLIC_APP_VARIANT as
-  | 'student'
-  | 'faculty'
-  | 'admin'
-  | undefined;
-const VARIANT_ALLOWED_ROUTE_ROLES: Record<string, ReadonlyArray<string>> = {
-  student: ['student'],
-  faculty: ['professor'],
-  admin: ['admin', 'superadmin'],
-};
-const VARIANT_LABELS: Record<string, string> = {
-  student: 'Student',
-  faculty: 'Faculty',
-  admin: 'Admin',
-};
 
 function OamsLogo({
   style,
@@ -122,8 +105,7 @@ export default function LoginScreen() {
       const authedUser = await login(email, password, showKeepLoggedIn && keepLoggedIn);
       const routeRole = getRouteRole(authedUser.role);
 
-      const allowedRoles = APP_VARIANT ? VARIANT_ALLOWED_ROUTE_ROLES[APP_VARIANT] : null;
-      if (allowedRoles && !allowedRoles.includes(routeRole)) {
+      if (!isRouteRoleAllowedInThisApp(routeRole)) {
         // This build's bundle genuinely doesn't contain that role's screens
         // (see metro.config.js) -- log the just-created session back out
         // immediately rather than leaving a valid token stored on a device
@@ -137,20 +119,7 @@ export default function LoginScreen() {
         return;
       }
 
-      switch (routeRole) {
-        case 'student':
-          router.replace('/pages/student/student_dashboard');
-          break;
-        case 'professor':
-          router.replace('/pages/professor/professor_dashboard');
-          break;
-        case 'admin':
-          router.replace('/pages/admin/admin_dashboard');
-          break;
-        case 'superadmin':
-          router.replace('/pages/superadmin/superadmin_dashboard');
-          break;
-      }
+      router.replace(DASHBOARD_PATH_BY_ROUTE_ROLE[routeRole]);
     } catch (error: any) {
       // A response means the server actually checked the credentials and
       // said no -- show its message (e.g. "Invalid credentials") as before.

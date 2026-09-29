@@ -9,6 +9,7 @@ import { QueueProvider } from '../context/QueueContext';
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
 import { NetworkProvider } from '../context/NetworkContext';
 import { emitDrawerSwipeOpen } from '../utils/drawerSwipeBus';
+import { isRouteRoleAllowedInThisApp, DASHBOARD_PATH_BY_ROUTE_ROLE } from '../utils/appVariant';
 
 // A swipe starting within this many px of the left edge counts as an
 // edge-swipe attempt; standard iOS/Android back-gesture width, narrow enough
@@ -48,7 +49,24 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const isTabsGroup = rawSegments[0] === '(tabs)';
     const topSegment = isTabsGroup ? rawSegments[1] : rawSegments[0];
     const isPublicRoute = topSegment === undefined || PUBLIC_SEGMENTS.has(topSegment);
-    if (isPublicRoute) return;
+    if (isPublicRoute) {
+      // A saved session ("Keep me logged in") skips the landing page and the
+      // login form on app launch -- without this, reopening the app always
+      // showed Sign In even though the stored token was still valid. Only the
+      // landing (topSegment undefined) and /login: privacy-policy and
+      // unauthorized must stay reachable while signed in. The variant check
+      // matters during login.tsx's own wrong-app flow, where the session exists
+      // for a moment before login.tsx logs it back out -- redirecting then
+      // would target a dashboard this split build doesn't contain.
+      const isEntryScreen = topSegment === undefined || topSegment === 'login';
+      if (isEntryScreen && isAuthenticated && user) {
+        const role = getRouteRole(user.role);
+        if (isRouteRoleAllowedInThisApp(role)) {
+          router.replace(DASHBOARD_PATH_BY_ROUTE_ROLE[role]);
+        }
+      }
+      return;
+    }
 
     if (!isAuthenticated || !user) {
       router.replace('/login');
