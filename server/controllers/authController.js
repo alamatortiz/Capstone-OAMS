@@ -176,10 +176,11 @@ const login = async (req, res) => {
       userId: user.user_id,
       role: user.role,
     };
-    // "Keep me logged in" (mobile student login only): a longer-lived token so
-    // the student's saved announcements/FAQs/transactions stay reachable
-    // offline for weeks instead of the session lapsing after a day.
-    const keepLong = keepLoggedIn === true && user.role === "student";
+    // "Keep me logged in" (mobile login, every role): a longer-lived token so
+    // reopening the app doesn't ask for a password again for weeks instead of
+    // after a day. Only the mobile apps send this -- web never does, so web
+    // sessions keep the normal lifetime (and its own 30-min idle timeout).
+    const keepLong = keepLoggedIn === true;
     const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
       expiresIn: keepLong
         ? process.env.JWT_KEEP_LOGGED_IN_EXPIRES_IN || "30d"

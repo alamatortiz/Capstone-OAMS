@@ -74,10 +74,10 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  // Students only: signs in with a 30-day session so saved FAQs, announcements
-  // and transactions stay readable offline. Other roles never see it.
+  // Every role: signs in with a 30-day session instead of 24h, so reopening
+  // the app doesn't ask for the password again. (The offline cache is a
+  // separate, student-only feature -- see useStudentOfflinePrefetch.)
   const [keepLoggedIn, setKeepLoggedIn] = useState(true);
-  const showKeepLoggedIn = !APP_VARIANT || APP_VARIANT === 'student';
   const { isDarkMode, toggleTheme } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -102,7 +102,7 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
-      const authedUser = await login(email, password, showKeepLoggedIn && keepLoggedIn);
+      const authedUser = await login(email, password, keepLoggedIn);
       const routeRole = getRouteRole(authedUser.role);
 
       if (!isRouteRoleAllowedInThisApp(routeRole)) {
@@ -242,22 +242,20 @@ export default function LoginScreen() {
                 </View>
               </View>
 
-              {showKeepLoggedIn && (
-                <Pressable
-                  style={styles.keepRow}
-                  onPress={() => setKeepLoggedIn((prev) => !prev)}
-                  disabled={isLoading}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: keepLoggedIn }}
-                >
-                  <Ionicons
-                    name={keepLoggedIn ? 'checkbox' : 'square-outline'}
-                    size={20}
-                    color={keepLoggedIn ? '#22c55e' : theme.inputIcon}
-                  />
-                  <Text style={styles.keepLabel}>Keep me logged in</Text>
-                </Pressable>
-              )}
+              <Pressable
+                style={styles.keepRow}
+                onPress={() => setKeepLoggedIn((prev) => !prev)}
+                disabled={isLoading}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: keepLoggedIn }}
+              >
+                <Ionicons
+                  name={keepLoggedIn ? 'checkbox' : 'square-outline'}
+                  size={20}
+                  color={keepLoggedIn ? '#22c55e' : theme.inputIcon}
+                />
+                <Text style={styles.keepLabel}>Keep me logged in</Text>
+              </Pressable>
 
               {/* Submit */}
               <Pressable
