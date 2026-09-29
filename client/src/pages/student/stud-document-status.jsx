@@ -18,6 +18,7 @@ import api from "../../utils/api";
 import { getCollegeLogo } from "../../data/collegeLogo";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
+import RefreshButton from "../../components/RefreshButton";
 import { formatManilaDate, formatManilaTime, formatManilaDateTime } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
 import { useAuth } from "../../context/AuthContext";
@@ -641,26 +642,33 @@ export default function DocumentStatusPage() {
         ) : (
           <div className="dss-status-container">
             {/* Page Header */}
-            <PageHeader
-              breadcrumb={
-                <Link
-                  to={navState.from === "documents" ? "/student/documents" : "/student/dashboard"}
-                  className="breadcrumb-link"
-                >
-                  <ChevronLeft className="breadcrumb-icon" />
-                  {navState.from === "documents" ? "Documents" : "Home"}
-                </Link>
-              }
-              icon={<FileText style={{ width: "1.75rem", height: "1.75rem" }} />}
-              iconClassName="dss-title-icon"
-              title="My Document Requests and Submissions"
-              subtitle="Track all of your document requests and submissions."
-              headerClassName="dss-header"
-              breadcrumbClassName="page-breadcrumb"
-              titleSectionClassName="dss-title-section"
-              titleClassName="dss-title"
-              subtitleClassName="dss-subtitle"
-            />
+            <div className="refresh-header-row">
+              <PageHeader
+                breadcrumb={
+                  <Link
+                    to={navState.from === "documents" ? "/student/documents" : "/student/dashboard"}
+                    className="breadcrumb-link"
+                  >
+                    <ChevronLeft className="breadcrumb-icon" />
+                    {navState.from === "documents" ? "Documents" : "Home"}
+                  </Link>
+                }
+                icon={<FileText style={{ width: "1.75rem", height: "1.75rem" }} />}
+                iconClassName="dss-title-icon"
+                title="My Document Requests and Submissions"
+                subtitle="Track all of your document requests and submissions."
+                headerClassName="dss-header"
+                breadcrumbClassName="page-breadcrumb"
+                titleSectionClassName="dss-title-section"
+                titleClassName="dss-title"
+                subtitleClassName="dss-subtitle"
+              />
+              <RefreshButton
+                onClick={fetchDocuments}
+                loading={loading}
+                label="Refresh documents"
+              />
+            </div>
 
             {/* Error */}
             {error && (

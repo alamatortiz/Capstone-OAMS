@@ -18,6 +18,7 @@ import api from "../../utils/api";
 import { getCollegeLogo } from "../../data/collegeLogo";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
+import RefreshButton from "../../components/RefreshButton";
 import { formatManilaDate, formatManilaTime, formatManilaDateTime } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
 import { getDocStatusDetailMeta, normalizeDocStatus } from "../../utils/documentStatus";
@@ -659,6 +660,7 @@ export default function ProfessorDocumentStatus() {
         ) : (
           <div className="dss-status-container">
             {/* Page Header */}
+            <div className="refresh-header-row">
             <PageHeader
               breadcrumb={
                 <Link
@@ -679,6 +681,12 @@ export default function ProfessorDocumentStatus() {
               titleClassName="dss-title"
               subtitleClassName="dss-subtitle"
             />
+              <RefreshButton
+                onClick={fetchDocuments}
+                loading={loading}
+                label="Refresh documents"
+              />
+            </div>
 
             {/* Error */}
             {error && (

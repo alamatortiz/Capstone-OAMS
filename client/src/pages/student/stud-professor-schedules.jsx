@@ -7,6 +7,7 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 import api from "../../utils/api";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
+import RefreshButton from "../../components/RefreshButton";
 import { getManilaDateString, formatManilaDate } from "../../utils/dateTime";
 
 import "./stud-professor-schedules.css";
@@ -201,30 +202,37 @@ export default function ProfessorSchedule() {
     >
         <div className="professor-schedule-page">
           {/* Header */}
-          <PageHeader
-            breadcrumb={
-              viewMode === "schedules" ? (
-                <button className="breadcrumb-link" onClick={handleBack}>
-                  <ChevronLeft className="breadcrumb-icon" />
-                  Back to Departments
-                </button>
-              ) : (
-                <Link to={cameFrom} className="breadcrumb-link">
-                  <ChevronLeft className="breadcrumb-icon" />
-                  {cameFromLabel}
-                </Link>
-              )
-            }
-            icon={<GraduationCapIcon />}
-            iconClassName="psched-title-icon"
-            title="Professor Schedules"
-            subtitle="Check professor consultation hours and availability across all departments."
-            headerClassName="psched-header"
-            breadcrumbClassName="page-breadcrumb"
-            titleSectionClassName="psched-title-section"
-            titleClassName="psched-title"
-            subtitleClassName="psched-subtitle"
-          />
+          <div className="refresh-header-row">
+            <PageHeader
+              breadcrumb={
+                viewMode === "schedules" ? (
+                  <button className="breadcrumb-link" onClick={handleBack}>
+                    <ChevronLeft className="breadcrumb-icon" />
+                    Back to Departments
+                  </button>
+                ) : (
+                  <Link to={cameFrom} className="breadcrumb-link">
+                    <ChevronLeft className="breadcrumb-icon" />
+                    {cameFromLabel}
+                  </Link>
+                )
+              }
+              icon={<GraduationCapIcon />}
+              iconClassName="psched-title-icon"
+              title="Professor Schedules"
+              subtitle="Check professor consultation hours and availability across all departments."
+              headerClassName="psched-header"
+              breadcrumbClassName="page-breadcrumb"
+              titleSectionClassName="psched-title-section"
+              titleClassName="psched-title"
+              subtitleClassName="psched-subtitle"
+            />
+            <RefreshButton
+              onClick={fetchSchedules}
+              loading={loading}
+              label="Refresh schedules"
+            />
+          </div>
 
           {/* Loading state */}
           {loading && (

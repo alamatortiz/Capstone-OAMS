@@ -15,6 +15,7 @@ import "./adm-appointment.css";
 import api from "../../utils/api";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
+import RefreshButton from "../../components/RefreshButton";
 import { formatManilaDate, formatManilaTime } from "../../utils/dateTime";
 import { filterByRange } from "../../utils/dateRange";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
@@ -513,18 +514,25 @@ export default function AdminAppointment() {
       }
     >
         <div className="admin-appointment-container">
-          <PageHeader
-            breadcrumb={<Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link>}
-            icon={<Calendar />}
-            iconClassName="admin-appointment-title-icon"
-            title="Appointments Overview"
-            subtitle="Monitor appointments within your department."
-            headerClassName="admin-appointment-page-header"
-            breadcrumbClassName="page-breadcrumb"
-            titleSectionClassName="admin-appointment-title-section"
-            titleClassName="admin-appointment-page-title"
-            subtitleClassName="admin-appointment-page-subtitle"
-          />
+          <div className="refresh-header-row">
+            <PageHeader
+              breadcrumb={<Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link>}
+              icon={<Calendar />}
+              iconClassName="admin-appointment-title-icon"
+              title="Appointments Overview"
+              subtitle="Monitor appointments within your department."
+              headerClassName="admin-appointment-page-header"
+              breadcrumbClassName="page-breadcrumb"
+              titleSectionClassName="admin-appointment-title-section"
+              titleClassName="admin-appointment-page-title"
+              subtitleClassName="admin-appointment-page-subtitle"
+            />
+            <RefreshButton
+              onClick={fetchAppointments}
+              loading={loading}
+              label="Refresh appointments"
+            />
+          </div>
 
           {/* Filters */}
           <div className="admin-appointment-filters-card">

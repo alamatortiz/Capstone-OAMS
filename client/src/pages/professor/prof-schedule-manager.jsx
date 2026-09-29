@@ -4,6 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 import { ChevronLeft, CalendarClock, ChevronDown, StickyNote } from "lucide-react";
 import ProfessorSidebar from "../../components/ProfessorSidebar";
 import PageHeader from "../../components/PageHeader";
+import RefreshButton from "../../components/RefreshButton";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import "./prof-dashboard.css";
 import "./prof-schedule-manager.css";
@@ -522,23 +523,30 @@ export default function ProfessorScheduleManager() {
         <div className="sa-page">
 
           {/* Page Header */}
-          <PageHeader
-            breadcrumb={
-              <Link to={cameFrom} className="breadcrumb-link">
-                <ChevronLeft className="breadcrumb-icon" />
-                {cameFromLabel}
-              </Link>
-            }
-            icon={<CalendarClock />}
-            iconClassName="sa-title-icon"
-            title="Schedule Manager"
-            subtitle="Set your weekly availability schedule for appointments."
-            headerClassName="sa-header"
-            breadcrumbClassName="page-breadcrumb"
-            titleSectionClassName="sa-title-section"
-            titleClassName="sa-title"
-            subtitleClassName="sa-subtitle"
-          />
+          <div className="refresh-header-row">
+            <PageHeader
+              breadcrumb={
+                <Link to={cameFrom} className="breadcrumb-link">
+                  <ChevronLeft className="breadcrumb-icon" />
+                  {cameFromLabel}
+                </Link>
+              }
+              icon={<CalendarClock />}
+              iconClassName="sa-title-icon"
+              title="Schedule Manager"
+              subtitle="Set your weekly availability schedule for appointments."
+              headerClassName="sa-header"
+              breadcrumbClassName="page-breadcrumb"
+              titleSectionClassName="sa-title-section"
+              titleClassName="sa-title"
+              subtitleClassName="sa-subtitle"
+            />
+            <RefreshButton
+              onClick={fetchAll}
+              loading={loading}
+              label="Refresh schedule"
+            />
+          </div>
 
           <button className="sa-action-btn sa-action-btn--primary" onClick={() => openAddSlot(selectedDay)}>
             <PlusIcon /> Add Time Slot

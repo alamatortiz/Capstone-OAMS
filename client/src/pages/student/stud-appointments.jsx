@@ -5,6 +5,7 @@ import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import StudentPageShell from "../../components/StudentPageShell";
 import FilterSelect from "../../components/FilterSelect";
 import PageHeader from "../../components/PageHeader";
+import RefreshButton from "../../components/RefreshButton";
 import AppointmentListItem from "../../components/AppointmentListItem";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import "./stud-appointments.css";
@@ -683,23 +684,33 @@ export default function AppointmentsPage() {
     >
         <div className="appointment-content">
           {/* Header */}
-          <PageHeader
-            breadcrumb={
-              <Link to="/student/dashboard" className="breadcrumb-link">
-                <ChevronLeft className="breadcrumb-icon" />
-                Home
-              </Link>
-            }
-            icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
-            iconClassName="ab-title-icon"
-            title="Appointments"
-            subtitle="Schedule appointments with professors and view available slots."
-            headerClassName="ab-header"
-            breadcrumbClassName="page-breadcrumb"
-            titleSectionClassName="ab-title-section"
-            titleClassName="ab-title"
-            subtitleClassName="ab-subtitle"
-          />
+          <div className="refresh-header-row">
+            <PageHeader
+              breadcrumb={
+                <Link to="/student/dashboard" className="breadcrumb-link">
+                  <ChevronLeft className="breadcrumb-icon" />
+                  Home
+                </Link>
+              }
+              icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
+              iconClassName="ab-title-icon"
+              title="Appointments"
+              subtitle="Schedule appointments with professors and view available slots."
+              headerClassName="ab-header"
+              breadcrumbClassName="page-breadcrumb"
+              titleSectionClassName="ab-title-section"
+              titleClassName="ab-title"
+              subtitleClassName="ab-subtitle"
+            />
+            <RefreshButton
+              onClick={() => {
+                fetchSlots();
+                fetchMyBookings();
+              }}
+              loading={slotsLoading || bookingsLoading}
+              label="Refresh appointments"
+            />
+          </div>
 
           {/* Professor Schedules card */}
           <Link

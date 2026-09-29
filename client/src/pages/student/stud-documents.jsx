@@ -4,6 +4,7 @@ import ActionConfirmModal from "../../components/ActionConfirmModal";
 import StudentPageShell from "../../components/StudentPageShell";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import PageHeader from "../../components/PageHeader";
+import RefreshButton from "../../components/RefreshButton";
 import { toast } from "sonner";
 import "./stud-documents.css";
 import api from "../../utils/api";
@@ -702,22 +703,29 @@ export default function DocumentsPage() {
         <div className="doc-content">
           {/* Header */}
           {docsError && <div className="doc-error-banner">{docsError}</div>}
-          <PageHeader
-            breadcrumb={
-              <Link to="/student/dashboard" className="breadcrumb-link">
-                <ChevronLeft className="breadcrumb-icon" /> Home
-              </Link>
-            }
-            icon={<FileText />}
-            iconClassName="doc-title-icon"
-            title="Document Requests and Submissions"
-            subtitle="Request and submit documents as well as track their status."
-            headerClassName="doc-header"
-            breadcrumbClassName="page-breadcrumb"
-            titleSectionClassName="doc-title-section"
-            titleClassName="doc-title"
-            subtitleClassName="doc-subtitle"
-          />
+          <div className="refresh-header-row">
+            <PageHeader
+              breadcrumb={
+                <Link to="/student/dashboard" className="breadcrumb-link">
+                  <ChevronLeft className="breadcrumb-icon" /> Home
+                </Link>
+              }
+              icon={<FileText />}
+              iconClassName="doc-title-icon"
+              title="Document Requests and Submissions"
+              subtitle="Request and submit documents as well as track their status."
+              headerClassName="doc-header"
+              breadcrumbClassName="page-breadcrumb"
+              titleSectionClassName="doc-title-section"
+              titleClassName="doc-title"
+              subtitleClassName="doc-subtitle"
+            />
+            <RefreshButton
+              onClick={fetchDocuments}
+              loading={docsLoading}
+              label="Refresh documents"
+            />
+          </div>
 
           <div className="doc-action-buttons">
             <button

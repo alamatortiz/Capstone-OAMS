@@ -20,6 +20,7 @@ import api from "../../utils/api";
 import { getCollegeLogo } from "../../data/collegeLogo";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
+import RefreshButton from "../../components/RefreshButton";
 import AppointmentListItem from "../../components/AppointmentListItem";
 import { formatManilaDate, formatManilaTime } from "../../utils/dateTime";
 import { getAppointmentActions } from "../../utils/appointmentActions";
@@ -566,26 +567,33 @@ export default function AppointmentStatusPage() {
         ) : (
           <div className="apst-status-container">
             {/* Header */}
-            <PageHeader
-              breadcrumb={
-                <Link
-                  to="/student/dashboard"
-                  className="breadcrumb-link"
-                >
-                  <ChevronLeft className="breadcrumb-icon" />
-                  Home
-                </Link>
-              }
-              icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
-              iconClassName="apst-title-icon"
-              title="My Appointments"
-              subtitle="Track all of your appointments."
-              headerClassName="apst-header"
-              breadcrumbClassName="page-breadcrumb"
-              titleSectionClassName="apst-title-section"
-              titleClassName="apst-title"
-              subtitleClassName="apst-subtitle"
-            />
+            <div className="refresh-header-row">
+              <PageHeader
+                breadcrumb={
+                  <Link
+                    to="/student/dashboard"
+                    className="breadcrumb-link"
+                  >
+                    <ChevronLeft className="breadcrumb-icon" />
+                    Home
+                  </Link>
+                }
+                icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
+                iconClassName="apst-title-icon"
+                title="My Appointments"
+                subtitle="Track all of your appointments."
+                headerClassName="apst-header"
+                breadcrumbClassName="page-breadcrumb"
+                titleSectionClassName="apst-title-section"
+                titleClassName="apst-title"
+                subtitleClassName="apst-subtitle"
+              />
+              <RefreshButton
+                onClick={fetchAppointments}
+                loading={loading}
+                label="Refresh appointments"
+              />
+            </div>
 
             {/* Professor Schedules card */}
             <Link

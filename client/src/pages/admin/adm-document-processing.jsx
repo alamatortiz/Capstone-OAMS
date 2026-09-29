@@ -6,6 +6,7 @@ import api from "../../utils/api";
 import { toast } from "sonner";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
+import RefreshButton from "../../components/RefreshButton";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import QueueReasonModal from "../../components/QueueReasonModal";
 import FilterSelect from "../../components/FilterSelect";
@@ -1140,23 +1141,30 @@ export default function AdminDocumentProcessing() {
       }
     >
       <div className="adp-content">
-        <PageHeader
-          breadcrumb={
-            <Link to="/admin/dashboard" className="page-breadcrumb-link">
-              <ChevronLeft />
-              Home
-            </Link>
-          }
-          icon={<FileText className="adp-icon-lg" />}
-          iconClassName="adp-title-icon"
-          title="Document Processing"
-          subtitle="Process and manage document requests and submissions within your department."
-          headerClassName="adp-page-header"
-          breadcrumbClassName="page-breadcrumb"
-          titleSectionClassName="adp-title-section"
-          titleClassName="adp-page-title"
-          subtitleClassName="adp-page-subtitle"
-        />
+        <div className="refresh-header-row">
+          <PageHeader
+            breadcrumb={
+              <Link to="/admin/dashboard" className="page-breadcrumb-link">
+                <ChevronLeft />
+                Home
+              </Link>
+            }
+            icon={<FileText className="adp-icon-lg" />}
+            iconClassName="adp-title-icon"
+            title="Document Processing"
+            subtitle="Process and manage document requests and submissions within your department."
+            headerClassName="adp-page-header"
+            breadcrumbClassName="page-breadcrumb"
+            titleSectionClassName="adp-title-section"
+            titleClassName="adp-page-title"
+            subtitleClassName="adp-page-subtitle"
+          />
+          <RefreshButton
+            onClick={fetchDocuments}
+            loading={loading}
+            label="Refresh documents"
+          />
+        </div>
 
         {/* Source toggle */}
         <div className="adp-source-toggle">
