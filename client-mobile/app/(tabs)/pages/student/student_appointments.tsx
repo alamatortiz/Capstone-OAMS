@@ -29,6 +29,7 @@ import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
+import RefreshButton from '@/components/RefreshButton';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 
 // Mirrors web's CSS `spin 1s linear infinite` on Loader2 for loading states.
@@ -681,6 +682,7 @@ export default function StudentAppointmentsScreen() {
             <Pressable style={styles.iconBtn} onPress={toggleTheme} hitSlop={8}>
               <Image source={isDarkMode ? sunIcon : darkModeIcon} style={styles.iconBtnImg} resizeMode="contain" />
             </Pressable>
+            <RefreshButton onPress={() => { fetchSlots(); fetchMyBookings(); }} loading={slotsLoading || bookingsLoading} style={styles.iconBtn} color={theme.text} label="Refresh appointments" />
             <NotificationBell
               endpointBase="student"
               theme={theme}

@@ -22,9 +22,9 @@ import {
   Megaphone, Paperclip, Users, ClipboardList,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import { useAuth } from '@/context/AuthContext';
+import { useAttachmentOpener } from '@/hooks/useAttachmentOpener';
+import ImagePreviewOverlay from '@/components/ImagePreviewOverlay';
 import { useTheme } from '@/context/ThemeContext';
 import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import NotificationBell from '@/components/NotificationBell';
@@ -214,7 +214,7 @@ export default function StudentAnnouncementScreen() {
   // so there's no separate "all announcements ever fetched" cache anymore.
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const { openingId: downloadingId, previewFile, openAttachment, closePreview } = useAttachmentOpener();
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -378,41 +378,14 @@ export default function StudentAnnouncementScreen() {
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
 
-  const viewAttachment = async (announcement: Announcement, attachment: AnnouncementAttachment) => {
-    if (downloadingId) return;
-    setDownloadingId(attachment.id);
-    try {
-      const safeName = attachment.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const uri = `${FileSystem.cacheDirectory}announcement-${announcement.id}-${attachment.id}-${safeName}`;
-      const result = await FileSystem.downloadAsync(
-        `${api.defaults.baseURL}/student/announcements/${announcement.id}/attachments/${attachment.id}`,
-        uri,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      // downloadAsync only rejects on a true network failure -- a 404/403
-      // response still "succeeds" and writes the error JSON body to disk, so
-      // the status has to be checked explicitly before treating it as a file.
-      if (result.status < 200 || result.status >= 300) {
-        await FileSystem.deleteAsync(result.uri, { idempotent: true });
-        Alert.alert('Error', 'Could not open the attachment.');
-        return;
-      }
-      const canShare = await Sharing.isAvailableAsync();
-      if (!canShare) {
-        Alert.alert('Sharing unavailable', 'Sharing is not available on this device.');
-        return;
-      }
-      await Sharing.shareAsync(uri, { mimeType: attachment.mimeType ?? undefined });
-    } catch (err) {
-      console.error('Failed to download attachment:', err);
-      Alert.alert(
-        isOfflineLikeError(err) ? 'You are offline' : 'Error',
-        isOfflineLikeError(err) ? 'Attachments need an internet connection to open.' : 'Could not open the attachment.',
-      );
-    } finally {
-      setDownloadingId(null);
-    }
-  };
+  // Images preview in-app; PDF/DOCX open in the phone's viewer on Android;
+  // anything else goes to the Share sheet (utils/openAttachment.ts).
+  const viewAttachment = (announcement: Announcement, attachment: AnnouncementAttachment) =>
+    openAttachment(
+      `/student/announcements/${announcement.id}/attachments/${attachment.id}`,
+      `announcement-${announcement.id}`,
+      attachment,
+    );
 
   const comingSoon = () =>
     Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
@@ -723,6 +696,7 @@ export default function StudentAnnouncementScreen() {
           </View>
         </View>
       </Modal>
+      <ImagePreviewOverlay file={previewFile} onClose={closePreview} />
     </View>
   );
 }

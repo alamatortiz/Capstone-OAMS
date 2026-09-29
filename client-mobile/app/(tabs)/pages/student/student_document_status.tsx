@@ -18,8 +18,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import QRCode from 'react-native-qrcode-svg';
 import {
   AlertCircle, Calendar, CheckCircle, ChevronLeft, FileText, Home as HomeIcon, Loader2,
@@ -27,9 +25,12 @@ import {
 } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useAttachmentOpener } from '@/hooks/useAttachmentOpener';
+import ImagePreviewOverlay from '@/components/ImagePreviewOverlay';
 import { useTheme } from '@/context/ThemeContext';
 import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import NotificationBell from '@/components/NotificationBell';
+import RefreshButton from '@/components/RefreshButton';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
@@ -216,6 +217,7 @@ export default function StudentDocumentStatusScreen() {
   const [claiming, setClaiming] = useState(false);
   const router = useRouter();
   const { user, token, logout } = useAuth();
+  const { openingId, previewFile, openAttachment, closePreview } = useAttachmentOpener();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -367,6 +369,7 @@ export default function StudentDocumentStatusScreen() {
             <Pressable style={styles.iconBtn} onPress={toggleTheme} hitSlop={8}>
               <Image source={isDarkMode ? sunIcon : darkModeIcon} style={styles.iconBtnImg} resizeMode="contain" />
             </Pressable>
+            <RefreshButton onPress={() => fetchDocuments()} loading={loading} style={styles.iconBtn} color={theme.text} label="Refresh documents" />
             <NotificationBell
               endpointBase="student"
               theme={theme}
@@ -394,6 +397,8 @@ export default function StudentDocumentStatusScreen() {
               claiming={claiming}
               requirements={selectedDocRequirements}
               reqLoading={loading && !selectedDoc}
+              onOpenFile={openAttachment}
+              downloadingFileId={openingId}
             />
           ) : (
             <>
@@ -675,6 +680,7 @@ export default function StudentDocumentStatusScreen() {
           </View>
         </View>
       </Modal>
+      <ImagePreviewOverlay file={previewFile} onClose={closePreview} />
     </View>
   );
 }
@@ -755,6 +761,8 @@ function DocumentDetail({
   claiming,
   requirements,
   reqLoading,
+  onOpenFile,
+  downloadingFileId,
 }: {
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
@@ -768,48 +776,22 @@ function DocumentDetail({
   claiming: boolean;
   requirements: DocumentRequirement[];
   reqLoading: boolean;
+  onOpenFile: (endpointPath: string, cacheName: string, file: DocumentAttachment) => void;
+  downloadingFileId: string | null;
 }) {
   const meta = getDetailStatusMeta(doc.status, isDarkMode);
   const canCancel = doc.status === 'pending' || doc.status === 'processing';
   const canClaim = normalizeDocStatus(doc.status) === 'ready';
-  const { token } = useAuth();
-  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
 
-  // Mirrors student_announcement.tsx's viewAttachment() -- download to cache
-  // then hand off to the OS share sheet, since RN has no direct "open file".
-  const viewDocFile = async (file: DocumentAttachment) => {
-    if (downloadingFileId) return;
-    setDownloadingFileId(file.id);
-    try {
-      const isSub = doc.kind === 'submission';
-      const rawId = doc.id.replace(/^(sub|req)-/, '');
-      const safeName = file.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const uri = `${FileSystem.cacheDirectory}${isSub ? 'submission' : 'request'}-${rawId}-${file.id}-${safeName}`;
-      const endpoint = isSub
-        ? `/student/document-submissions/${rawId}/files/${file.id}`
-        : `/student/documents/${rawId}/files/${file.id}`;
-      const result = await FileSystem.downloadAsync(
-        `${api.defaults.baseURL}${endpoint}`,
-        uri,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      if (result.status < 200 || result.status >= 300) {
-        await FileSystem.deleteAsync(result.uri, { idempotent: true });
-        Alert.alert('Error', 'Could not open the file.');
-        return;
-      }
-      const canShare = await Sharing.isAvailableAsync();
-      if (!canShare) {
-        Alert.alert('Sharing unavailable', 'Sharing is not available on this device.');
-        return;
-      }
-      await Sharing.shareAsync(uri, { mimeType: file.mimeType ?? undefined });
-    } catch (err) {
-      console.error('Failed to download file:', err);
-      Alert.alert('Error', 'Could not open the file.');
-    } finally {
-      setDownloadingFileId(null);
-    }
+  // Shared opener (utils/openAttachment.ts), owned by the screen so the
+  // image preview can render full-screen above the ScrollView.
+  const viewDocFile = (file: DocumentAttachment) => {
+    const isSub = doc.kind === 'submission';
+    const rawId = doc.id.replace(/^(sub|req)-/, '');
+    const endpoint = isSub
+      ? `/student/document-submissions/${rawId}/files/${file.id}`
+      : `/student/documents/${rawId}/files/${file.id}`;
+    onOpenFile(endpoint, `${isSub ? 'submission' : 'request'}-${rawId}`, file);
   };
 
   return (

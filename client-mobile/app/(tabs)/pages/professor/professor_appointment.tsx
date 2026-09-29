@@ -25,6 +25,7 @@ import { notify } from '@/utils/notifications';
 import { formatManilaDate, formatManilaTime, getManilaDateString } from '@/utils/date';
 import { filterByRange } from '@/utils/dateRange';
 import NotificationBell from '@/components/NotificationBell';
+import RefreshButton from '@/components/RefreshButton';
 import QueueReasonModal from '@/components/QueueReasonModal';
 import ProfessorAvailabilityToggle from '@/components/ProfessorAvailabilityToggle';
 import { useProfessorAvailability } from '@/hooks/useProfessorAvailability';
@@ -482,6 +483,7 @@ export default function ProfessorAppointmentScreen() {
                 resizeMode="contain"
               />
             </Pressable>
+            <RefreshButton onPress={() => fetchAppointments()} loading={loading} style={styles.iconBtn} color={theme.text} label="Refresh appointments" />
             <NotificationBell
               endpointBase="professor"
               theme={theme}

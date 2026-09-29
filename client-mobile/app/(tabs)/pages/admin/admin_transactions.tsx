@@ -37,6 +37,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import NotificationBell from '@/components/NotificationBell';
+import RefreshButton from '@/components/RefreshButton';
 import ExportMenu from '@/components/ExportMenu';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
@@ -463,6 +464,7 @@ export default function AdminTransactionsScreen() {
                 resizeMode="contain"
               />
             </Pressable>
+            <RefreshButton onPress={() => fetchTransactions()} loading={loading} style={styles.iconBtn} color={theme.text} label="Refresh transactions" />
             <NotificationBell
               endpointBase="admin"
               theme={theme}

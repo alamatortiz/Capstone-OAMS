@@ -34,17 +34,18 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import DatePickerSheet from '@/components/DatePickerSheet';
 import { toLocalYMD, fromLocalYMD, getManilaDateString } from '@/utils/date';
 import { useAuth } from '@/context/AuthContext';
+import { useAttachmentOpener } from '@/hooks/useAttachmentOpener';
+import ImagePreviewOverlay from '@/components/ImagePreviewOverlay';
 import { useTheme } from '@/context/ThemeContext';
 import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
 import NotificationBell from '@/components/NotificationBell';
+import RefreshButton from '@/components/RefreshButton';
 import QueueReasonModal from '@/components/QueueReasonModal';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import { getHubStatusMeta, normalizeDocStatus, type DocStatus } from '@/utils/documentStatus';
@@ -243,7 +244,7 @@ export default function AdminDocumentProcessingScreen() {
   const [confirmStatus, setConfirmStatus] = useState<ConfirmStatus | null>(null);
   const [updating, setUpdating] = useState(false);
   const [returnFiles, setReturnFiles] = useState<DocumentPicker.DocumentPickerAsset[]>([]);
-  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
+  const { openingId: downloadingFileId, previewFile, openAttachment, closePreview } = useAttachmentOpener();
   const router = useRouter();
   const { user, token, logout } = useAuth();
   const adminName = user?.name ?? 'Admin';
@@ -456,37 +457,11 @@ export default function AdminDocumentProcessingScreen() {
   };
   const removeReturnFile = (uri: string) => setReturnFiles((prev) => prev.filter((f) => f.uri !== uri));
 
-  // Mirrors student_document_status.tsx's viewSubmissionFile() -- download to
-  // cache then hand off to the OS share sheet.
-  const viewDocFile = async (docEndpointPath: string, cachePrefix: string, file: DocumentAttachment) => {
-    if (downloadingFileId) return;
-    setDownloadingFileId(file.id);
-    try {
-      const safeName = file.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const uri = `${FileSystem.cacheDirectory}${cachePrefix}-${file.id}-${safeName}`;
-      const result = await FileSystem.downloadAsync(
-        `${api.defaults.baseURL}${docEndpointPath}/${file.id}`,
-        uri,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      if (result.status < 200 || result.status >= 300) {
-        await FileSystem.deleteAsync(result.uri, { idempotent: true });
-        Alert.alert('Error', 'Could not open the file.');
-        return;
-      }
-      const canShare = await Sharing.isAvailableAsync();
-      if (!canShare) {
-        Alert.alert('Sharing unavailable', 'Sharing is not available on this device.');
-        return;
-      }
-      await Sharing.shareAsync(uri, { mimeType: file.mimeType ?? undefined });
-    } catch (err) {
-      console.error('Failed to download file:', err);
-      Alert.alert('Error', 'Could not open the file.');
-    } finally {
-      setDownloadingFileId(null);
-    }
-  };
+  // Shared opener (utils/openAttachment.ts): images preview in-app inside the
+  // details Modal, PDF/DOCX open in the phone's viewer on Android, the rest
+  // go to the Share sheet.
+  const viewDocFile = (docEndpointPath: string, cachePrefix: string, file: DocumentAttachment) =>
+    openAttachment(`${docEndpointPath}/${file.id}`, cachePrefix, file);
 
   const handleUpdateStatus = async (newStatus: DocumentStatus) => {
     if (!selectedDocument) return;
@@ -674,6 +649,7 @@ export default function AdminDocumentProcessingScreen() {
                 resizeMode="contain"
               />
             </Pressable>
+            <RefreshButton onPress={() => fetchDocuments()} loading={loading} style={styles.iconBtn} color={theme.text} label="Refresh documents" />
             <NotificationBell
               endpointBase="admin"
               theme={theme}
@@ -1197,6 +1173,8 @@ export default function AdminDocumentProcessingScreen() {
             </View>
           </View>
         )}
+        {/* Inside this Modal on purpose -- no nested native Modal. */}
+        <ImagePreviewOverlay file={previewFile} onClose={closePreview} />
       </Modal>
 
       {/* Status-change confirmation -- reject gets a required-reason modal

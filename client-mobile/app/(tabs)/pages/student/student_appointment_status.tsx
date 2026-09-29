@@ -27,6 +27,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import NotificationBell from '@/components/NotificationBell';
+import RefreshButton from '@/components/RefreshButton';
 import QueueReasonModal from '@/components/QueueReasonModal';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
@@ -433,6 +434,7 @@ export default function StudentAppointmentStatusScreen() {
             <Pressable style={styles.iconBtn} onPress={toggleTheme} hitSlop={8}>
               <Image source={isDarkMode ? sunIcon : darkModeIcon} style={styles.iconBtnImg} resizeMode="contain" />
             </Pressable>
+            <RefreshButton onPress={() => fetchAppointments()} loading={loading} style={styles.iconBtn} color={theme.text} label="Refresh appointments" />
             <NotificationBell
               endpointBase="student"
               theme={theme}

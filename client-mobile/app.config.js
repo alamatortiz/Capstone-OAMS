@@ -102,7 +102,11 @@ module.exports = {
     extra: {
       router: {},
       eas: {
-        projectId: "48def5ce-8755-4257-91ff-2187f8940f79",
+        // @alamatyuorts/client-mobile. Moved off @alamatyuortz (old project
+        // 48def5ce-8755-4257-91ff-2187f8940f79) when that account's free
+        // monthly Android build quota ran out; signing keys were carried over
+        // so the new builds install over the old apps.
+        projectId: "46bbc68d-3bf6-4a6b-a3e9-fb1d47c385c7",
       },
     },
   },

@@ -26,6 +26,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import NotificationBell from '@/components/NotificationBell';
+import RefreshButton from '@/components/RefreshButton';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
@@ -312,6 +313,7 @@ export default function StudentProfessorSchedulesScreen() {
                 resizeMode="contain"
               />
             </Pressable>
+            <RefreshButton onPress={() => fetchSchedules()} loading={loading} style={styles.iconBtn} color={theme.text} label="Refresh schedules" />
             <NotificationBell
               endpointBase="student"
               theme={theme}

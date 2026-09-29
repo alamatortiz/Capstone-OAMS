@@ -23,6 +23,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import NotificationBell from '@/components/NotificationBell';
+import RefreshButton from '@/components/RefreshButton';
 import QueueReasonModal from '@/components/QueueReasonModal';
 import ProfessorAvailabilityToggle from '@/components/ProfessorAvailabilityToggle';
 import { useProfessorAvailability } from '@/hooks/useProfessorAvailability';
@@ -514,6 +515,7 @@ export default function ProfessorScheduleManagerScreen() {
             <Pressable style={styles.iconBtn} onPress={toggleTheme} hitSlop={8}>
               <Image source={isDarkMode ? sunIcon : darkModeIcon} style={styles.iconBtnImg} resizeMode="contain" />
             </Pressable>
+            <RefreshButton onPress={() => fetchSlots()} loading={loading} style={styles.iconBtn} color={theme.text} label="Refresh schedule" />
             <NotificationBell
               endpointBase="professor"
               theme={theme}

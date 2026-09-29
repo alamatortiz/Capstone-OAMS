@@ -38,6 +38,7 @@ import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { formatManilaDate, formatManilaTime } from '@/utils/date';
 import NotificationBell from '@/components/NotificationBell';
+import RefreshButton from '@/components/RefreshButton';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
@@ -351,6 +352,7 @@ export default function AdminAppointmentScreen() {
                 resizeMode="contain"
               />
             </Pressable>
+            <RefreshButton onPress={() => fetchAppointments()} loading={loading} style={styles.iconBtn} color={theme.text} label="Refresh appointments" />
             <NotificationBell
               endpointBase="admin"
               theme={theme}

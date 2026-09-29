@@ -25,6 +25,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import NotificationBell from '@/components/NotificationBell';
+import RefreshButton from '@/components/RefreshButton';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import DatePickerSheet from '@/components/DatePickerSheet';
 import * as DocumentPicker from 'expo-document-picker';
@@ -620,6 +621,7 @@ export default function StudentDocumentsScreen() {
             <Pressable style={styles.iconBtn} onPress={toggleTheme} hitSlop={8}>
               <Image source={isDarkMode ? sunIcon : darkModeIcon} style={styles.iconBtnImg} resizeMode="contain" />
             </Pressable>
+            <RefreshButton onPress={() => fetchDocuments()} loading={docsLoading} style={styles.iconBtn} color={theme.text} label="Refresh documents" />
             <NotificationBell
               endpointBase="student"
               theme={theme}

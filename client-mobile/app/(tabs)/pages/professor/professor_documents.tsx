@@ -23,6 +23,7 @@ import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
+import RefreshButton from '@/components/RefreshButton';
 import QueueReasonModal from '@/components/QueueReasonModal';
 import ProfessorAvailabilityToggle from '@/components/ProfessorAvailabilityToggle';
 import { useProfessorAvailability } from '@/hooks/useProfessorAvailability';
@@ -522,6 +523,7 @@ export default function ProfessorDocumentsScreen() {
                 resizeMode="contain"
               />
             </Pressable>
+            <RefreshButton onPress={() => fetchRequests()} loading={requestsLoading} style={styles.iconBtn} color={theme.text} label="Refresh documents" />
             <NotificationBell
               endpointBase="professor"
               theme={theme}

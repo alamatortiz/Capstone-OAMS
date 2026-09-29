@@ -53,6 +53,8 @@ export const WATCHED_EVENTS = [
   'appointment:slot-updated',
   'appointment:comment-updated',
   'document:status-updated',
+  // Admins' bell: a new request/sent document arrives (web 67fac6b9).
+  'document:new-request',
 ];
 
 const FALLBACK_POLL_INTERVAL_MS = 45000;

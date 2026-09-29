@@ -27,6 +27,7 @@ import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
+import RefreshButton from '@/components/RefreshButton';
 import ExportMenu from '@/components/ExportMenu';
 import ActionsTakenToggle from '@/components/ActionsTakenToggle';
 import QueueReasonModal from '@/components/QueueReasonModal';
@@ -441,6 +442,7 @@ export default function ProfessorTransactionsScreen() {
             <Pressable style={styles.iconBtn} onPress={toggleTheme} hitSlop={8}>
               <Image source={isDarkMode ? sunIcon : darkModeIcon} style={styles.iconBtnImg} resizeMode="contain" />
             </Pressable>
+            <RefreshButton onPress={() => { fetchTransactions(); fetchStats(); }} loading={loading} style={styles.iconBtn} color={theme.text} label="Refresh transactions" />
             <NotificationBell
               endpointBase="professor"
               theme={theme}

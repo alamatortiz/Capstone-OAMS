@@ -27,6 +27,7 @@ import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
+import RefreshButton from '@/components/RefreshButton';
 import ExportMenu from '@/components/ExportMenu';
 import { exportRowsAsCsv } from '@/utils/csvExport';
 import { exportRowsAsPdf } from '@/utils/pdfExport';
@@ -586,6 +587,7 @@ export default function StudentTransactionsScreen() {
             <Pressable style={styles.iconBtn} onPress={toggleTheme} hitSlop={8}>
               <Image source={isDarkMode ? sunIcon : darkModeIcon} style={styles.iconBtnImg} resizeMode="contain" />
             </Pressable>
+            <RefreshButton onPress={() => fetchTransactions(1)} loading={txLoading} style={styles.iconBtn} color={theme.text} label="Refresh transactions" />
             <NotificationBell
               endpointBase="student"
               theme={theme}
