@@ -3,9 +3,9 @@ import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronDown, BarChart3, Users, Calendar, FileText } from "lucide-react";
 // Supplies the .admin-dashboard-with-sidebar / .admin-dashboard-main shell
 // classes. Lazy-loaded route, so it needs its own import.
-import "../admin/adm-dashboard.css";
+import "../../pages/admin/adm-dashboard.css";
 import "./sa-analytics.css";
-import SuperadminPageShell from "../../components/SuperadminPageShell";
+import SuperadminPageShell from "./SuperadminPageShell";
 import PageHeader from "../../components/PageHeader";
 import FilterDateRange from "../../components/FilterDateRange";
 import FilterSelect from "../../components/FilterSelect";

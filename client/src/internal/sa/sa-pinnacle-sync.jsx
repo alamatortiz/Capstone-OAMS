@@ -6,9 +6,9 @@ import { toast } from "sonner";
 // Supplies the .admin-dashboard-with-sidebar / .admin-dashboard-main shell
 // classes and their <=1024px mobile-header offset. Lazy-loaded route, so it
 // needs its own import.
-import "../admin/adm-dashboard.css";
+import "../../pages/admin/adm-dashboard.css";
 import "./sa-pinnacle-sync.css";
-import SuperadminPageShell from "../../components/SuperadminPageShell";
+import SuperadminPageShell from "./SuperadminPageShell";
 import PageHeader from "../../components/PageHeader";
 import { formatManilaDateTime } from "../../utils/dateTime";
 import api from "../../utils/api";

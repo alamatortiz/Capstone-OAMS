@@ -2,13 +2,13 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Users, BarChart3, RefreshCw, Star, Clock, Calendar, FileText, UserCog } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-import SuperadminPageShell from "../../components/SuperadminPageShell";
+import SuperadminPageShell from "./SuperadminPageShell";
 import api from "../../utils/api";
 import { getManilaDateString } from "../../utils/dateTime";
 // Reuses the admin dashboard's stylesheet (welcome-banner / stat-card /
 // quick-action classes scoped under .admin-dashboard); sa-dashboard.css only
 // holds the few additions this page needs.
-import "../admin/adm-dashboard.css";
+import "../../pages/admin/adm-dashboard.css";
 import "./sa-dashboard.css";
 
 const quickActions = [

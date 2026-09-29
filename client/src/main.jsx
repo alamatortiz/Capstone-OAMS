@@ -77,19 +77,19 @@ const AdminDataManagement = React.lazy(
 
 // Superadmin -- system-wide role, separate from department-scoped admin.
 const SuperadminDashboard = React.lazy(
-  () => import("./pages/superadmin/sa-dashboard.jsx"),
+  () => import("./internal/sa/sa-dashboard.jsx"),
 );
 const SuperadminUserManagement = React.lazy(
-  () => import("./pages/superadmin/sa-user-management.jsx"),
+  () => import("./internal/sa/sa-user-management.jsx"),
 );
 const SuperadminPinnacleSync = React.lazy(
-  () => import("./pages/superadmin/sa-pinnacle-sync.jsx"),
+  () => import("./internal/sa/sa-pinnacle-sync.jsx"),
 );
 const SuperadminSatisfactionSurvey = React.lazy(
-  () => import("./pages/superadmin/sa-satisfaction-survey.jsx"),
+  () => import("./internal/sa/sa-satisfaction-survey.jsx"),
 );
 const SuperadminAnalytics = React.lazy(
-  () => import("./pages/superadmin/sa-analytics.jsx"),
+  () => import("./internal/sa/sa-analytics.jsx"),
 );
 
 import AppointmentsPage from "./pages/student/stud-appointments.jsx";

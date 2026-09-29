@@ -5,9 +5,9 @@ import { ChevronLeft, Star, AlertTriangle } from "lucide-react";
 // Reuses the admin dashboard shell + Pinnacle Sync's own panel/form/button
 // classes (aps-*) rather than forking a parallel stylesheet for what is
 // visually the exact same "one settings panel" shape.
-import "../admin/adm-dashboard.css";
+import "../../pages/admin/adm-dashboard.css";
 import "./sa-pinnacle-sync.css";
-import SuperadminPageShell from "../../components/SuperadminPageShell";
+import SuperadminPageShell from "./SuperadminPageShell";
 import PageHeader from "../../components/PageHeader";
 import api from "../../utils/api";
 

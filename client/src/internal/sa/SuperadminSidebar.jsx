@@ -2,20 +2,20 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Star, BarChart3 } from "lucide-react";
 
-import { useAuth } from "../context/AuthContext";
-import LogoutConfirmModal from "./LogoutConfirmModal";
-import { applyTheme, getSavedTheme } from "../utils/theme";
-import useEdgeSwipeOpen from "../hooks/useEdgeSwipeOpen";
+import { useAuth } from "../../context/AuthContext";
+import LogoutConfirmModal from "../../components/LogoutConfirmModal";
+import { applyTheme, getSavedTheme } from "../../utils/theme";
+import useEdgeSwipeOpen from "../../hooks/useEdgeSwipeOpen";
 
-import ucLogo from "../assets/Pnc-Logo.png";
-import oamsLogo from "../assets/oams_logo.png";
+import ucLogo from "../../assets/Pnc-Logo.png";
+import oamsLogo from "../../assets/oams_logo.png";
 
 // Reuses AdminSidebar.css's own classes directly rather than forking a
 // parallel stylesheet -- this sidebar is structurally the same shell
 // (logo, user card, nav list, logout), just with a narrower nav list and
 // no department/college line, since this role is system-wide.
-import "./AdminSidebar.css";
-import { loginPathForRole } from "../utils/loginPaths";
+import "../../components/AdminSidebar.css";
+import { loginPathForRole } from "../../utils/loginPaths";
 
 const HomeIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
