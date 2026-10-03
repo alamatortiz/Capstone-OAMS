@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef } from "react";
-import jsQR from "jsqr";
+import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import { ChevronLeft, FileText } from "lucide-react";
@@ -14,6 +13,7 @@ import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import api from "../../utils/api";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
+import { useQrScanner } from "../../hooks/useQrScanner";
 import { toast } from "sonner";
 
 const DOCUMENT_STATUS_LABELS = {
@@ -86,9 +86,8 @@ const CheckCircleIcon = () => (
 export default function AdminScanDocument() {
   const { user: authUser } = useAuth();
 
-  // Scanner state
+  // Scanner state (`scanning` itself now comes from useQrScanner below)
   const [manualCode, setManualCode] = useState("");
-  const [scanning, setScanning] = useState(false);
   const [verifiedDoc, setVerifiedDoc] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   useLockBodyScroll(modalOpen);
@@ -100,14 +99,17 @@ export default function AdminScanDocument() {
   // "Mark as Claimed" button in the app instead of firing on a single tap.
   const [confirmClaimOpen, setConfirmClaimOpen] = useState(false);
 
-  // Live camera scanner refs -- video element the camera stream is attached
-  // to, an offscreen canvas used to sample frames for jsQR, the active
-  // MediaStream (so it can be stopped), and the requestAnimationFrame handle
-  // for the decode loop.
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const streamRef = useRef(null);
-  const rafRef = useRef(null);
+  // Camera + decode loop live in a shared hook so the student queue-join
+  // scanner runs the identical code path -- see hooks/useQrScanner.js. This
+  // page supplies only what a decoded string means (a document delivery code).
+  const {
+    scanning,
+    error: cameraError,
+    start: handleStartScanning,
+    stop: handleStopScanning,
+    videoRef,
+    canvasRef,
+  } = useQrScanner({ onDecode: (code) => processCode(code) });
 
   // Load recent scans on mount
   useEffect(() => {
@@ -117,69 +119,14 @@ export default function AdminScanDocument() {
       .catch((err) => console.error("Recent scans fetch error:", err));
   }, [authUser]);
 
-  // Stop the camera stream + decode loop on unmount, in case the admin
-  // navigates away mid-scan.
-  useEffect(() => stopScanning, []);
-
-  function stopScanning() {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    rafRef.current = null;
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
+  // The hook owns camera permission/hardware failures; this page's own
+  // errorMsg still carries verification failures from the server. Surface
+  // whichever is present, keeping the manual-entry hint the camera path had.
+  useEffect(() => {
+    if (cameraError) {
+      setErrorMsg(`${cameraError} You can also enter the QR code manually below.`);
     }
-    streamRef.current = null;
-  }
-
-  const tick = () => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
-      rafRef.current = requestAnimationFrame(tick);
-      return;
-    }
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const result = jsQR(imageData.data, imageData.width, imageData.height);
-    if (result?.data) {
-      stopScanning();
-      setScanning(false);
-      processCode(result.data);
-      return;
-    }
-    rafRef.current = requestAnimationFrame(tick);
-  };
-
-  const handleStartScanning = async () => {
-    setErrorMsg("");
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-      });
-      streamRef.current = stream;
-      setScanning(true);
-      // Wait a tick for the <video> element to mount before attaching the stream.
-      requestAnimationFrame(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play();
-        }
-        rafRef.current = requestAnimationFrame(tick);
-      });
-    } catch (err) {
-      console.error("Camera access error:", err);
-      setErrorMsg(
-        "Couldn't access the camera. Please allow camera permission, or enter the QR code manually below.",
-      );
-    }
-  };
-
-  const handleStopScanning = () => {
-    stopScanning();
-    setScanning(false);
-  };
+  }, [cameraError]);
 
   const processCode = async (code) => {
     const trimmed = code.trim();
