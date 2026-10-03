@@ -913,3 +913,62 @@ html, body {
   border: 1px solid rgba(168, 85, 247, 0.25);
   text-transform: capitalize;
 }
+/* ── Queue delegation (who may run a service's queue) ──────────────── */
+/* Labelled, self-describing control: it states who currently runs the
+   queue AND is the way to change it. Previously an icon-only button in the
+   Edit/Delete cluster, which nobody found. */
+.adm-delegate-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  border: 1px dashed var(--card-border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.adm-delegate-chip:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+/* Solid border once someone is assigned -- dashed reads as "empty slot". */
+.adm-delegate-chip.is-assigned {
+  border-style: solid;
+  border-color: rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.08);
+  color: #2563eb;
+}
+
+.adm-delegate-chip strong { font-weight: 600; }
+
+.adm-delegate-chip svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex-shrink: 0;
+}
+
+.adm-assign-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.85rem 0;
+}
+
+.adm-assign-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--card-border);
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
