@@ -110,11 +110,43 @@ async function sweepExpiredSlots() {
   }
 }
 
+// Housekeeping for the two short-lived tables the on-site queueing redesign
+// introduced. Neither affects correctness -- expiry is always evaluated in
+// the query that reads them, so a stale row is already inert -- this just
+// stops them growing without bound (a busy queue mints a token every 45s).
+//
+// Tokens are kept a day past expiry so a "why didn't my code work?" question
+// can still be answered from the data; credits are kept 30 days because
+// consumed ones are the audit trail for why a student jumped the line.
+async function cleanupExpiredArtifacts() {
+  try {
+    const [tokens] = await pool.query(
+      `DELETE FROM queue_slot_tokens WHERE expires_at < NOW() - INTERVAL 1 DAY`,
+    );
+    const [credits] = await pool.query(
+      `DELETE FROM queue_priority_credits
+        WHERE (consumed_at IS NOT NULL AND consumed_at < NOW() - INTERVAL 30 DAY)
+           OR (consumed_at IS NULL AND expires_at < NOW() - INTERVAL 30 DAY)`,
+    );
+    if (tokens.affectedRows || credits.affectedRows) {
+      console.log(
+        `[queueExpirySweeper] Cleaned ${tokens.affectedRows} stale join token${tokens.affectedRows === 1 ? "" : "s"}, ${credits.affectedRows} old priority credit${credits.affectedRows === 1 ? "" : "s"}`,
+      );
+    }
+  } catch (error) {
+    console.error("[queueExpirySweeper] Artifact cleanup failed:", error);
+  }
+}
+
 function startExpirySweeper() {
   // Deliberately not firing an immediate sweep on boot -- see the identical
   // note in queueNoShowSweeper.js. End-time granularity is minutes-scale, so
   // waiting for the first interval tick costs nothing functionally.
-  return setInterval(sweepExpiredSlots, SWEEP_INTERVAL_MS);
+  const slotTimer = setInterval(sweepExpiredSlots, SWEEP_INTERVAL_MS);
+  // Housekeeping runs far less often than the slot sweep -- nothing depends
+  // on its timeliness.
+  const cleanupTimer = setInterval(cleanupExpiredArtifacts, 60 * 60 * 1000);
+  return { slotTimer, cleanupTimer };
 }
 
-module.exports = { startExpirySweeper, sweepExpiredSlots };
+module.exports = { startExpirySweeper, sweepExpiredSlots, cleanupExpiredArtifacts };

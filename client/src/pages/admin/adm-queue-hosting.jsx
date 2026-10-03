@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ChevronLeft, StopCircle, PauseCircle } from "lucide-react";
+import { ChevronLeft, StopCircle, PauseCircle, QrCode, UserX } from "lucide-react";
 import "./adm-queue-hosting.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
 import { useAdminQueueHosting } from "../../hooks/useAdminQueueHosting";
 import AdminPageShell from "../../components/AdminPageShell";
 import QueueReasonModal from "../../components/QueueReasonModal";
+import QueueJoinQrDisplay from "../../components/QueueJoinQrDisplay";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import { formatManilaDate, formatManilaTime, getManilaTimeString, addMinutesClampedToDay, formatTimeString } from "../../utils/dateTime";
 import { getCollegeLogo } from "../../data/collegeLogo";
@@ -133,6 +134,43 @@ export default function AdminQueueHosting() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+
+  // ── Join-code overlay ─────────────────────────────────────────────────────
+  // { id, name } of the queue whose QR is on screen, or null.
+  const [qrSlot, setQrSlot] = useState(null);
+  useLockBodyScroll(!!qrSlot);
+
+  // ── No-show blocks ────────────────────────────────────────────────────────
+  // Students who hit the daily no-show limit. The override exists so a human
+  // who can see the student decides, so this has to be reachable from the
+  // screen the secretary is already running the queue from.
+  const [blockedStudents, setBlockedStudents] = useState([]);
+  const [showBlocked, setShowBlocked] = useState(false);
+  useLockBodyScroll(showBlocked);
+
+  const fetchBlockedStudents = useCallback(async () => {
+    try {
+      const res = await api.get("/admin/queue-blocked-students");
+      setBlockedStudents(res.data.students ?? []);
+    } catch {
+      // Non-fatal -- hosting still works without the restriction list.
+    }
+  }, []);
+
+  useEffect(() => { fetchBlockedStudents(); }, [fetchBlockedStudents]);
+
+  const clearBlock = useCallback(
+    async (studentId) => {
+      try {
+        await api.post(`/admin/queue-blocked-students/${studentId}/clear`);
+        toast.success("Restriction lifted");
+        await fetchBlockedStudents();
+      } catch (err) {
+        toast.error(err?.response?.data?.error ?? "Could not lift the restriction");
+      }
+    },
+    [fetchBlockedStudents],
+  );
 
   // ── "Open New Queue Line" modal state ─────────────────────────────────────
   const [showModal, setShowModal] = useState(false);
@@ -371,6 +409,61 @@ export default function AdminQueueHosting() {
             onConfirm={handleReasonConfirm}
             onCancel={() => setReasonModal(null)}
           />
+
+          {/* The join code students scan. Lives in the shell's overlay slot
+              because the page content is transformed, which would break a
+              position:fixed child. */}
+          {qrSlot && (
+            <div
+              className="aqh-qr-overlay"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Queue join code"
+              onClick={() => setQrSlot(null)}
+            >
+              <div className="aqh-qr-sheet" onClick={(e) => e.stopPropagation()}>
+                <div className="aqh-qr-header">
+                  <h2>{qrSlot.name}</h2>
+                  <button type="button" onClick={() => setQrSlot(null)} aria-label="Close join code">×</button>
+                </div>
+                <QueueJoinQrDisplay slotId={qrSlot.id} apiBase="admin" />
+              </div>
+            </div>
+          )}
+
+          {/* Students blocked by today's no-show limit, and the lift control. */}
+          {showBlocked && (
+            <div className="aqh-qr-overlay" role="dialog" aria-modal="true" aria-label="Queue restrictions" onClick={() => setShowBlocked(false)}>
+              <div className="aqh-qr-sheet" onClick={(e) => e.stopPropagation()}>
+                <div className="aqh-qr-header">
+                  <h2>Queue Restrictions</h2>
+                  <button type="button" onClick={() => setShowBlocked(false)} aria-label="Close">×</button>
+                </div>
+                <div className="aqh-blocked-body">
+                  {blockedStudents.length === 0 ? (
+                    <p className="aqh-blocked-empty">
+                      No one is restricted right now. A student is paused for the rest of the day
+                      after being marked a no-show three times.
+                    </p>
+                  ) : (
+                    blockedStudents.map((s) => (
+                      <div key={s.student_id} className="aqh-blocked-row">
+                        <div>
+                          <p className="aqh-blocked-name">{s.student_name}</p>
+                          <p className="aqh-blocked-meta">
+                            {s.student_number} · {s.strikes} no-shows today
+                          </p>
+                        </div>
+                        <button type="button" className="aqh-action-btn" onClick={() => clearBlock(s.student_id)}>
+                          Lift
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Open New Queue Line Modal */}
           {showModal && (
@@ -648,6 +741,20 @@ export default function AdminQueueHosting() {
               <PlusIcon />
               Open Queue Line
             </button>
+            {/* Header-level secondary beside "Open Queue Line" -- NOT the
+                small .aqh-action-btn card style, which looked undersized
+                next to the primary. Badge only appears when someone is
+                actually restricted, so it stays quiet on a normal day. */}
+            <button
+              className="aqh-restrictions-btn"
+              onClick={() => { fetchBlockedStudents(); setShowBlocked(true); }}
+            >
+              <UserX />
+              Restrictions
+              {blockedStudents.length > 0 && (
+                <span className="aqh-restrictions-count">{blockedStudents.length}</span>
+              )}
+            </button>
           </div>
 
           {queueHostingError && (
@@ -829,6 +936,16 @@ export default function AdminQueueHosting() {
                           </span>
                         )}
                         <div className="aqh-queue-card-actions">
+                          {/* Students can only join by scanning this, so it
+                              needs to be reachable in one tap from the queue
+                              the secretary is already looking at. */}
+                          <button
+                            className="aqh-action-btn aqh-action-qr"
+                            onClick={(e) => { e.stopPropagation(); setQrSlot({ id: queue.id, name: queue.queueType ?? queue.serviceName }); }}
+                          >
+                            <QrCode width={16} height={16} />
+                            <span>Show QR</span>
+                          </button>
                           <button
                             className="aqh-action-btn aqh-action-pause"
                             onClick={(e) => { e.stopPropagation(); handlePauseQueue(queue.id); }}

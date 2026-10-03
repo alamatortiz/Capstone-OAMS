@@ -186,6 +186,11 @@
 /* The "Open Queue Line" CTA sits on its own row below the header. */
 .aqh-actions-row {
   display: flex;
+  /* Gained a second button (Restrictions) -- it held only one before, so
+     there was no gap and the two sat flush against each other. */
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .aqh-title-section {
@@ -1180,4 +1185,149 @@
 @media (max-width: 380px) {
   .aqh-stats-row-3,
   .aqh-stats-row-4 { grid-template-columns: 1fr; }
+}
+
+/* ── Join-code overlay ───────────────────────────────────────────────────
+   The QR students scan to join. Rendered through AdminPageShell's overlay
+   slot so it escapes the transformed page content. */
+.aqh-qr-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.aqh-qr-sheet {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  width: 100%;
+  max-width: 24rem;
+  max-height: 92vh;
+  overflow-y: auto;
+}
+
+.aqh-qr-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem 0;
+}
+
+.aqh-qr-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.aqh-qr-header button {
+  background: transparent;
+  border: none;
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.aqh-action-qr:hover {
+  border-color: var(--blue, #3b82f6);
+  color: var(--blue, #3b82f6);
+}
+
+/* ── No-show restrictions ───────────────────────────────────────────── */
+
+/* Header-level SECONDARY button: same geometry as .aqh-open-queue-btn it
+   sits beside (padding, radius, font size/weight), outlined instead of
+   filled. It previously reused .aqh-action-btn -- the small card-level
+   style -- so it looked undersized next to the primary. */
+.aqh-restrictions-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  /* Border-box + padding reduced by the border width so this lands at the
+     exact same height as the borderless primary beside it. */
+  box-sizing: border-box;
+  padding: calc(0.7rem - 1.5px) calc(1.25rem - 1.5px);
+  background: transparent;
+  color: var(--text-primary);
+  border: 1.5px solid var(--card-border);
+  border-radius: 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.aqh-restrictions-btn:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.aqh-restrictions-btn svg {
+  width: 1rem;
+  height: 1rem;
+  stroke: currentColor;
+}
+
+/* Only rendered when someone is actually restricted, so it reads as an
+   alert rather than a permanent "0". */
+.aqh-restrictions-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Kept at/below the 0.9rem text line box -- a taller badge becomes the
+     tallest item in the flex row and silently stretches the button. */
+  min-width: 1rem;
+  height: 1rem;
+  padding: 0 0.3rem;
+  background: #ef4444;
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.aqh-blocked-body {
+  padding: 1rem 1.25rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.aqh-blocked-empty {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.aqh-blocked-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--card-border);
+  border-radius: 0.6rem;
+}
+
+.aqh-blocked-name {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--text-primary);
+}
+
+.aqh-blocked-meta {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
 }

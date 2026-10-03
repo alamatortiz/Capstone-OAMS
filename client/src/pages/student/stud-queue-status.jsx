@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import {
   Clock,
@@ -91,6 +91,48 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
   const getServiceRequirements = (serviceId) => findSvc(serviceId)?.requirements ?? [];
 
   const getProcedureSteps = (serviceId) => findSvc(serviceId)?.procedureSteps ?? [];
+
+  // ── Pre-processing checklist (2026-09-30 panel review) ──────────────────
+  // Per-TICKET state, not per-service: the student ticks off what they
+  // actually brought today, and the staff member sees it before calling
+  // them. Sourced from the queue entry rather than the service catalogue,
+  // because only the entry knows what's been confirmed.
+  const [checklist, setChecklist] = useState(null);
+  const [savingReqId, setSavingReqId] = useState(null);
+
+  const loadChecklist = useCallback(async () => {
+    if (!queue?.queueId) return;
+    try {
+      const { data } = await api.get(`/student/queues/${queue.queueId}/requirements`);
+      setChecklist(data.requirements ?? []);
+    } catch {
+      setChecklist([]); // fall back to the read-only catalogue list below
+    }
+  }, [queue?.queueId]);
+
+  useEffect(() => { loadChecklist(); }, [loadChecklist]);
+
+  const toggleRequirement = async (requirementId, next) => {
+    setSavingReqId(requirementId);
+    // Optimistic: ticking a box should feel instant, and a failure rolls
+    // back below rather than leaving the box in a lying state.
+    setChecklist((prev) =>
+      prev.map((r) => (r.requirementId === requirementId ? { ...r, isChecked: next } : r)),
+    );
+    try {
+      await api.put(`/student/queues/${queue.queueId}/requirements`, {
+        requirementId,
+        isChecked: next,
+      });
+    } catch (err) {
+      setChecklist((prev) =>
+        prev.map((r) => (r.requirementId === requirementId ? { ...r, isChecked: !next } : r)),
+      );
+      toast.error(err?.response?.data?.error ?? "Couldn't save that. Try again.");
+    } finally {
+      setSavingReqId(null);
+    }
+  };
 
   const handleSaveNotes = async () => {
     setSavingNotes(true);
@@ -345,9 +387,51 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
                 <CheckCircle2 style={{ width: "1.25rem", height: "1.25rem" }} />
                 Requirements
               </h3>
+              {checklist?.length > 0 && (
+                <span className="qss-checklist-count">
+                  {checklist.filter((r) => r.isChecked).length}/{checklist.length} ready
+                </span>
+              )}
             </div>
             <div className="qss-card-content">
-              {(() => {
+              {/* Interactive checklist once the per-ticket state has loaded;
+                  the read-only catalogue list below is the fallback if that
+                  request failed, so requirements are never simply missing. */}
+              {checklist?.length > 0 ? (
+                <>
+                  <p className="qss-checklist-intro">
+                    Tick what you have with you. Staff can see this before they call you, so
+                    your turn at the counter goes faster.
+                  </p>
+                  <ul className="qss-requirements-list">
+                    {checklist.map((req) => (
+                      <li key={req.requirementId} className="qss-requirement-item">
+                        <label className="qss-checklist-label">
+                          <input
+                            type="checkbox"
+                            checked={req.isChecked}
+                            disabled={savingReqId === req.requirementId}
+                            onChange={(e) => toggleRequirement(req.requirementId, e.target.checked)}
+                          />
+                          <div>
+                            <div className="qss-requirement-name-row">
+                              <span>{req.name}</span>
+                              <span className={`qss-requirement-badge ${req.isMandatory ? 'is-mandatory' : 'is-optional'}`}>
+                                {req.isMandatory ? 'Required' : 'Optional'}
+                              </span>
+                            </div>
+                            {req.description && (
+                              <p style={{ fontSize: '0.75rem', opacity: 0.65, marginTop: '2px' }}>
+                                {req.description}
+                              </p>
+                            )}
+                          </div>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (() => {
                 const reqs = getServiceRequirements(queue.serviceId);
                 if (reqs.length === 0 && servicesLoading && !isServiceKnown(queue.serviceId)) {
                   return (

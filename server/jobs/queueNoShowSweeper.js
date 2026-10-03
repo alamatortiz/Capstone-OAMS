@@ -2,6 +2,7 @@ const pool = require("../db");
 const { emitToSlot, emitToUser, emitToDept } = require("../sockets");
 const { settleSlotAfterEntryChange } = require("../utils/queueSlotSettlement");
 const { createNotification } = require("../utils/notifications");
+const { getStrikeState } = require("../utils/queueStrikes");
 
 const SWEEP_INTERVAL_MS = 30 * 1000;
 
@@ -53,6 +54,23 @@ function emitVoidEvents({ slotId, queueId, studentId, deptId, settleResult, serv
     `You were marked as a no-show${noShowServicePart} and your queue ticket was voided.`,
     "queue",
   );
+
+  // If that no-show was the one that tripped the daily limit, say so
+  // explicitly. Otherwise the student only finds out when a later join is
+  // refused -- most likely standing at the counter, which is the worst place
+  // to discover it. Best-effort: a failed lookup must never break the void.
+  getStrikeState(pool, studentId)
+    .then((state) => {
+      if (state.strikes !== state.limit) return; // only on the exact trip
+      createNotification(
+        studentId,
+        `You've now been marked as a no-show ${state.limit} times today, so joining queues is ` +
+          `paused until tomorrow. Ask the staff at the counter if you need this lifted.`,
+        "queue",
+      );
+      emitToUser(studentId, "queue:blocked", { studentId, strikes: state.strikes });
+    })
+    .catch((err) => console.error("Strike-state notify error:", err.message));
 
   if (settleResult) {
     const settledPayload = { slotId, status: settleResult.newStatus };

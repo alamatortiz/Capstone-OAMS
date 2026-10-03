@@ -1,11 +1,12 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 
-import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Loader2, ChevronDown, HelpCircle, MapPin, FileText } from 'lucide-react';
+import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Loader2, ChevronDown, HelpCircle, MapPin, FileText, QrCode } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import QueueConcernModal from "../../components/QueueConcernModal";
+import QueueJoinScanner from "../../components/QueueJoinScanner";
 import StudentPageShell from "../../components/StudentPageShell";
 import FilterSelect from "../../components/FilterSelect";
 import PageHeader from "../../components/PageHeader";
@@ -207,34 +208,64 @@ export default function QueuePage() {
   const joiningSlotIdRef = useRef(null);
   const leavingQueueIdRef = useRef(null);
 
-  // Shared by both join entry points (quick card button + detail panel CTA) --
-  // both open the concern popup first; this runs once the student confirms.
+  // Scanning is now the only way in (2026-09-30 panel review). `scanTarget`
+  // carries whatever had to be decided BEFORE the camera opens, so that the
+  // scan itself can commit instantly with no extra confirmation:
+  //   - a Universal Service Queue needs the specific service picked, since
+  //     the server rejects a universal join without one
+  //   - notes stay optional and can also be edited later from the status page
+  // null = scanner closed.
+  const [scanTarget, setScanTarget] = useState(null); // { serviceId, notes }
+  const [scanError, setScanError] = useState('');
+
+  // No-show strike state. Fetched up-front so a blocked student is told here
+  // rather than discovering it at the counter after walking over.
+  const [blockStatus, setBlockStatus] = useState(null);
+  const refreshBlockStatus = useCallback(async () => {
+    try {
+      const res = await api.get('/student/queues/block-status');
+      setBlockStatus(res.data);
+    } catch {
+      // Non-fatal -- the server still enforces the block on join, so a
+      // failed status read just means we show no warning.
+    }
+  }, []);
+  useEffect(() => { refreshBlockStatus(); }, [refreshBlockStatus]);
+  const joiningRef = useRef(false);
+
+  const openScanner = useCallback((serviceId = null, notes = '') => {
+    setScanError('');
+    setScanTarget({ serviceId, notes });
+  }, []);
+
+  // The slot is NOT chosen here -- it's whatever queue the scanned code
+  // belongs to, resolved server-side. That's the point: a student can only
+  // join the queue whose screen they are physically standing in front of.
   const performJoin = useCallback(
-    async (slotId, notes, serviceId = null) => {
-      if (joiningSlotIdRef.current === slotId) return;
-      // Guards the narrow window where a cross-tab/other-device join for
-      // this same slot completed while the concern modal was still open.
-      if (isAlreadyInQueue(slotId)) {
-        toast.info('You are already in this queue.');
-        setConcernModal(null);
-        setSelectedSlot(null);
-        return;
-      }
-      joiningSlotIdRef.current = slotId;
-      setJoiningSlotId(slotId);
+    async (qrToken) => {
+      if (joiningRef.current) return;
+      joiningRef.current = true;
+      setJoiningSlotId('scanning');
+      setScanError('');
       try {
-        await joinQueue(slotId, notes, serviceId);
+        await joinQueue(qrToken, scanTarget?.notes, scanTarget?.serviceId ?? null);
         toast.success('Successfully joined the queue!');
+        setScanTarget(null);
         setSelectedSlot(null);
         setConcernModal(null);
       } catch (err) {
-        toast.error(err.message ?? 'Failed to join the queue. Please try again.');
+        // Shown inside the scanner sheet (not just a toast) so the student
+        // can read it while still holding the phone up to the code.
+        setScanError(err.message ?? 'Failed to join the queue. Please try again.');
+        // A refused join may itself be the block kicking in -- resync so the
+        // banner appears immediately instead of after a reload.
+        refreshBlockStatus();
       } finally {
-        joiningSlotIdRef.current = null;
+        joiningRef.current = false;
         setJoiningSlotId(null);
       }
     },
-    [joinQueue, isAlreadyInQueue],
+    [joinQueue, scanTarget, refreshBlockStatus],
   );
 
   const handleLeaveQueue = useCallback(
@@ -266,22 +297,22 @@ export default function QueuePage() {
   // "Queue Full" for a merely paused queue (hasCapacity is false for any
   // non-open status, not just a full one).
   const detailJoinBtnLabel = () => {
-    if (!selectedSlot) return 'Join Queue';
+    if (!selectedSlot) return 'Scan QR to Join';
+    if (blockStatus?.blocked) return 'Joining Paused Today';
     if (isAlreadyInQueue(selectedSlot.slotId)) return 'Already in Queue';
     if (selectedSlot.status === 'paused') return 'Queue Paused';
     if (!selectedSlot.isWithinHours) return 'Currently Closed';
     if (!selectedSlot.hasCapacity) return 'Queue Full';
-    if (joiningSlotId === selectedSlot.slotId) return 'Joining…';
-    return 'Join Queue';
+    return 'Scan QR to Join';
   };
 
   const detailJoinBtnDisabled = () => {
     if (!selectedSlot) return true;
+    if (blockStatus?.blocked) return true;
     if (isAlreadyInQueue(selectedSlot.slotId)) return true;
     if (selectedSlot.status === 'paused') return true;
     if (!selectedSlot.isWithinHours) return true;
     if (!selectedSlot.hasCapacity) return true;
-    if (joiningSlotId === selectedSlot.slotId) return true;
     return false;
   };
 
@@ -322,17 +353,24 @@ export default function QueuePage() {
             confirmDisabled={leavingQueueId === leaveConfirmQueue?.queueId}
             accentTheme="blue"
           />
+          {/* Only shown for a Universal Service Queue now, where picking the
+              specific service is mandatory before the scan. A normal queue
+              goes straight to the camera -- see openScanner. */}
           <QueueConcernModal
             show={concernModal !== null}
             onCancel={() => setConcernModal(null)}
-            onConfirm={(notes, serviceId) => performJoin(concernModal.slotId, notes, serviceId)}
+            onConfirm={(notes, serviceId) => {
+              setConcernModal(null);
+              openScanner(serviceId, notes);
+            }}
             universalServices={concernModal?.isUniversal ? (concernModal?.universalServices ?? null) : null}
             title="What's your concern?"
             message={
               concernModal?.isUniversal ? (
                 <>
                   Joining the <strong>Universal Service Queue</strong>. Pick the specific service
-                  you need, then let the staff know why you're here.
+                  you need, then let the staff know why you're here. You'll scan the office's QR
+                  code next.
                 </>
               ) : (
                 <>
@@ -340,8 +378,15 @@ export default function QueuePage() {
                 </>
               )
             }
-            confirmText={joiningSlotId === concernModal?.slotId ? "Joining…" : "Join Queue"}
-            submitting={joiningSlotId === concernModal?.slotId}
+            confirmText="Continue to Scan"
+            submitting={false}
+          />
+          <QueueJoinScanner
+            open={scanTarget !== null}
+            onClose={() => { setScanTarget(null); setScanError(''); }}
+            onScanned={performJoin}
+            submitting={joiningSlotId === 'scanning'}
+            errorMessage={scanError}
           />
         </>
       }
@@ -373,6 +418,21 @@ export default function QueuePage() {
             titleClassName="queue-title"
             subtitleClassName="queue-subtitle"
           />
+
+          {/* Told here rather than at the counter: a student who walks to the
+              office only to be refused has wasted a trip. */}
+          {blockStatus?.blocked && (
+            <div className="queue-block-banner" role="alert">
+              <AlertCircle className="queue-block-banner-icon" />
+              <div>
+                <strong>Queue joining is paused for today.</strong>
+                <p>
+                  You were marked as a no-show {blockStatus.strikes} times today. Ask the staff
+                  at the counter to lift this if you need to join a queue.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* ── DETAIL VIEW ── */}
           {selectedSlot && (
@@ -421,17 +481,14 @@ export default function QueuePage() {
                 </div>
                 <button
                   className="avail-services-queue-btn"
-                  onClick={() => setConcernModal({ slotId: selectedSlot.slotId, serviceName: selectedSlot.serviceName, isUniversal: selectedSlot.isUniversal, universalServices: buildUniversalServices(selectedSlot) })}
+                  onClick={() =>
+                    selectedSlot.isUniversal
+                      ? setConcernModal({ slotId: selectedSlot.slotId, serviceName: selectedSlot.serviceName, isUniversal: true, universalServices: buildUniversalServices(selectedSlot) })
+                      : openScanner()
+                  }
                   disabled={detailJoinBtnDisabled()}
                 >
-                  {joiningSlotId === selectedSlot.slotId ? (
-                    <Loader2
-                      className="avail-services-queue-btn-icon"
-                      style={{ animation: 'spin 1s linear infinite' }}
-                    />
-                  ) : (
-                    <Clock className="avail-services-queue-btn-icon" />
-                  )}
+                  <QrCode className="avail-services-queue-btn-icon" />
                   {detailJoinBtnLabel()}
                 </button>
               </div>
@@ -780,7 +837,9 @@ export default function QueuePage() {
                   {filteredSlots.length > 0 ? (
                     <div className="available-queues-list">
                       {filteredSlots.map((slot) => {
-                        const isJoining = joiningSlotId === slot.slotId;
+                        // No per-card "joining" state any more -- the scanner
+                        // overlay owns that, since the slot isn't known until
+                        // the code is decoded.
                         const isPaused = slot.status === 'paused';
                         const atCapacity = !slot.hasCapacity;
                         const outsideHours = !slot.isWithinHours;
@@ -843,9 +902,19 @@ export default function QueuePage() {
                                 </div>
                               </div>
                               <button
-                                className={`queue-join-btn ${(isJoining || isPaused || outsideHours || atCapacity) ? 'disabled' : ''}`}
-                                onClick={(e) => { e.stopPropagation(); setConcernModal({ slotId: slot.slotId, serviceName: slot.serviceName, isUniversal: slot.isUniversal, universalServices: buildUniversalServices(slot) }); }}
-                                disabled={isJoining || isPaused || outsideHours || atCapacity}
+                                className={`queue-join-btn ${(isPaused || outsideHours || atCapacity) ? 'disabled' : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // Universal queues still need the service
+                                  // picked first; everything else goes
+                                  // straight to the camera.
+                                  if (slot.isUniversal) {
+                                    setConcernModal({ slotId: slot.slotId, serviceName: slot.serviceName, isUniversal: true, universalServices: buildUniversalServices(slot) });
+                                  } else {
+                                    openScanner();
+                                  }
+                                }}
+                                disabled={isPaused || outsideHours || atCapacity || !!blockStatus?.blocked}
                                 type="button"
                                 aria-label={
                                   isPaused
@@ -854,22 +923,11 @@ export default function QueuePage() {
                                     ? `Queue for ${slot.serviceName} is closed for today`
                                     : atCapacity
                                     ? `Queue for ${slot.serviceName} is full`
-                                    : `Join queue for ${slot.serviceName}`
+                                    : `Scan QR to join the queue for ${slot.serviceName}`
                                 }
                               >
-                                {isJoining ? (
-                                  <>
-                                    <Loader2
-                                      style={{
-                                        width: '1rem',
-                                        height: '1rem',
-                                        marginRight: '0.375rem',
-                                        animation: 'spin 1s linear infinite',
-                                        display: 'inline',
-                                      }}
-                                    />
-                                    Joining…
-                                  </>
+                                {blockStatus?.blocked ? (
+                                  'Joining Paused Today'
                                 ) : isPaused ? (
                                   'Queue Paused'
                                 ) : outsideHours ? (
@@ -877,7 +935,17 @@ export default function QueuePage() {
                                 ) : atCapacity ? (
                                   'Queue Full'
                                 ) : (
-                                  'Join Queue'
+                                  <>
+                                    <QrCode
+                                      style={{
+                                        width: '1rem',
+                                        height: '1rem',
+                                        marginRight: '0.375rem',
+                                        display: 'inline',
+                                      }}
+                                    />
+                                    Scan QR to Join
+                                  </>
                                 )}
                               </button>
                             </div>

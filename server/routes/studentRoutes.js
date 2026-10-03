@@ -15,7 +15,14 @@ const {
   manilaDayEndExclusiveUTC,
 } = require("../utils/dateTime");
 const { settleSlotAfterEntryChange } = require("../utils/queueSlotSettlement");
-const { getQueueDisplayInfo } = require("../utils/queueDisplay");
+const {
+  getQueueDisplayInfo,
+  queueOrderBy,
+  queueAtOrBeforePredicate,
+} = require("../utils/queueDisplay");
+const { resolveSlotToken } = require("../utils/queueJoinToken");
+const { getStrikeState, getBlockRejection } = require("../utils/queueStrikes");
+const { claimPriorityCredit, consumePriorityCredit } = require("../utils/queuePriorityCredits");
 const { notifyAlmostUp } = require("../utils/queuePositionNudge");
 const {
   STATUS_LABEL_MAP,
@@ -85,7 +92,7 @@ router.get(
              FROM queues q2
              WHERE q2.slot_id = q.slot_id
                AND q2.status = 'waiting'
-               AND q2.queue_number <= q.queue_number
+               AND ${queueAtOrBeforePredicate("q2", "q")}
            ) AS position,
            (
              SELECT COUNT(*)
@@ -1506,6 +1513,138 @@ router.get(
   },
 );
 
+// GET /api/student/queues/block-status
+// Today's no-show strike count and whether joining is currently paused.
+// Exists so the queue page can warn the student BEFORE they walk to the
+// office and scan -- discovering the block at the counter would be the worst
+// possible moment to find out.
+router.get(
+  "/queues/block-status",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    try {
+      const state = await getStrikeState(pool, req.user.userId);
+      res.json(state);
+    } catch (error) {
+      sendServerError(res, error, "Queue block status error:");
+    }
+  },
+);
+
+// GET /api/student/queues/:queueId/requirements
+// The service's requirement checklist for one of the student's own queue
+// entries, with what they've already ticked off.
+//
+// This is the "pre-processing" the panel asked for (2026-09-30): the student
+// confirms what they brought while waiting, so the staff member already
+// knows whether they're ready when their number comes up, instead of
+// discovering a missing document at the counter.
+router.get(
+  "/queues/:queueId/requirements",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const queueId = parseInt(req.params.queueId, 10);
+    if (!Number.isInteger(queueId) || queueId <= 0) {
+      return res.status(400).json({ error: "Invalid queueId" });
+    }
+    try {
+      const [[entry]] = await pool.query(
+        `SELECT queue_id, service_id FROM queues WHERE queue_id = ? AND student_id = ?`,
+        [queueId, studentId],
+      );
+      if (!entry) {
+        return res.status(404).json({ error: "Queue entry not found" });
+      }
+
+      const [rows] = await pool.query(
+        `SELECT r.requirement_id, r.requirement_name, r.description, r.is_mandatory,
+                COALESCE(c.is_checked, 0) AS is_checked
+           FROM service_requirements r
+           LEFT JOIN queue_requirement_checks c
+             ON c.requirement_id = r.requirement_id AND c.queue_id = ?
+          WHERE r.service_id = ?
+          ORDER BY r.is_mandatory DESC, r.requirement_name`,
+        [queueId, entry.service_id],
+      );
+
+      res.json({
+        requirements: rows.map((r) => ({
+          requirementId: r.requirement_id,
+          name: r.requirement_name,
+          description: r.description,
+          // mysql2 hands back TINYINT(1) as a Number -- coerce, or strict
+          // comparisons on the client silently always take one branch.
+          isMandatory: !!r.is_mandatory,
+          isChecked: !!r.is_checked,
+        })),
+      });
+    } catch (error) {
+      sendServerError(res, error, "Queue requirements fetch error:");
+    }
+  },
+);
+
+// PUT /api/student/queues/:queueId/requirements
+// Body: { requirementId, isChecked }
+router.put(
+  "/queues/:queueId/requirements",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const queueId = parseInt(req.params.queueId, 10);
+    const requirementId = parseInt(req.body?.requirementId, 10);
+    const isChecked = req.body?.isChecked === true;
+    if (!Number.isInteger(queueId) || !Number.isInteger(requirementId)) {
+      return res.status(400).json({ error: "queueId and requirementId are required" });
+    }
+    try {
+      // Only while the ticket is live: editing the checklist of a finished
+      // or cancelled visit would rewrite what the staff member saw.
+      const [[entry]] = await pool.query(
+        `SELECT q.queue_id, q.slot_id
+           FROM queues q
+          WHERE q.queue_id = ? AND q.student_id = ?
+            AND q.status IN ('waiting', 'serving')`,
+        [queueId, studentId],
+      );
+      if (!entry) {
+        return res.status(404).json({ error: "Queue entry not found or no longer active" });
+      }
+
+      // The requirement must belong to this entry's own service, or a
+      // student could tick boxes against another service's checklist.
+      const [[req0]] = await pool.query(
+        `SELECT r.requirement_id
+           FROM service_requirements r
+           JOIN queues q ON q.service_id = r.service_id
+          WHERE r.requirement_id = ? AND q.queue_id = ?`,
+        [requirementId, queueId],
+      );
+      if (!req0) {
+        return res.status(404).json({ error: "Requirement not found for this service" });
+      }
+
+      await pool.query(
+        `INSERT INTO queue_requirement_checks (queue_id, requirement_id, is_checked, checked_at)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE is_checked = VALUES(is_checked), checked_at = VALUES(checked_at)`,
+        [queueId, requirementId, isChecked, isChecked ? new Date() : null],
+      );
+
+      // Lets the host's entry list update live while the student ticks.
+      emitToSlot(entry.slot_id, "queue:requirements-updated", { queueId, requirementId, isChecked });
+
+      res.json({ message: "Saved" });
+    } catch (error) {
+      sendServerError(res, error, "Queue requirement update error:");
+    }
+  },
+);
+
 // GET /api/student/queues/active
 // Returns all waiting/serving queue entries for the logged-in student. A
 // completed entry drops off this list immediately (rather than lingering
@@ -1541,13 +1680,15 @@ router.get(
            l.location_name AS service_location,
            d.department_name,
            d.department_abbreviation,
-           -- Position: how many 'waiting' entries in this slot have queue_number <= mine
+           -- Position: how many 'waiting' entries in this slot sit at or before
+           -- mine in the canonical order (priority, then arrival) -- NOT by
+           -- queue_number, which is only a display label. See queueDisplay.js.
            (
              SELECT COUNT(*)
              FROM queues q2
              WHERE q2.slot_id = q.slot_id
                AND q2.status = 'waiting'
-               AND q2.queue_number <= q.queue_number
+               AND ${queueAtOrBeforePredicate("q2", "q")}
            ) AS position,
            -- Total waiting in the same slot
            (
@@ -1736,14 +1877,23 @@ router.get(
 );
 
 // POST /api/student/queues/join
-// Body: { slotId, notes? }
+// Body: { qrToken, notes?, serviceId? }
+//
+// On-site only (2026-09-30 panel review: "No more online reservation"). The
+// slot is resolved from the scanned token rather than taken from the body --
+// a student cannot name the queue they want to join, they can only present
+// proof that they are standing in front of it.
+//
+// The route PATH is kept even though the contract changed, so the shipped
+// mobile build (which still posts { slotId }) receives an explainable 400
+// instead of a 404 it has no handling for. See ONSITE_QR_REQUIRED below.
 router.post(
   "/queues/join",
   authenticateToken,
   authorizeRoles("student"),
   async (req, res) => {
     const studentId = req.user.userId;
-    const { slotId, notes } = req.body;
+    const { notes, qrToken } = req.body;
     // For a Universal Service Queue the student picks which specific service
     // they're here for; ignored for a normal single-service slot.
     const pickedServiceId = req.body.serviceId
@@ -1751,8 +1901,12 @@ router.post(
       : null;
     const trimmedNotes = typeof notes === "string" ? notes.trim() : "";
 
-    if (!slotId) {
-      return res.status(400).json({ error: "slotId is required" });
+    if (typeof qrToken !== "string" || !qrToken.trim()) {
+      return res.status(400).json({
+        error:
+          "Joining a queue now requires scanning the QR code shown at the office.",
+        code: "ONSITE_QR_REQUIRED",
+      });
     }
     if (trimmedNotes.length > 255) {
       return res
@@ -1763,6 +1917,31 @@ router.post(
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
+
+      // Resolve the scanned code to its slot. Expiry is judged by MySQL's
+      // NOW() inside resolveSlotToken, never a client clock. An unknown,
+      // expired or revoked code is reported identically -- the student just
+      // needs the code currently on screen, and distinguishing the cases
+      // would tell a probe which guesses were real.
+      // Anti-abuse gate, checked before the token so a blocked student gets
+      // the real reason rather than a confusing "expired code" if their scan
+      // happens to land on a rotation boundary.
+      const blocked = await getBlockRejection(conn, studentId);
+      if (blocked) {
+        await conn.rollback();
+        return res.status(403).json(blocked);
+      }
+
+      const tokenRow = await resolveSlotToken(conn, qrToken.trim());
+      if (!tokenRow) {
+        await conn.rollback();
+        return res.status(410).json({
+          error:
+            "That QR code has expired. Scan the code currently shown at the office.",
+          code: "QR_EXPIRED",
+        });
+      }
+      const slotId = tokenRow.slot_id;
 
       // 1. Lock and fetch the slot, including the owning service's
       // department/cross-college scope so we can re-check eligibility
@@ -1874,10 +2053,19 @@ router.post(
       // concurrent-waiting-room limit, so it counts everyone who has already
       // claimed a spot today (waiting + serving + completed), not just those
       // still waiting. Avoids relying on drifted current_count.
+      //
+      // FOR UPDATE is load-bearing, not decoration. This transaction is
+      // REPEATABLE READ, and its snapshot is fixed by the FIRST read --
+      // which is now the block check / token lookup ABOVE, both of which
+      // run before the slot row is locked. A plain SELECT here would
+      // therefore still see the pre-lock snapshot and miss a join that
+      // committed while we were waiting on the lock, letting the queue be
+      // oversold. A locking read always sees the latest committed rows.
       const [[countRow]] = await conn.query(
         `SELECT COUNT(*) AS claimed
          FROM queues
-         WHERE slot_id = ? AND status IN ('waiting', 'serving', 'completed')`,
+         WHERE slot_id = ? AND status IN ('waiting', 'serving', 'completed')
+         FOR UPDATE`,
         [slotId],
       );
       if (countRow.claimed >= slot.max_capacity) {
@@ -1889,9 +2077,13 @@ router.post(
 
       // 2. Check if student is already in this slot
       const [[existing]] = await conn.query(
+        // Locking read for the same snapshot reason as the capacity count
+        // above -- otherwise a double-scan a few ms apart wouldn't see its
+        // own first entry.
         `SELECT queue_id FROM queues
          WHERE student_id = ? AND slot_id = ? AND status IN ('waiting', 'serving')
-         LIMIT 1`,
+         LIMIT 1
+         FOR UPDATE`,
         [studentId, slotId],
       );
 
@@ -1902,20 +2094,43 @@ router.post(
 
       // 3. Generate next queue_number for this slot
       const [[maxRow]] = await conn.query(
+        // Locking read: with a plain SELECT this returned the pre-lock
+        // snapshot, so simultaneous scanners of the same on-screen code all
+        // computed the same number and every one but the first died on
+        // uq_queue_slot_number with an opaque 500. Reproduced 3/3 before
+        // this was added.
         `SELECT COALESCE(MAX(queue_number), 0) AS max_num
-         FROM queues WHERE slot_id = ?`,
+         FROM queues WHERE slot_id = ?
+         FOR UPDATE`,
         [slotId],
       );
       const queueNumber = maxRow.max_num + 1;
 
+      // 3b. Does this student hold a live priority credit for this service?
+      // Claimed under the slot row lock already held above, so two
+      // simultaneous scans can't both spend the same one. Note the strike
+      // check ran earlier and would have rejected a blocked student before
+      // reaching here -- a blocked student's credit is deliberately left
+      // unspent so clearing the block still restores their head start.
+      const credit = await claimPriorityCredit(conn, {
+        studentId,
+        serviceId: queueServiceId,
+      });
+
       // 4. Insert queue entry. service_label_snapshot freezes the display label
       // at join time so a later service rename never rewrites this ticket.
+      // priority_rank 1 puts a credit-holder ahead of everyone on rank 0
+      // under the canonical ordering (see utils/queueDisplay.js).
       const [insertResult] = await conn.query(
-        `INSERT INTO queues (student_id, service_id, slot_id, queue_number, status, notes, service_label_snapshot, created_at)
-         VALUES (?, ?, ?, ?, 'waiting', ?, ?, NOW())`,
-        [studentId, queueServiceId, slotId, queueNumber, trimmedNotes || null, queueServiceName],
+        `INSERT INTO queues (student_id, service_id, slot_id, queue_number, priority_rank, status, notes, service_label_snapshot, created_at)
+         VALUES (?, ?, ?, ?, ?, 'waiting', ?, ?, NOW())`,
+        [studentId, queueServiceId, slotId, queueNumber, credit ? 1 : 0, trimmedNotes || null, queueServiceName],
       );
       const queueId = insertResult.insertId;
+
+      if (credit) {
+        await consumePriorityCredit(conn, { creditId: credit.credit_id, queueId });
+      }
 
       // 5. Increment slot current_count
       await conn.query(
@@ -1960,7 +2175,8 @@ router.post(
            d.department_abbreviation,
            (
              SELECT COUNT(*) FROM queues q2
-             WHERE q2.slot_id = q.slot_id AND q2.status = 'waiting' AND q2.queue_number <= q.queue_number
+             WHERE q2.slot_id = q.slot_id AND q2.status = 'waiting'
+               AND ${queueAtOrBeforePredicate("q2", "q")}
            ) AS position,
            (
              SELECT COUNT(*) FROM queues q3
@@ -2086,9 +2302,13 @@ router.post(
     try {
       await conn.beginTransaction();
 
-      // 1. Look up which slot this entry belongs to. This plain read is
-      // safe without a lock because slot_id is immutable once a queue
-      // entry is created.
+      // 1. Look up which slot this entry belongs to, so we know which
+      // queue_slots row to lock first.
+      //
+      // This read is intentionally unlocked, but slot_id is NO LONGER
+      // immutable: staff can relay a waiting student to another queue
+      // (POST /queue-hosting/:slotId/entries/:queueId/transfer). The
+      // re-check after the row lock below closes that window.
       const [[entryLookup]] = await conn.query(
         `SELECT slot_id FROM queues WHERE queue_id = ?`,
         [queueId],
@@ -2115,6 +2335,21 @@ router.post(
       if (!entry) {
         await conn.rollback();
         return res.status(404).json({ error: "Queue entry not found" });
+      }
+      // Staff relayed this entry to a different queue between the unlocked
+      // read above and this row lock, so the slot we locked is no longer
+      // the one we're about to mutate and settle. Locking the new slot now
+      // would take a queue_slots lock while already holding a queues lock
+      // -- the reverse of the order every other route (and transfer
+      // itself) uses, which is exactly how deadlocks happen. Bail out and
+      // let the client retry instead; the window is sub-second and the
+      // retry lands cleanly on the new slot.
+      if (entry.slot_id !== entryLookup.slot_id) {
+        await conn.rollback();
+        return res.status(409).json({
+          error: "Staff just moved you to another queue. Please try again.",
+          code: "QUEUE_MOVED_RETRY",
+        });
       }
       if (entry.student_id !== studentId) {
         await conn.rollback();
@@ -2322,6 +2557,7 @@ router.get(
            a.appointment_date,
            a.status,
            a.notes,
+           (af.appointment_id IS NOT NULL) AS has_feedback,
            a.rejection_reason,
            a.booking_year_program,
            a.course_code,
@@ -2347,6 +2583,9 @@ router.get(
          JOIN departments  d ON f.department_id = d.department_id
          LEFT JOIN faculty_availability fda ON a.availability_id = fda.availability_id
          LEFT JOIN appointment_services s ON a.service_id = s.service_id
+         -- Lets the booking page surface "you haven't rated this yet"
+         -- without a second request per appointment.
+         LEFT JOIN appointment_feedback af ON af.appointment_id = a.appointment_id
          WHERE a.student_id = ?
          ORDER BY a.created_at DESC`,
         [studentId],
@@ -2357,6 +2596,9 @@ router.get(
         trackingNumber: row.tracking_number ?? null,
         availabilityId: row.availability_id,
         appointmentType: row.service_name ?? null,
+        // mysql2 returns this as 0/1, not a boolean -- coerce, or a strict
+        // comparison on the client silently always takes one branch.
+        hasFeedback: !!row.has_feedback,
         college: row.college,
         collegeAbbrev: row.college_abbrev ?? "",
         person: row.faculty_name,
@@ -2482,6 +2724,109 @@ router.delete(
       sendServerError(res, error, "Cancel appointment error");
     } finally {
       conn.release();
+    }
+  },
+);
+
+// GET /api/student/appointments/:appointmentId/feedback
+// Returns this student's existing feedback for the appointment, or null.
+// The UI uses it to decide between showing the form and showing what they
+// already said -- feedback is one-shot, so it must never offer a second box.
+router.get(
+  "/appointments/:appointmentId/feedback",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const appointmentId = parseInt(req.params.appointmentId, 10);
+    if (!Number.isInteger(appointmentId) || appointmentId <= 0) {
+      return res.status(400).json({ error: "Invalid appointmentId" });
+    }
+    try {
+      const [[appt]] = await pool.query(
+        `SELECT appointment_id, status FROM appointments
+          WHERE appointment_id = ? AND student_id = ?`,
+        [appointmentId, studentId],
+      );
+      if (!appt) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      const [[row]] = await pool.query(
+        `SELECT feedback_text, created_at FROM appointment_feedback WHERE appointment_id = ?`,
+        [appointmentId],
+      );
+      res.json({
+        // Optional, and only once the meeting actually happened.
+        canSubmit: appt.status === "completed" && !row,
+        feedback: row ? { text: row.feedback_text, createdAt: row.created_at } : null,
+      });
+    } catch (error) {
+      sendServerError(res, error, "Appointment feedback fetch error:");
+    }
+  },
+);
+
+// POST /api/student/appointments/:appointmentId/feedback
+// Body: { feedback }
+//
+// Optional, student-only, exactly once, any time after the appointment is
+// completed (2026-09-30 panel: "evaluation/feedback after appointment").
+// Deliberately separate from appointments.shared_comment, which is the
+// professor's "actions taken" note and is not student-writable.
+router.post(
+  "/appointments/:appointmentId/feedback",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const appointmentId = parseInt(req.params.appointmentId, 10);
+    const text = typeof req.body?.feedback === "string" ? req.body.feedback.trim() : "";
+
+    if (!Number.isInteger(appointmentId) || appointmentId <= 0) {
+      return res.status(400).json({ error: "Invalid appointmentId" });
+    }
+    if (!text) {
+      return res.status(400).json({ error: "Please write your feedback before submitting." });
+    }
+    if (text.length > 2000) {
+      return res.status(400).json({ error: "Feedback must be 2000 characters or fewer." });
+    }
+
+    try {
+      const [[appt]] = await pool.query(
+        `SELECT appointment_id, status FROM appointments
+          WHERE appointment_id = ? AND student_id = ?`,
+        [appointmentId, studentId],
+      );
+      if (!appt) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      if (appt.status !== "completed") {
+        return res.status(409).json({
+          error: "You can only leave feedback once the appointment is completed.",
+        });
+      }
+
+      try {
+        await pool.query(
+          `INSERT INTO appointment_feedback (appointment_id, student_id, feedback_text)
+           VALUES (?, ?, ?)`,
+          [appointmentId, studentId, text],
+        );
+      } catch (err) {
+        // appointment_id is the PRIMARY KEY, so a double-submit (double tap,
+        // or two tabs) collides here rather than creating a second row --
+        // the "exactly once" rule is enforced by the schema, not by the UI
+        // hiding the form.
+        if (err.code === "ER_DUP_ENTRY") {
+          return res.status(409).json({ error: "You've already left feedback for this appointment." });
+        }
+        throw err;
+      }
+
+      res.status(201).json({ message: "Thanks for your feedback." });
+    } catch (error) {
+      sendServerError(res, error, "Appointment feedback submit error:");
     }
   },
 );

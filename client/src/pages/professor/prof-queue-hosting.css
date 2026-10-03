@@ -1,0 +1,137 @@
+/* Faculty queue hosting.
+ *
+ * Nearly everything here is inherited from adm-queue-hosting.css, which this
+ * page imports -- the two hosts run the same screen, so they share the same
+ * stylesheet rather than keeping two copies in sync by hand. What remains
+ * below is only what the faculty variant genuinely adds or overrides. */
+
+/* Page container. The admin equivalent inherits padding from
+   .admin-dashboard-main; this page's shell is .dashboard-main, which also
+   sets text-align:center -- so the left-align reset lives here too. */
+.pqh-page {
+  padding: 1.5rem;
+  text-align: left;
+}
+
+/* Vertical rhythm between the header, the action row and the tiles. The
+   admin page gets this from its own surrounding layout. */
+.pqh-page .aqh-actions-row {
+  margin: 1.25rem 0;
+}
+
+.pqh-page .aqh-summary-grid {
+  margin-bottom: 1.5rem;
+}
+
+/* Four tiles, not the admin's five (no "manually closed" bucket -- faculty
+   only ever see their own queues, so that column would almost always be 0). */
+.pqh-summary-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* A faculty card carries six actions; the admin's equivalent has three,
+   because its Call Next / Mark Arrived / Done live in the separate Manage
+   view that faculty don't have. Side by side with the title that squeezed
+   the service name into a two-word-wide column, so the cluster gets its
+   own row here. Deliberate divergence from the admin card, forced by the
+   extra controls. */
+.pqh-page .aqh-queue-card-top {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.85rem;
+}
+
+.pqh-page .aqh-queue-card-top-right {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.pqh-page .aqh-queue-card-actions {
+  flex-wrap: wrap;
+}
+
+/* The admin page groups queues with filters; faculty have few enough to
+   group with plain headings instead, so this one heading style is ours. */
+.aqh-section-title {
+  margin: 1.75rem 0 0.9rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Matches .dash-error-banner on the admin side, which lives in
+   adm-dashboard.css -- redefined here rather than importing that whole
+   dashboard stylesheet just for one rule. */
+.dash-error-banner {
+  margin: 1rem 0;
+  padding: 0.8rem 1.1rem;
+  border-radius: 0.6rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  font-size: 0.9rem;
+}
+
+/* Shown when the college office hasn't delegated anything yet -- the normal
+   state for most staff, so it explains itself rather than looking broken. */
+.pqh-empty {
+  margin-top: 1.5rem;
+  padding: 2rem 1.5rem;
+  border: 1px dashed var(--card-border);
+  border-radius: 0.9rem;
+  text-align: center;
+}
+
+.pqh-empty h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  color: var(--text-primary);
+}
+
+.pqh-empty p {
+  margin: 0 auto;
+  max-width: 34rem;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+}
+
+.pqh-muted {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin: 0.75rem 0;
+}
+
+/* ── "Open a Queue" form fields (inside the shared FormModal) ───────── */
+.pqh-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1;
+}
+
+.pqh-field span {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.pqh-field select,
+.pqh-field input {
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.55rem;
+  border: 1px solid var(--card-border);
+  background: var(--input-bg, transparent);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.pqh-field-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .pqh-summary-grid { grid-template-columns: repeat(2, 1fr); }
+  .pqh-field-row { flex-direction: column; }
+}

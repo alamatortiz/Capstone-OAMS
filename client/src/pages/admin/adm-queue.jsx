@@ -11,6 +11,7 @@ import QueueReasonModal from "../../components/QueueReasonModal";
 import QueueProgressBars from "../../components/QueueProgressBars";
 import PageHeader from "../../components/PageHeader";
 import FilterSelect from "../../components/FilterSelect";
+import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import { getCollegeLogo } from "../../data/collegeLogo";
 import { formatTimeString } from "../../utils/dateTime";
 
@@ -159,6 +160,12 @@ export default function AdminQueue() {
   const [visibleEntryCount, setVisibleEntryCount] = useState(3);
   const ENTRIES_PAGE_SIZE = 3;
 
+  // ── Relay: move a mis-queued student without losing their place ─────────
+  const [moveTarget, setMoveTarget] = useState(null); // { queueId, name }
+  const [moveDestId, setMoveDestId] = useState("");
+  const [moving, setMoving] = useState(false);
+  useLockBodyScroll(!!moveTarget);
+
   // Lets other pages (e.g. Queue Hosting Management) jump straight into this
   // queue's monitor view instead of requiring the in-page Monitor button.
   // Clears the consumed nav state afterward -- unlike a route change, "Back
@@ -191,6 +198,25 @@ export default function AdminQueue() {
       setLoadingEntries(false);
     }
   }, [monitoringQueueId]);
+
+  const handleMove = useCallback(async () => {
+    if (!moveTarget || !moveDestId) return;
+    setMoving(true);
+    try {
+      await api.post(
+        `/admin/queue-hosting/${monitoringQueueId}/entries/${moveTarget.queueId}/transfer`,
+        { targetSlotId: Number(moveDestId) },
+      );
+      toast.success(`${moveTarget.name} moved — they keep their place in line`);
+      setMoveTarget(null);
+      setMoveDestId("");
+      await fetchQueueEntries();
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? "Could not move that student");
+    } finally {
+      setMoving(false);
+    }
+  }, [moveTarget, moveDestId, monitoringQueueId, fetchQueueEntries]);
 
   useEffect(() => {
     fetchQueueEntries();
@@ -390,6 +416,43 @@ export default function AdminQueue() {
         mainClassName="admin-queue-main"
         overlay={
           <>
+            {/* Relay: pick which open queue to move this student into. Only
+                other OPEN queues in the department are offered, since the
+                server rejects anything else anyway. */}
+            {moveTarget && (
+              <div className="queue-move-overlay" role="dialog" aria-modal="true" aria-label="Move student" onClick={() => setMoveTarget(null)}>
+                <div className="queue-move-sheet" onClick={(e) => e.stopPropagation()}>
+                  <div className="queue-move-header">
+                    <h2>Move {moveTarget.name}</h2>
+                    <button type="button" onClick={() => setMoveTarget(null)} aria-label="Close">×</button>
+                  </div>
+                  <div className="queue-move-body">
+                    <p className="queue-move-note">
+                      They keep their place in line — the destination orders them by when they
+                      originally joined, not by when they were moved.
+                    </p>
+                    <select
+                      className="queue-move-select"
+                      value={moveDestId}
+                      onChange={(e) => setMoveDestId(e.target.value)}
+                    >
+                      <option value="">Choose a queue…</option>
+                      {queueDetails
+                        .filter((q) => q.id !== monitoringQueueId && q.status === "open")
+                        .map((q) => (
+                          <option key={q.id} value={q.id}>{q.queueType}</option>
+                        ))}
+                    </select>
+                  </div>
+                  <div className="queue-move-actions">
+                    <button type="button" className="queue-move-cancel" onClick={() => setMoveTarget(null)}>Cancel</button>
+                    <button type="button" className="queue-move-confirm" onClick={handleMove} disabled={!moveDestId || moving}>
+                      {moving ? "Moving…" : "Move student"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             <QueueReasonModal
               show={!!reasonModal}
               title={reasonModal?.mode === "pause" ? "Pause Queue" : "Stop Queue"}
@@ -716,6 +779,18 @@ export default function AdminQueue() {
                           </h4>
                         </div>
                         <div className="queue-entry-badges">
+                          {/* Explains an out-of-order position: without these
+                              a priority or relayed entry looks like a bug. */}
+                          {entry.isPriority && (
+                            <span className="queue-entry-flag queue-entry-flag--priority" title="Was left unserved previously">
+                              Priority
+                            </span>
+                          )}
+                          {entry.wasTransferred && (
+                            <span className="queue-entry-flag queue-entry-flag--moved" title="Moved here from another queue">
+                              Moved
+                            </span>
+                          )}
                           <span className={`queue-entry-status queue-entry-status--${entry.status}`}>
                             {getEntryStatusLabel(entry)}
                           </span>
@@ -732,10 +807,36 @@ export default function AdminQueue() {
                         <p className="queue-entry-concern">
                           <strong>Concern:</strong> {entry.concern}
                         </p>
+                        {/* What the student says they brought, ticked off
+                            while waiting -- lets staff spot an unprepared
+                            visit before calling them up. */}
+                        {entry.requirementsReady && (
+                          <p className="queue-entry-concern">
+                            <strong>Requirements:</strong>{" "}
+                            <span
+                              className={
+                                entry.requirementsReady.checked === entry.requirementsReady.total
+                                  ? "queue-entry-ready"
+                                  : "queue-entry-not-ready"
+                              }
+                            >
+                              {entry.requirementsReady.checked}/{entry.requirementsReady.total} confirmed
+                            </span>
+                          </p>
+                        )}
                         <p className="queue-entry-time">
                           <ClockIcon />
                           Joined at {entry.joinedAt}
                         </p>
+                        {entry.status === "waiting" && (
+                          <button
+                            type="button"
+                            className="queue-entry-move-btn"
+                            onClick={() => setMoveTarget({ queueId: entry.queueId, name: entry.studentName })}
+                          >
+                            Move to another queue
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))

@@ -39,6 +39,16 @@ const CalendarIconNav = () => (
 );
 const FileTextNavIcon = () => <LucideFileText />;
 const MegaphoneNavIcon = () => <LucideMegaphone />;
+// Matches the "people in a line" glyph the student and admin sidebars use
+// for queueing, so the same concept reads the same across all three roles.
+const QueueIconNav = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+    <circle cx="9" cy="7" r="4"></circle>
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+  </svg>
+);
 const HistoryIconNav = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
@@ -92,11 +102,12 @@ const MoonIcon = () => (
   </svg>
 );
 
-// Where a clicked notification should land, by its `type`. Professor has no
-// dedicated queue screen, so that one falls back to the dashboard;
-// announcements now route to their own screen.
+// Where a clicked notification should land, by its `type`. Faculty now have
+// their own queue screen (for services the college office delegates to
+// them), so queue notifications go there instead of the dashboard;
+// announcements route to their own screen.
 const NOTIFICATION_TYPE_PATHS = {
-  queue: "/professor/dashboard",
+  queue: "/professor/queue-hosting",
   document: "/professor/document-status",
   appointment: "/professor/appointments",
   announcement: "/professor/announcements",
@@ -115,6 +126,12 @@ const navItems = [
     label: "Appointments",
     path: "/professor/appointments",
     tourId: "nav-appointments",
+  },
+  {
+    icon: QueueIconNav,
+    label: "My Queue",
+    path: "/professor/queue-hosting",
+    tourId: "nav-queue",
   },
   {
     icon: FileTextNavIcon,

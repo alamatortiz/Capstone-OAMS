@@ -263,7 +263,17 @@ CREATE TABLE queue_slots (
     -- NULL service_id never drops a universal slot from a dept-scoped query.
     department_id   INT          NOT NULL,
     is_universal    BOOLEAN      NOT NULL DEFAULT FALSE,
-    admin_id        INT          NOT NULL,
+    -- The secretary who CONFIGURED this slot's window. NULL when a faculty
+    -- member opened their own delegated queue directly. Distinct from
+    -- host_user_id below: this is "who set it up", that is "who is running it".
+    admin_id        INT          NULL,
+    -- Who is actually hosting. Generic users.user_id rather than a pair of
+    -- nullable admin/faculty columns: administrators.admin_id and
+    -- faculty.faculty_id are both PK-FKs onto users.user_id, so there's no
+    -- ID-space collision, and every ownership check stays one predicate
+    -- instead of a two-branch COALESCE in ~10 route handlers.
+    host_user_id    INT          NOT NULL,
+    host_role       ENUM('admin','faculty') NOT NULL DEFAULT 'admin',
     slot_date       DATE         NOT NULL,
     start_time      TIME         NOT NULL,
     end_time        TIME         NOT NULL,
@@ -279,6 +289,7 @@ CREATE TABLE queue_slots (
     FOREIGN KEY (service_id)    REFERENCES services(service_id),
     FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE RESTRICT,
     FOREIGN KEY (admin_id)      REFERENCES administrators(admin_id),
+    FOREIGN KEY (host_user_id)  REFERENCES users(user_id),
     -- Non-unique on purpose. A UNIQUE key here would let a completed/closed slot
     -- permanently block re-hosting that same window ("Host Again"). Uniqueness
     -- among *live* queues is enforced in POST /queue-hosting by the status-aware
@@ -287,7 +298,10 @@ CREATE TABLE queue_slots (
     INDEX idx_slot_window (service_id, slot_date, start_time),
     -- Backs the dept-scoped lookups used everywhere now that scoping is by
     -- department_id, and the "one live universal per dept" / overlap checks.
-    INDEX idx_slot_dept_date_status (department_id, slot_date, status)
+    INDEX idx_slot_dept_date_status (department_id, slot_date, status),
+    -- Backs "which queues am I hosting today", the faculty hosting screen's
+    -- primary read.
+    INDEX idx_slot_host (host_user_id, slot_date, status)
 );
 
 -- ─────────────────────────────────────────────────────────────
@@ -299,6 +313,14 @@ CREATE TABLE queues (
     service_id      INT          NOT NULL,
     slot_id         INT          NULL,
     queue_number    INT          NOT NULL,
+    -- queue_number CANNOT be renumbered to express priority or a transfer --
+    -- uq_queue_slot_number below turns any shuffle into a deadlock farm. So
+    -- queue_number stays a stable display label and the canonical ordering is
+    --   ORDER BY priority_rank DESC, created_at ASC, queue_id ASC
+    -- (see server/utils/queueDisplay.js). A priority credit sets rank 1; a
+    -- relayed entry keeps its ORIGINAL created_at, which by itself lands it
+    -- mid-line in the destination rather than at the back.
+    priority_rank   TINYINT      NOT NULL DEFAULT 0,
     status          ENUM('waiting','serving','completed','cancelled','no_show') DEFAULT 'waiting',
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     -- Auto-touched on any change to this row (status, notes, etc). Lets the
@@ -324,6 +346,17 @@ CREATE TABLE queues (
     -- from `notes` (the student's own concern text) so neither overwrites
     -- the other.
     admin_reason    VARCHAR(255) NULL,
+    -- Mirrors appointments.cancelled_by so both modules attribute an ended
+    -- record the same way. 'system_not_entertained' is the queue equivalent
+    -- of the appointment sweeper's value: the office closed before reaching
+    -- this student (they are also issued a queue_priority_credits row).
+    cancelled_by    ENUM('student','admin','faculty','system','system_no_show','system_not_entertained') NULL,
+    -- Set when staff relayed this entry here from another queue. The entry
+    -- keeps its original created_at so it doesn't lose its place.
+    transferred_from_slot_id INT NULL,
+    -- Provenance, so analytics can tell pre-cutover online joins from the
+    -- on-site QR joins that replaced them (2026-09-30 panel requirement).
+    joined_via      ENUM('online','onsite_qr') NOT NULL DEFAULT 'onsite_qr',
     -- The service label to show for this ticket, frozen at join time. For a
     -- normal queue it's the service's name as it was then; for a Universal
     -- Service Queue it's "Universal Service Queue - <picked service>". Every
@@ -333,6 +366,7 @@ CREATE TABLE queues (
     FOREIGN KEY (student_id) REFERENCES students(student_id),
     FOREIGN KEY (service_id) REFERENCES services(service_id),
     FOREIGN KEY (slot_id)    REFERENCES queue_slots(slot_id),
+    FOREIGN KEY (transferred_from_slot_id) REFERENCES queue_slots(slot_id) ON DELETE SET NULL,
     -- Defense-in-depth: queue numbers are generated app-side under a row
     -- lock on the owning slot (POST /queues/join), but nothing previously
     -- stopped a duplicate at the DB layer if that ever got bypassed.
@@ -340,7 +374,9 @@ CREATE TABLE queues (
     -- Supports the per-service/date-range aggregate queries used by
     -- GET /admin/queue-analytics (performance, peak-hour, and trend
     -- comparisons all filter+group on this pair).
-    INDEX idx_queues_service_created (service_id, created_at)
+    INDEX idx_queues_service_created (service_id, created_at),
+    -- Backs the canonical waiting-list ordering described on priority_rank.
+    INDEX idx_queue_order (slot_id, status, priority_rank, created_at)
 );
 
 -- Audit trail for all queue status transitions
@@ -354,6 +390,111 @@ CREATE TABLE queue_status_logs (
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (queue_id)   REFERENCES queues(queue_id)   ON DELETE CASCADE,
     FOREIGN KEY (changed_by) REFERENCES users(user_id)     ON DELETE SET NULL
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 7b. ON-SITE QUEUEING (2026-09-30 panel review)
+-- Queueing is on-site only: a student can no longer join from
+-- anywhere, they must scan a rotating code shown by the host.
+-- ─────────────────────────────────────────────────────────────
+
+-- Which faculty may host which service's queue. Authorization about a
+-- *service*, independent of any one slot -- queue_slots.host_user_id can only
+-- say who is running a queue right now, not who is permitted to.
+CREATE TABLE service_delegations (
+    delegation_id   INT          AUTO_INCREMENT PRIMARY KEY,
+    service_id      INT          NOT NULL,
+    faculty_id      INT          NOT NULL,
+    delegated_by    INT          NOT NULL,          -- administrators.admin_id
+    is_active       BOOLEAN      NOT NULL DEFAULT TRUE,
+    revoked_at      TIMESTAMP    NULL,
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    -- One row per pair; re-delegating flips is_active back on rather than
+    -- inserting a duplicate, so the record of who granted it is preserved.
+    UNIQUE KEY uq_service_faculty (service_id, faculty_id),
+    INDEX idx_delegation_faculty (faculty_id, is_active),
+    FOREIGN KEY (service_id)   REFERENCES services(service_id)       ON DELETE CASCADE,
+    FOREIGN KEY (faculty_id)   REFERENCES faculty(faculty_id)        ON DELETE CASCADE,
+    FOREIGN KEY (delegated_by) REFERENCES administrators(admin_id)
+);
+
+-- The rotating on-site join code. Only a sha256 hash is stored, never the raw
+-- token -- a DB dump must not hand someone a working join code.
+--
+-- Tokens are deliberately MULTI-USE within their TTL: many students scan the
+-- same screen at once. Replay is bounded by the short window (~60s) plus the
+-- existing per-slot duplicate-join guard, not by single-use consumption.
+CREATE TABLE queue_slot_tokens (
+    token_id        BIGINT       AUTO_INCREMENT PRIMARY KEY,
+    slot_id         INT          NOT NULL,
+    token_hash      CHAR(64)     NOT NULL,          -- sha256 hex of 32 random bytes
+    issued_by       INT          NOT NULL,          -- users.user_id of the host
+    issued_at       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    expires_at      DATETIME     NOT NULL,
+    -- Set when the slot is paused/closed or a newer token supersedes this one,
+    -- so a code left displayed on a sleeping screen dies immediately instead
+    -- of lingering until its TTL runs out.
+    revoked_at      DATETIME     NULL,
+    UNIQUE KEY uq_token_hash (token_hash),
+    INDEX idx_token_slot_exp (slot_id, expires_at),
+    FOREIGN KEY (slot_id)   REFERENCES queue_slots(slot_id) ON DELETE CASCADE,
+    FOREIGN KEY (issued_by) REFERENCES users(user_id)
+);
+
+-- A host forgiving a student's no-show block in person.
+--
+-- There is deliberately NO no_show_count column: strikes are derived by
+-- COUNTing today's queues.status='no_show' rows, so they can never drift out
+-- of sync with the entries they describe. This table records only the
+-- exceptions. cleared_at doubles as a watermark -- strikes are recounted from
+-- it, so a student who no-shows again after being forgiven is blocked again.
+CREATE TABLE queue_block_overrides (
+    override_id     INT          AUTO_INCREMENT PRIMARY KEY,
+    student_id      INT          NOT NULL,
+    block_date      DATE         NOT NULL,
+    cleared_by      INT          NOT NULL,          -- users.user_id (admin or faculty host)
+    cleared_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    note            VARCHAR(255) NULL,
+    INDEX idx_override_student_date (student_id, block_date),
+    FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+    FOREIGN KEY (cleared_by) REFERENCES users(user_id)
+);
+
+-- Compensation for being left unserved when a queue closes.
+--
+-- Nothing may be RESERVED for the student -- that would reintroduce the online
+-- reservation the panel removed. A credit is inert: it does nothing until the
+-- student physically comes back and scans in again, at which point it puts
+-- them at the front (priority_rank = 1) and is consumed. Never returning just
+-- lets it expire.
+CREATE TABLE queue_priority_credits (
+    credit_id         INT        AUTO_INCREMENT PRIMARY KEY,
+    student_id        INT        NOT NULL,
+    service_id        INT        NOT NULL,
+    source_queue_id   INT        NULL,              -- the entry that went unserved
+    reason            VARCHAR(255) NULL,
+    expires_at        DATETIME   NOT NULL,
+    consumed_at       DATETIME   NULL,
+    consumed_queue_id INT        NULL,              -- the entry that spent it
+    created_at        TIMESTAMP  DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_credit_lookup (student_id, service_id, consumed_at, expires_at),
+    FOREIGN KEY (student_id)        REFERENCES students(student_id) ON DELETE CASCADE,
+    FOREIGN KEY (service_id)        REFERENCES services(service_id) ON DELETE CASCADE,
+    FOREIGN KEY (source_queue_id)   REFERENCES queues(queue_id)     ON DELETE SET NULL,
+    FOREIGN KEY (consumed_queue_id) REFERENCES queues(queue_id)     ON DELETE SET NULL
+);
+
+-- Pre-processing: the student ticks off the service's requirements from their
+-- phone while waiting, so the host sees a pre-validated checklist when they're
+-- called. Keyed on the queue entry (not the student) so each visit stands alone.
+CREATE TABLE queue_requirement_checks (
+    queue_id        INT          NOT NULL,
+    requirement_id  INT          NOT NULL,
+    is_checked      BOOLEAN      NOT NULL DEFAULT FALSE,
+    checked_at      TIMESTAMP    NULL,
+    PRIMARY KEY (queue_id, requirement_id),
+    FOREIGN KEY (queue_id)       REFERENCES queues(queue_id)                     ON DELETE CASCADE,
+    FOREIGN KEY (requirement_id) REFERENCES service_requirements(requirement_id) ON DELETE CASCADE
 );
 
 -- ─────────────────────────────────────────────────────────────
@@ -518,6 +659,24 @@ CREATE TABLE appointments (
     -- automatically from their own FK definitions above.
     INDEX idx_appointments_student (student_id),
     INDEX idx_appointments_dept_service (department_id, service_id)
+);
+
+-- Optional student feedback on a finished appointment (2026-09-30 panel
+-- review: "evaluation/feedback after appointment").
+--
+-- appointment_id is the PRIMARY KEY, not merely indexed -- that is what
+-- enforces "exactly once" at the DB layer, so a double-submit races into a
+-- duplicate-key error instead of producing two rows. Deliberately separate
+-- from appointments.shared_comment, which is the professor's "actions taken"
+-- note and is not student-writable.
+CREATE TABLE appointment_feedback (
+    appointment_id  INT          PRIMARY KEY,
+    student_id      INT          NOT NULL,
+    feedback_text   TEXT         NOT NULL,
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_feedback_student (student_id),
+    FOREIGN KEY (appointment_id) REFERENCES appointments(appointment_id) ON DELETE CASCADE,
+    FOREIGN KEY (student_id)     REFERENCES students(student_id)         ON DELETE CASCADE
 );
 
 -- ─────────────────────────────────────────────────────────────

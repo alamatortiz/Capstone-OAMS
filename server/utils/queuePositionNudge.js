@@ -1,5 +1,6 @@
 const pool = require("../db");
 const { createNotification } = require("./notifications");
+const { queueOrderBy } = require("./queueDisplay");
 
 // After the front of a slot's line advances (a student was called, or someone
 // ahead left), the students now at position #2 and #3 get a one-shot
@@ -14,7 +15,7 @@ async function notifyAlmostUp(slotId) {
        FROM queues q
        JOIN services s ON q.service_id = s.service_id
       WHERE q.slot_id = ? AND q.status = 'waiting'
-      ORDER BY q.queue_number ASC
+      ORDER BY ${queueOrderBy("q")}
       LIMIT 3`,
     [slotId],
   );

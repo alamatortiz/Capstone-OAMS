@@ -113,6 +113,9 @@ const ProfessorDocumentStatusPage = React.lazy(
 const ProfessorScheduleManagerPage = React.lazy(
   () => import("./pages/professor/prof-schedule-manager.jsx"),
 );
+const ProfessorQueueHostingPage = React.lazy(
+  () => import("./pages/professor/prof-queue-hosting.jsx"),
+);
 const ProfessorNotifications = React.lazy(
   () => import("./pages/professor/prof-notifications.jsx"),
 );
@@ -310,6 +313,16 @@ createRoot(document.getElementById("root")).render(
                 element={
                   <Suspense fallback={<LoadingFallback />}>
                     <ProfessorScheduleManagerPage />
+                  </Suspense>
+                }
+              />
+              {/* ★ Queue hosting — for services the college office has
+                  delegated to this faculty member */}
+              <Route
+                path="/professor/queue-hosting"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ProfessorQueueHostingPage />
                   </Suspense>
                 }
               />

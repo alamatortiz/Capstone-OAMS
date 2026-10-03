@@ -48,7 +48,21 @@ async function settleSlotAfterEntryChange(db, slotId) {
 // returning null so the caller can just `if (!slot) return;`. Returns
 // ({ slot_id, status, department_id, is_universal, service_name }) on success;
 // service_name is null for a universal slot.
+// Routes derive slotId with parseInt(), which yields NaN for a non-numeric
+// path segment. mysql2 then serialises NaN into the SQL as the bare token
+// `NaN`, which MySQL parses as a column identifier -- so a bad :slotId came
+// back as a 500 "Unknown column 'NaN' in 'where clause'" instead of a clean
+// 404. Reject it before it ever reaches a query.
+function isValidSlotId(slotId) {
+  return Number.isInteger(slotId) && slotId > 0;
+}
+
 async function getOwnedSlotOrRespond(conn, res, { slotId, deptId }) {
+  if (!isValidSlotId(slotId)) {
+    await conn.rollback();
+    res.status(404).json({ error: "Queue slot not found" });
+    return null;
+  }
   const [[slot]] = await conn.query(
     `SELECT qs.slot_id, qs.status, qs.department_id, qs.is_universal,
             CASE WHEN qs.is_universal THEN 'Universal Service Queue' ELSE s.service_name END AS service_name
@@ -70,4 +84,4 @@ async function getOwnedSlotOrRespond(conn, res, { slotId, deptId }) {
   return slot;
 }
 
-module.exports = { settleSlotAfterEntryChange, getOwnedSlotOrRespond };
+module.exports = { settleSlotAfterEntryChange, getOwnedSlotOrRespond, isValidSlotId };
