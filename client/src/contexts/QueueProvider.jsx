@@ -316,6 +316,9 @@ export function QueueProvider({ children }) {
       "queue:student-left",
       "queue:notes-updated",
       "queue:service-updated",
+      // Staff relayed this student to another queue -- their slot, service
+      // and position all change, so the ticket has to be refetched.
+      "queue:transferred",
     ];
     events.forEach((event) => socket.on(event, refetch));
 
@@ -356,10 +359,14 @@ export function QueueProvider({ children }) {
   }, [token]);
 
   // ── Join a queue ──────────────────────────────────────────────────────────
+  // Takes the scanned QR token, not a slotId: since the 2026-09-30 panel
+  // review the server resolves the queue from the code itself, so the client
+  // can no longer name which queue it wants to join. A student has to be
+  // standing in front of the host's screen.
   const joinQueue = useCallback(
-    async (slotId, notes, serviceId = null) => {
+    async (qrToken, notes, serviceId = null) => {
       try {
-        const { data } = await api.post("/student/queues/join", { slotId, notes, serviceId });
+        const { data } = await api.post("/student/queues/join", { qrToken, notes, serviceId });
         setQueues((prev) => [...prev, data.queue]);
         await fetchAvailableSlots();
         await fetchActiveQueues();

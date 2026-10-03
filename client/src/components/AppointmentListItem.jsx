@@ -1,4 +1,4 @@
-import { Calendar, XCircle, CheckCircle2, AlertCircle, MapPin, Clock } from "lucide-react";
+import { Calendar, XCircle, CheckCircle2, AlertCircle, MapPin, Clock, MessageSquare } from "lucide-react";
 import { getAppointmentActions } from "../utils/appointmentActions";
 import "./AppointmentListItem.css";
 
@@ -26,6 +26,12 @@ export default function AppointmentListItem({
   showReportButton = false,
   onReport,
   isReporting = false,
+  // Unlike the others this has no getAppointmentActions() gate -- whether
+  // feedback is still open depends on a DB row, not on the appointment's
+  // own fields, so the caller decides (see awaitingFeedback in
+  // stud-appointments.jsx).
+  showFeedbackButton = false,
+  onFeedback,
 }) {
   const { label, cls } = STATUS_META[appointment.status] ?? {
     label: appointment.status,
@@ -84,8 +90,22 @@ export default function AppointmentListItem({
         </div>
       )}
 
-      {((showCancelButton && canCancel) || (showCompleteButton && canComplete) || (showReportButton && canReportNotServed)) && (
+      {((showCancelButton && canCancel) || (showCompleteButton && canComplete) || (showReportButton && canReportNotServed) || showFeedbackButton) && (
         <div className="apt-list-btn-row">
+          {showFeedbackButton && (
+            <button
+              type="button"
+              className="apt-list-btn-sm apt-list-btn-sm-feedback"
+              onClick={(e) => {
+                e.stopPropagation();
+                onFeedback?.(appointment);
+              }}
+              title="Provide Feedback"
+            >
+              <MessageSquare />
+              Provide Feedback
+            </button>
+          )}
           {showCompleteButton && canComplete && (
             <button
               type="button"

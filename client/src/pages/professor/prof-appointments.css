@@ -971,3 +971,20 @@ html, body {
   color: var(--text-tertiary);
   opacity: 0.85;
 }
+
+/* ─── Student feedback (read-only) ────────────────────────────────────────── */
+/* Blue-tinted so it never reads as the professor's own Actions Taken note. */
+.appt-feedback-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #2563eb;
+}
+
+.appt-feedback-body {
+  margin-top: 0.5rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.55rem;
+  background: rgba(37, 99, 235, 0.07);
+  border-left: 3px solid #2563eb;
+}

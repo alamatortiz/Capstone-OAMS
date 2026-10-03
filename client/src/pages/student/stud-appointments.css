@@ -884,3 +884,43 @@ body {
 }
 
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* ── Needs Feedback tab ─────────────────────────────────────────────── */
+
+/* Amber rather than the tab strip's usual purple: this count is a nudge
+   ("you owe these a rating"), not a neutral total like the other tabs. */
+.ab-tab-count--attention {
+  background: rgba(245, 158, 11, 0.18);
+  color: #d97706;
+}
+
+.ab-feedback-intro {
+  margin: 0 0 0.9rem;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+
+.ab-feedback-input {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--card-border);
+  background: var(--input-bg, transparent);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 5.5rem;
+}
+
+.ab-feedback-input:focus {
+  outline: none;
+  border-color: #a855f7;
+}
+
+.ab-feedback-count {
+  margin: 0.4rem 0 0;
+  text-align: right;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}

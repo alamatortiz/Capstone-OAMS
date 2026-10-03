@@ -1061,3 +1061,63 @@
   color: var(--text-tertiary);
   font-style: italic;
 }
+
+/* ── Post-appointment feedback ──────────────────────────────────────
+   Optional, one-shot; see FeedbackCard in stud-appointment-status.jsx. */
+.apst-feedback-intro {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.apst-feedback-input {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--card-border);
+  background: var(--input-bg, transparent);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 5.5rem;
+}
+
+.apst-feedback-input:focus {
+  outline: none;
+  border-color: #a855f7;
+}
+
+.apst-feedback-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.6rem;
+}
+
+.apst-feedback-count {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+
+.apst-feedback-submit {
+  padding: 0.5rem 1rem;
+  border-radius: 0.6rem;
+  /* Appointments are purple throughout this page (see .apst-* above);
+     green here was the only off-theme element on the screen. */
+  border: 1px solid #a855f7;
+  background: #a855f7;
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.apst-feedback-submit:hover:not(:disabled) { background: #9333ea; }
+
+.apst-feedback-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

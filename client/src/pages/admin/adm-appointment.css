@@ -833,7 +833,8 @@ body {
 
 @media (min-width: 768px) {
   .admin-appointment-card-details {
-    grid-template-columns: repeat(4, 1fr);
+    /* Student gets a wider share so the name and student number fit on one line. */
+    grid-template-columns: 1.6fr 1fr 1fr 1fr;
   }
 }
 
@@ -1070,4 +1071,25 @@ body {
 
 @media (max-width: 380px) {
   .admin-appointment-card-details { grid-template-columns: 1fr; }
+}
+
+/* Student feedback: blue accent so it's distinct from the faculty's comments. */
+.admin-appointment-modal-feedback {
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.55rem;
+  background: rgba(37, 99, 235, 0.07);
+  border-left: 3px solid #2563eb;
+}
+
+/* Student number sits beside the name, not under it. */
+.admin-appointment-detail-student-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.admin-appointment-detail-student-row .admin-appointment-detail-id-badge {
+  margin-top: 0;
 }

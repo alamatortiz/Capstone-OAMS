@@ -87,6 +87,91 @@ function CommentCard({ appt }) {
   );
 }
 
+// The student's own say on how the appointment went (2026-09-30 panel:
+// "evaluation/feedback after appointment"). Optional, available any time
+// once the appointment is completed, and submittable exactly once -- the
+// DB enforces that via a PK on appointment_id, so this form closing is a
+// reflection of the rule rather than the rule itself.
+function FeedbackCard({ appt }) {
+  const [state, setState] = useState(null); // { canSubmit, feedback }
+  const [text, setText] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .get(`/student/appointments/${appt.id}/feedback`)
+      .then(({ data }) => { if (active) setState(data); })
+      .catch(() => { if (active) setState({ canSubmit: false, feedback: null }); });
+    return () => { active = false; };
+  }, [appt.id]);
+
+  const submit = async () => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    setSaving(true);
+    try {
+      await api.post(`/student/appointments/${appt.id}/feedback`, { feedback: trimmed });
+      setState({ canSubmit: false, feedback: { text: trimmed, createdAt: new Date().toISOString() } });
+      toast.success("Thanks for your feedback.");
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? "Couldn't send your feedback. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Nothing to show until the appointment is finished and we know whether
+  // they've already spoken.
+  if (!state || (!state.canSubmit && !state.feedback)) return null;
+
+  return (
+    <div className="apst-card">
+      <div className="apst-card-header">
+        <h3 className="apst-card-title">
+          <MessageSquare style={{ width: "1.25rem", height: "1.25rem", color: "#a855f7" }} />
+          Your Feedback
+        </h3>
+      </div>
+      <div className="apst-card-content">
+        {state.feedback ? (
+          <>
+            <p className="apst-detail-value apst-comment-text">{state.feedback.text}</p>
+            <p className="apst-comment-meta">
+              Submitted on {formatDateShort(state.feedback.createdAt)} — thanks for sharing.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="apst-feedback-intro">
+              Optional, and you can only send it once.
+            </p>
+            <textarea
+              className="apst-feedback-input"
+              placeholder="How's the appointment/service?"
+              value={text}
+              maxLength={2000}
+              rows={4}
+              onChange={(e) => setText(e.target.value)}
+            />
+            <div className="apst-feedback-actions">
+              <span className="apst-feedback-count">{text.length}/2000</span>
+              <button
+                type="button"
+                className="apst-feedback-submit"
+                onClick={submit}
+                disabled={!text.trim() || saving}
+              >
+                {saving ? "Sending…" : "Send Feedback"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Detail View ──────────────────────────────────────────────────────────────
 function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, completing, onReportNotServed, reporting, backLabel = "My Appointments" }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -222,6 +307,9 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, com
           </div>
 
           <CommentCard appt={appt} />
+          {/* Renders itself only once the appointment is completed and
+              they haven't already spoken -- see FeedbackCard. */}
+          <FeedbackCard appt={appt} />
         </div>
 
         <div className="apst-detail-sidebar">

@@ -407,9 +407,11 @@ router.get(
           COALESCE(a.window_start_snapshot, fda.start_time) AS window_start,
           COALESCE(a.window_end_snapshot,   fda.end_time)   AS window_end,
           COALESCE(a.location_snapshot,     fda.location)   AS location,
-          COALESCE(a.slot_note_snapshot,    fda.slot_note)  AS slot_note
+          COALESCE(a.slot_note_snapshot,    fda.slot_note)  AS slot_note,
+          af.feedback_text, af.created_at AS feedback_created_at
         FROM appointments a
         JOIN students s ON a.student_id = s.student_id
+        LEFT JOIN appointment_feedback af ON af.appointment_id = a.appointment_id
         LEFT JOIN appointment_services svc ON a.service_id = svc.service_id
         LEFT JOIN faculty_availability fda ON a.availability_id = fda.availability_id
         WHERE a.faculty_id = ?`;
@@ -464,6 +466,10 @@ router.get(
           completedAtRaw: r.completed_at ?? null,
           cancelledBy: r.cancelled_by ?? null,
           cancelReason: r.cancel_reason ?? null,
+          // Student's one-shot post-appointment feedback (read-only here).
+          studentFeedback: r.feedback_text
+            ? { text: r.feedback_text, createdAt: r.feedback_created_at }
+            : null,
         })),
       );
     } catch (err) {

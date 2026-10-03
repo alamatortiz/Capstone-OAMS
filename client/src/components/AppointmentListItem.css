@@ -399,3 +399,17 @@
   .apt-list-btn-sm { padding: 0.55rem 0.6rem; font-size: 0.78rem; }
   .apt-list-btn-sm svg { width: 0.95rem; height: 0.95rem; }
 }
+
+/* "Rate this appointment" — purple, matching the appointment section's
+   accent (the sibling Complete/Cancel/Not-Served buttons each carry their
+   own semantic colour; this one is informational, so it takes the section's). */
+.apt-list-btn-sm-feedback {
+  color: #9333ea;
+  border-color: rgba(168, 85, 247, 0.35);
+}
+
+.apt-list-btn-sm-feedback:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.1);
+  border-color: rgba(168, 85, 247, 0.65);
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.2);
+}

@@ -16,7 +16,8 @@ import CalendarGrid from "../../components/CalendarGrid";
 import { useAuth } from "../../context/AuthContext";
 import { formatCollegeLabel } from "../../utils/formatCollege";
 import { connectSocket } from "../../utils/socket";
-import { ChevronDown, ChevronLeft, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle, CheckCircle2, AlertCircle, StickyNote, GraduationCap as LucideGraduationCap } from "lucide-react";
+import { ChevronDown, ChevronLeft, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle, CheckCircle2, AlertCircle, StickyNote, MessageSquare, GraduationCap as LucideGraduationCap } from "lucide-react";
+import FormModal from "../../components/FormModal";
 
 // ─── Content Icons ────────────────────────────────────────────────────────────
 const CloseIcon = () => (
@@ -340,6 +341,32 @@ export default function AppointmentsPage() {
   }, {}), [visibleSlots]);
 
   const activeBookings = myBookings.filter((b) => b.status === "pending" || b.status === "approved");
+  // Completed and not yet rated. hasFeedback comes from the appointments
+  // list itself (one LEFT JOIN server-side), so this costs no extra request.
+  const awaitingFeedback = myBookings.filter((b) => b.status === "completed" && !b.hasFeedback);
+
+  // ── Inline feedback (same one-shot POST the detail page's card uses) ──
+  const [feedbackTarget, setFeedbackTarget] = useState(null);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackSaving, setFeedbackSaving] = useState(false);
+
+  const submitFeedback = async () => {
+    const text = feedbackText.trim();
+    if (!feedbackTarget || !text) return;
+    setFeedbackSaving(true);
+    try {
+      await api.post(`/student/appointments/${feedbackTarget.id}/feedback`, { feedback: text });
+      toast.success("Thanks for your feedback.");
+      setFeedbackTarget(null);
+      // Refetch so hasFeedback flips and the row (and possibly the whole
+      // tab) disappears.
+      await fetchMyBookings();
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? "Couldn't send your feedback. Try again.");
+    } finally {
+      setFeedbackSaving(false);
+    }
+  };
 
   const sortedActiveBookings = useMemo(
     () => [...activeBookings].sort((a, b) => a.date.localeCompare(b.date)),
@@ -567,6 +594,35 @@ export default function AppointmentsPage() {
       mainClassName="appointment-main"
       overlay={
         <>
+          {/* Rate a finished appointment, inline from the Needs Feedback
+              tab. Posts to the same one-shot endpoint the detail page's
+              card uses, so "exactly once" stays enforced in one place. */}
+          <FormModal
+            show={!!feedbackTarget}
+            icon={<MessageSquare />}
+            title="Provide Feedback"
+            description={
+              feedbackTarget
+                ? `${feedbackTarget.person ?? "Your professor"} — ${formatDate(feedbackTarget.date)}. Optional, and you can only send it once.`
+                : ""
+            }
+            onCancel={() => setFeedbackTarget(null)}
+            onSubmit={submitFeedback}
+            submitText="Send Feedback"
+            submitDisabled={!feedbackText.trim()}
+            submitting={feedbackSaving}
+          >
+            <textarea
+              className="ab-feedback-input"
+              placeholder="How's the appointment/service?"
+              value={feedbackText}
+              maxLength={2000}
+              rows={4}
+              onChange={(e) => setFeedbackText(e.target.value)}
+            />
+            <p className="ab-feedback-count">{feedbackText.length}/2000</p>
+          </FormModal>
+
           {/* Book Appointment Dialog */}
           {showBookDialog && selectedSlot && (
             <div className="dialog-overlay" onClick={closeBookDialog}>
@@ -792,6 +848,22 @@ export default function AppointmentsPage() {
                 <ClipboardList className="ab-tab-icon" /> Active Bookings
                 <span className="ab-tab-count">{bookingsLoading ? "—" : activeBookings.length}</span>
               </button>
+              {/* Finished appointments the student hasn't rated yet. Without
+                  this the feedback form is only reachable by remembering to
+                  open a completed appointment's detail view, which nobody
+                  does -- so the panel's "evaluation after appointment" ask
+                  would go mostly unused. Hidden entirely when there's
+                  nothing to rate, so it isn't a permanent empty tab. */}
+              {awaitingFeedback.length > 0 && (
+                <button
+                  type="button"
+                  className={`ab-tab ${activeTab === "feedback" ? "active" : ""}`}
+                  onClick={() => setActiveTab("feedback")}
+                >
+                  <MessageSquare className="ab-tab-icon" /> Needs Feedback
+                  <span className="ab-tab-count ab-tab-count--attention">{awaitingFeedback.length}</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -873,6 +945,28 @@ export default function AppointmentsPage() {
                   ))}
                 </div>
               )}
+            </>
+          )}
+
+          {/* Needs Feedback */}
+          {activeTab === "feedback" && (
+            <>
+              <p className="ab-feedback-intro">
+                These appointments are finished. Rating them is optional, and you can only
+                send it once.
+              </p>
+              <div className="bookings-list">
+                {awaitingFeedback.map((booking) => (
+                  <AppointmentListItem
+                    key={booking.id}
+                    appointment={booking}
+                    formatDate={formatDate}
+                    onClick={() => navigate("/student/appointment-status", { state: { appointmentId: booking.id, fromBookings: true } })}
+                    showFeedbackButton
+                    onFeedback={(appt) => { setFeedbackTarget(appt); setFeedbackText(""); }}
+                  />
+                ))}
+              </div>
             </>
           )}
         </div>

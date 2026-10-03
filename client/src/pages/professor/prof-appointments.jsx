@@ -202,6 +202,45 @@ function CommentBlock({ appointment, onSaved }) {
   );
 }
 
+// Student's post-appointment feedback. Read-only -- only the student can write
+// it (once), so unlike CommentBlock there's no edit affordance here.
+// Collapsible like Actions Taken, collapsed by default.
+function StudentFeedbackBlock({ feedback }) {
+  const [open, setOpen] = useState(false);
+  if (!feedback) return null;
+  return (
+    <div className="appt-comment-section">
+      <div className="appt-comment-section-header">
+        <button
+          type="button"
+          className="appt-comment-toggle appt-feedback-title"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+        >
+          <MessageSquare style={{ width: "1.1rem", height: "1.1rem" }} />
+          <span className="appt-comment-section-title">Student Feedback</span>
+          {!open && <span className="appt-comment-recorded">Received</span>}
+          <ChevronDown
+            className={`appt-comment-chevron${open ? " appt-comment-chevron--open" : ""}`}
+            style={{ width: "1rem", height: "1rem" }}
+          />
+        </button>
+      </div>
+      {open && (
+      <div className="appt-comment-body appt-feedback-body">
+        <p className="appt-comment-text">{feedback.text}</p>
+        {feedback.createdAt && (
+          <p className="appt-comment-meta">
+            Submitted on{" "}
+            {formatManilaDate(feedback.createdAt, { month: "short", day: "numeric", year: "numeric" })}
+          </p>
+        )}
+      </div>
+      )}
+    </div>
+  );
+}
+
 // ── AppointmentCard ────────────────────────────────────────────────────────────
 function AppointmentCard({
   appointment,
@@ -319,6 +358,7 @@ function AppointmentCard({
             )}
           </div>
           <CommentBlock appointment={appointment} onSaved={onCommentSaved} />
+          <StudentFeedbackBlock feedback={appointment.studentFeedback} />
           {appointment.status === "pending" && (
             <div className="appt-header-btn-row">
               <button

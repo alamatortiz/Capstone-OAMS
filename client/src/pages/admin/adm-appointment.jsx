@@ -216,14 +216,16 @@ export default function AdminAppointment() {
           <div className="admin-appointment-card-details">
             <div className="admin-appointment-detail-item">
               <span className="admin-appointment-detail-label">Student</span>
-              <span className="admin-appointment-detail-value">
-                {appointment.studentName}
-              </span>
-              {appointment.studentId && (
-                <span className="admin-appointment-detail-id-badge">
-                  {appointment.studentId}
+              <div className="admin-appointment-detail-student-row">
+                <span className="admin-appointment-detail-value">
+                  {appointment.studentName}
                 </span>
-              )}
+                {appointment.studentId && (
+                  <span className="admin-appointment-detail-id-badge">
+                    {appointment.studentId}
+                  </span>
+                )}
+              </div>
             </div>
             <div className="admin-appointment-detail-item">
               <span className="admin-appointment-detail-label">Date</span>
@@ -457,6 +459,26 @@ export default function AdminAppointment() {
                               : "faculty member"}{" "}
                             on{" "}
                             {formatManilaDate(selectedAppointment.commentUpdatedAt, {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {selectedAppointment.studentFeedback && (
+                      <div className="admin-appointment-modal-field admin-appointment-modal-field--full admin-appointment-modal-feedback">
+                        <span className="admin-appointment-modal-label">
+                          Student Feedback
+                        </span>
+                        <span className="admin-appointment-modal-value">
+                          {selectedAppointment.studentFeedback.text}
+                        </span>
+                        {selectedAppointment.studentFeedback.createdAt && (
+                          <span className="admin-appointment-modal-meta">
+                            Submitted on{" "}
+                            {formatManilaDate(selectedAppointment.studentFeedback.createdAt, {
                               month: "short",
                               day: "numeric",
                               year: "numeric",
