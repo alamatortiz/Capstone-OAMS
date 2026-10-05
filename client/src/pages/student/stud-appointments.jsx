@@ -17,7 +17,6 @@ import { useAuth } from "../../context/AuthContext";
 import { formatCollegeLabel } from "../../utils/formatCollege";
 import { connectSocket } from "../../utils/socket";
 import { ChevronDown, ChevronLeft, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle, CheckCircle2, AlertCircle, StickyNote, MessageSquare, GraduationCap as LucideGraduationCap } from "lucide-react";
-import FormModal from "../../components/FormModal";
 
 // ─── Content Icons ────────────────────────────────────────────────────────────
 const CloseIcon = () => (
@@ -349,6 +348,16 @@ export default function AppointmentsPage() {
   const [feedbackTarget, setFeedbackTarget] = useState(null);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackSaving, setFeedbackSaving] = useState(false);
+  useLockBodyScroll(!!feedbackTarget);
+
+  const closeFeedbackDialog = () => {
+    if (feedbackSaving) return;
+    setFeedbackTarget(null);
+  };
+
+  // The Needs Feedback tab hides itself once nothing is left to rate --
+  // fall back to Active Bookings rather than leaving an orphaned section.
+  const effectiveTab = activeTab === "feedback" && awaitingFeedback.length === 0 ? "bookings" : activeTab;
 
   const submitFeedback = async () => {
     const text = feedbackText.trim();
@@ -596,32 +605,55 @@ export default function AppointmentsPage() {
         <>
           {/* Rate a finished appointment, inline from the Needs Feedback
               tab. Posts to the same one-shot endpoint the detail page's
-              card uses, so "exactly once" stays enforced in one place. */}
-          <FormModal
-            show={!!feedbackTarget}
-            icon={<MessageSquare />}
-            title="Provide Feedback"
-            description={
-              feedbackTarget
-                ? `${feedbackTarget.person ?? "Your professor"} — ${formatDate(feedbackTarget.date)}. Optional, and you can only send it once.`
-                : ""
-            }
-            onCancel={() => setFeedbackTarget(null)}
-            onSubmit={submitFeedback}
-            submitText="Send Feedback"
-            submitDisabled={!feedbackText.trim()}
-            submitting={feedbackSaving}
-          >
-            <textarea
-              className="ab-feedback-input"
-              placeholder="How's the appointment/service?"
-              value={feedbackText}
-              maxLength={2000}
-              rows={4}
-              onChange={(e) => setFeedbackText(e.target.value)}
-            />
-            <p className="ab-feedback-count">{feedbackText.length}/2000</p>
-          </FormModal>
+              card uses, so "exactly once" stays enforced in one place.
+              Built from the Book this Slot dialog's own markup/classes
+              (below) so both appointment popups look identical. */}
+          {feedbackTarget && (
+            <div className="dialog-overlay" onClick={closeFeedbackDialog}>
+              <div className="dialog-content" onClick={(e) => e.stopPropagation()}>
+                <div className="dialog-header">
+                  <h3>Provide Feedback</h3>
+                  <button className="dialog-close" onClick={closeFeedbackDialog} disabled={feedbackSaving} aria-label="Close"><CloseIcon /></button>
+                </div>
+                <div className="dialog-body">
+                  <div className="slot-summary">
+                    <div className="slot-summary-title-row">
+                      <h4>{feedbackTarget.person ?? "Your professor"}</h4>
+                      {feedbackTarget.trackingNumber && (
+                        <span className="apt-list-tracking-pill">{feedbackTarget.trackingNumber}</span>
+                      )}
+                    </div>
+                    <div className="summary-details">
+                      <div className="summary-item"><MapPinIcon /><span>{feedbackTarget.location}</span></div>
+                      <div className="summary-item"><CalendarIcon /><span>{formatDate(feedbackTarget.date)}</span></div>
+                      {feedbackTarget.windowStart && feedbackTarget.windowEnd && (
+                        <div className="summary-item"><ClockIcon /><span>{feedbackTarget.windowStart} – {feedbackTarget.windowEnd}</span></div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="feedbackText">Your Feedback</label>
+                    <textarea
+                      id="feedbackText"
+                      className="textarea"
+                      placeholder="How's the appointment/service?"
+                      value={feedbackText}
+                      maxLength={2000}
+                      rows={4}
+                      onChange={(e) => setFeedbackText(e.target.value)}
+                    />
+                    <p className="ab-feedback-count">Optional, and you can only send it once. · {feedbackText.length}/2000</p>
+                  </div>
+                  <div className="dialog-actions">
+                    <button className="btn-secondary" onClick={closeFeedbackDialog} disabled={feedbackSaving}>Cancel</button>
+                    <button className="btn-primary" onClick={submitFeedback} disabled={!feedbackText.trim() || feedbackSaving}>
+                      {feedbackSaving ? "Sending…" : "Send Feedback"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Book Appointment Dialog */}
           {showBookDialog && selectedSlot && (
@@ -844,7 +876,7 @@ export default function AppointmentsPage() {
                 <CalendarDays className="ab-tab-icon" /> Available Slots
                 <span className="ab-tab-count">{slotsLoading ? "—" : visibleSlots.length}</span>
               </button>
-              <button type="button" className={`ab-tab ${activeTab === "bookings" ? "active" : ""}`} onClick={() => setActiveTab("bookings")}>
+              <button type="button" className={`ab-tab ${effectiveTab === "bookings" ? "active" : ""}`} onClick={() => setActiveTab("bookings")}>
                 <ClipboardList className="ab-tab-icon" /> Active Bookings
                 <span className="ab-tab-count">{bookingsLoading ? "—" : activeBookings.length}</span>
               </button>
@@ -857,7 +889,7 @@ export default function AppointmentsPage() {
               {awaitingFeedback.length > 0 && (
                 <button
                   type="button"
-                  className={`ab-tab ${activeTab === "feedback" ? "active" : ""}`}
+                  className={`ab-tab ${effectiveTab === "feedback" ? "active" : ""}`}
                   onClick={() => setActiveTab("feedback")}
                 >
                   <MessageSquare className="ab-tab-icon" /> Needs Feedback
@@ -916,7 +948,7 @@ export default function AppointmentsPage() {
           )}
 
           {/* Active Bookings */}
-          {activeTab === "bookings" && (
+          {effectiveTab === "bookings" && (
             <>
               {bookingsLoading ? (
                 <div className="appt-empty-state appt-empty-state--card"><Loader2Icon style={{ animation: "spin 1s linear infinite" }} /><h3>Loading your appointments…</h3></div>
@@ -949,7 +981,7 @@ export default function AppointmentsPage() {
           )}
 
           {/* Needs Feedback */}
-          {activeTab === "feedback" && (
+          {effectiveTab === "feedback" && (
             <>
               <p className="ab-feedback-intro">
                 These appointments are finished. Rating them is optional, and you can only

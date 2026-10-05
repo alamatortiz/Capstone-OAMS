@@ -164,13 +164,17 @@ router.get(
       // know which one they're formatting; the document branch has no
       // cancelled_by/student_name equivalent, so those are NULL placeholders
       // kept only to line up the two branches' column counts for the UNION.
+      // Ordered by updated_at (the latest change), not created_at -- titles
+      // describe the CURRENT status, so an item completed/rejected today must
+      // surface as recent even if it was booked last week. Same column the
+      // transactions feeds sort by.
       const [recentActivity] = await pool.query(
         `(
            SELECT
              'appointment' AS type,
              a.status,
              a.cancelled_by,
-             a.created_at AS event_time,
+             a.updated_at AS event_time,
              CONCAT(s.first_name, ' ', s.last_name) AS student_name,
              a.notes AS purpose,
              NULL AS request_type
@@ -184,7 +188,7 @@ router.get(
              'document' AS type,
              fdr.status,
              NULL AS cancelled_by,
-             fdr.created_at AS event_time,
+             fdr.updated_at AS event_time,
              NULL AS student_name,
              fdr.purpose,
              fdr.request_type
@@ -361,6 +365,10 @@ function buildActivityTitle(row) {
       return `${row.student_name} reported that you did not serve them`;
     return `Appointment cancelled by ${row.student_name}`;
   }
+  // cancelled_by on a REJECTED row marks a system auto-rejection (see
+  // utils/appointmentAutoResolution.js); a manual rejection leaves it NULL.
+  if (row.status === "rejected" && row.cancelled_by === "system_expired")
+    return `Appointment request from ${row.student_name} auto-rejected — not approved in time`;
   const map = {
     pending: `New appointment request from ${row.student_name}`,
     approved: `Appointment confirmed with ${row.student_name}`,
@@ -399,7 +407,7 @@ router.get(
         SELECT
           a.appointment_id, a.tracking_number, a.appointment_date, a.appointment_time,
           a.status, a.notes, a.created_at, a.approved_at, a.completed_at,
-          a.cancelled_by, a.cancel_reason,
+          a.cancelled_by, a.cancel_reason, a.rejection_reason,
           a.booking_year_program, a.course_code,
           a.shared_comment, a.comment_updated_by, a.comment_updated_at,
           s.first_name, s.last_name, s.student_number, s.course,
@@ -466,6 +474,7 @@ router.get(
           completedAtRaw: r.completed_at ?? null,
           cancelledBy: r.cancelled_by ?? null,
           cancelReason: r.cancel_reason ?? null,
+          rejectionReason: r.rejection_reason ?? null,
           // Student's one-shot post-appointment feedback (read-only here).
           studentFeedback: r.feedback_text
             ? { text: r.feedback_text, createdAt: r.feedback_created_at }
@@ -518,8 +527,13 @@ router.patch(
 
       if (!isValidTransition(appt.status, status)) {
         await conn.rollback();
+        // Most often hit when the card was stale: the system had already
+        // closed the appointment (auto-reject/complete/cancel) moments ago.
+        const isClosed = ["completed", "rejected", "cancelled"].includes(appt.status);
         return res.status(409).json({
-          error: `Cannot change status from ${appt.status} to ${status}`,
+          error: isClosed
+            ? `This appointment is already ${appt.status} — it may have been closed automatically. Refresh to see the latest.`
+            : `Cannot change status from ${appt.status} to ${status}`,
         });
       }
 
@@ -668,12 +682,20 @@ router.patch(
         });
       }
 
-      await pool.query(
+      // Re-check status in the UPDATE itself: the check above isn't locked,
+      // so the sweeper could close the appointment in between -- a note must
+      // never land on an already completed/cancelled/rejected row.
+      const [updateResult] = await pool.query(
         `UPDATE appointments
          SET shared_comment = ?, comment_updated_by = 'faculty', comment_updated_at = NOW()
-         WHERE appointment_id = ?`,
-        [trimmed || null, id],
+         WHERE appointment_id = ? AND faculty_id = ? AND status = 'approved'`,
+        [trimmed || null, id, facultyId],
       );
+      if (updateResult.affectedRows === 0) {
+        return res.status(409).json({
+          error: "This appointment has already been closed, so its actions taken can no longer be edited.",
+        });
+      }
 
       emitToUser(appt.student_id, "appointment:comment-updated", {
         appointmentId: Number(id),
@@ -1418,7 +1440,7 @@ router.patch(
         await conn.query(
           `UPDATE appointments
              SET window_start_snapshot = ?, window_end_snapshot = ?, location_snapshot = ?,
-                 reminder_sent_at = NULL
+                 imminent_reminder_sent_at = NULL
            WHERE appointment_id IN (?)`,
           [
             `${effectiveStart}:00`,
@@ -1903,7 +1925,7 @@ router.post(
         }
 
         const serviceSnapshot = await buildDocumentServiceSnapshot(conn, service_id);
-        const fdrTrackingNumber = await nextTrackingNumber(conn, "faculty_document_requests", "request_id", "FDR");
+        const fdrTrackingNumber = await nextTrackingNumber(conn, "FDR");
         [result] = await conn.query(
           `INSERT INTO faculty_document_requests (tracking_number, faculty_id, service_id, request_type, purpose, copies, notes, needed_by, service_snapshot)
            VALUES (?,?,?,?,?,?,?,?,?)`,
@@ -2156,7 +2178,7 @@ router.post(
       try {
         await conn.beginTransaction();
 
-        const facSubmissionTrackingNumber = await nextTrackingNumber(conn, "document_submissions", "submission_id", "SUB");
+        const facSubmissionTrackingNumber = await nextTrackingNumber(conn, "SUB");
         const [result] = await conn.query(
           `INSERT INTO document_submissions (tracking_number, faculty_id, submitter_type, department_id, title, purpose, needed_by, status, created_at)
            VALUES (?, ?, 'faculty', ?, ?, ?, ?, 'pending', NOW())`,

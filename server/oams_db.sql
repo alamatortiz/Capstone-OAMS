@@ -535,9 +535,10 @@ CREATE TABLE faculty_availability_services (
 CREATE TABLE appointments (
     appointment_id      INT          AUTO_INCREMENT PRIMARY KEY,
     -- Assigned in application code at booking time via the same
-    -- nextTrackingNumber() helper document_requests/document_submissions
-    -- use ("APT-00001", ...) -- NULL only for rows booked before this
-    -- column existed.
+    -- nextTrackingNumber() helper (utils/trackingNumber.js, backed by the
+    -- tracking_counters table) document_requests/document_submissions use
+    -- ("APT-00001", ...) -- NULL only for rows booked before this column
+    -- existed.
     tracking_number      VARCHAR(20)  NULL UNIQUE,
     student_id          INT          NOT NULL,
     faculty_id          INT          NOT NULL,
@@ -560,33 +561,35 @@ CREATE TABLE appointments (
     -- Real-world instant this appointment was first marked completed --
     -- via the professor's own PATCH above, the student's self-service
     -- PATCH /student/appointments/:appointmentId/complete, or
-    -- appointmentReminderSweeper.js's sweepStaleApproved() auto-complete.
+    -- appointmentReminderSweeper.js's resolveStaleApproved() auto-complete.
     -- Whichever of those three fires first wins; NULL until then. For the
     -- sweeper specifically this is "when the sweeper noticed", not a
     -- backdated reconstruction of the appointment window's end time (see
-    -- db.js's timezone comment) -- consistent with reminder_sent_at/
-    -- imminent_reminder_sent_at below, which are stamped the same
-    -- "when noticed" way.
+    -- db.js's timezone comment) -- consistent with imminent_reminder_sent_at
+    -- below, which is stamped the same "when noticed" way.
     completed_at        TIMESTAMP    NULL DEFAULT NULL,
     -- 'system' = auto-cancelled because the availability slot it was booked
     -- against got edited/deleted out from under it.
-    -- 'system_expired' = LEGACY. A pending request whose scheduled time passed
-    -- unanswered is now auto-*rejected* (status='rejected' + rejection_reason)
-    -- by appointmentReminderSweeper.js, not cancelled -- this value only exists
-    -- for rows written before that change.
+    -- 'system_expired' = a pending request whose scheduled time passed
+    -- unanswered. Written together with status='rejected' (+ a context-aware
+    -- rejection_reason) by appointmentReminderSweeper.js's auto-reject, so
+    -- screens can tell a system rejection from a manual one (a professor's
+    -- manual rejection leaves cancelled_by NULL). Older rows may instead
+    -- carry it with status='cancelled', from before auto-rejection existed.
     -- 'student_no_show' = the student self-reported, via PATCH
     -- /student/appointments/:id/report-not-served, that the professor never
     -- actually served them on an approved appointment -- a student-triggered
     -- cancellation like plain 'student', but distinguished for activity-feed/
     -- admin display. See cancel_reason below for its optional free-text note.
     -- 'system_not_entertained' = the opposite direction of the same idea:
-    -- appointmentReminderSweeper.js's sweepStaleApproved() auto-cancels an
+    -- appointmentReminderSweeper.js's resolveStaleApproved() auto-cancels an
     -- approved appointment (instead of auto-completing it) once its window
-    -- has passed with no "actions taken" (shared_comment) ever recorded --
+    -- plus a grace period has passed with no "actions taken" (shared_comment)
+    -- ever recorded (context-aware text in cancel_reason) --
     -- distinct from plain 'system', which already means "auto-cancelled
     -- because the schedule template changed" and is asserted by two
     -- hardcoded activity-feed strings (professorRoutes.js/studentRoutes.js).
-    cancelled_by        ENUM('student','faculty','system','system_expired','student_no_show','system_not_entertained') NULL, -- who/what triggered a 'cancelled' status, for activity-feed attribution
+    cancelled_by        ENUM('student','faculty','system','system_expired','student_no_show','system_not_entertained') NULL, -- who/what closed the appointment (cancelled, or system-rejected via 'system_expired'), for activity-feed attribution
     -- Separate from `notes` below (which is the student's own booking
     -- purpose, set once at creation and never a good place to also store
     -- the faculty member's rejection reason -- unlike document_requests.notes,
@@ -619,16 +622,12 @@ CREATE TABLE appointments (
     -- other timestamp column, so without this an approved/completed
     -- appointment would forever sort/display by its original booking time.
     updated_at          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    -- Set by appointmentReminderSweeper.js once a reminder notification has
-    -- been sent for this appointment, so the sweep never re-notifies the
-    -- same appointment on a later run (unlike updated_at, a fixed
-    -- appointment_date/time keeps matching the sweep's "within N hours"
-    -- window on every tick until the appointment passes).
-    reminder_sent_at    TIMESTAMP    NULL DEFAULT NULL,
     -- Set by appointmentReminderSweeper.js's imminent pass once the T-10min
     -- "your appointment starts soon" reminder has gone out (to BOTH the
-    -- student and the professor). Separate from reminder_sent_at, which is
-    -- the 24h-out reminder -- one row can get both.
+    -- student and the professor), so the sweep never re-sends it. Reset by
+    -- PATCH /professor/availability/:id when the window moves, so the
+    -- reminder re-fires for the new start time. (The former 24h-out
+    -- reminder and its reminder_sent_at column were removed.)
     imminent_reminder_sent_at TIMESTAMP NULL DEFAULT NULL,
     -- Computed from this row's own columns; NULL whenever status is
     -- cancelled/rejected, so any number of cancelled/rejected rows can share
@@ -684,7 +683,7 @@ CREATE TABLE appointment_feedback (
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE document_requests (
     request_id              INT          AUTO_INCREMENT PRIMARY KEY,
-    tracking_number         VARCHAR(50)  NOT NULL UNIQUE, -- Dynamically assigned via trigger below    
+    tracking_number         VARCHAR(50)  NOT NULL UNIQUE, -- assigned in app code via utils/trackingNumber.js (REQ-00001, ...)
     student_id              INT          NOT NULL,  
     service_id              INT          NOT NULL,
     request_type            VARCHAR(100) NOT NULL,
@@ -783,7 +782,7 @@ CREATE TABLE qr_tracking_logs (
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE document_submissions (
     submission_id   INT          AUTO_INCREMENT PRIMARY KEY,
-    tracking_number VARCHAR(50)  NOT NULL UNIQUE, -- assigned via trigger below (SUB-00001, ...)
+    tracking_number VARCHAR(50)  NOT NULL UNIQUE, -- assigned in app code via utils/trackingNumber.js (SUB-00001, ...)
     -- Exactly one of student_id/faculty_id is set, per submitter_type --
     -- enforced by the CHECK constraint below, not just convention. Faculty
     -- submissions reuse this same table/attachment pipeline rather than a
@@ -1160,6 +1159,23 @@ CREATE TABLE faqs (
     updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE RESTRICT,
     INDEX idx_faqs_department (department_id)
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- TRACKING NUMBER COUNTERS
+-- ─────────────────────────────────────────────────────────────
+-- One row per prefix (APT, REQ, FDR, SUB) holding the last number issued --
+-- see utils/trackingNumber.js. A request locks its prefix's row while taking
+-- a number, so simultaneous requests can't collide, and the increment rolls
+-- back with a failed request, so numbers never skip.
+--
+-- Deliberately created EMPTY: the server seeds each row at startup
+-- (ensureTrackingCounters) from the highest number already in use. Seeding
+-- 0 here would stick (the seed is INSERT IGNORE) even after mock data loads
+-- higher numbers, and the counter would then hand out duplicates.
+CREATE TABLE IF NOT EXISTS tracking_counters (
+    prefix     VARCHAR(10)  PRIMARY KEY,
+    last_number INT UNSIGNED NOT NULL
 );
 
 -- ============================================================

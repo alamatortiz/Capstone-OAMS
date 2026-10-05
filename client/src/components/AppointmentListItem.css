@@ -86,6 +86,43 @@
   margin: 0;
 }
 
+/* ─── Right side of the header: tracking pill + status badge, mirroring
+   stud-document-status.css's .dss-list-header-right. ───────────────────── */
+.apt-list-header-right {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+/* Purple twin of stud-document-status.css's orange .dss-tracking-pill. */
+.apt-list-tracking-pill {
+  padding: 0.3rem 0.7rem;
+  border-radius: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: #a855f7;
+  color: white;
+  font-family: "Inter", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+[data-theme="light"] .apt-list-tracking-pill {
+  background: #9333ea;
+}
+
+@media (max-width: 480px) {
+  .apt-list-header-right {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.3rem;
+  }
+}
+
 /* ─── Appointment type badge — sits inline in the name row, boxy like the
    professor-side appt-card badges (not a standalone labeled row). ────────── */
 .apt-list-appt-type-value {

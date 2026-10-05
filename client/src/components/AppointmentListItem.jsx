@@ -57,7 +57,12 @@ export default function AppointmentListItem({
           </div>
           <p className="apt-list-college">{appointment.college}</p>
         </div>
-        <span className={`apt-badge ${cls}`}>{label}</span>
+        <div className="apt-list-header-right">
+          {appointment.trackingNumber && (
+            <span className="apt-list-tracking-pill">{appointment.trackingNumber}</span>
+          )}
+          <span className={`apt-badge ${cls}`}>{label}</span>
+        </div>
       </div>
 
       <div className="apt-list-datetime-row">

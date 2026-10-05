@@ -37,6 +37,7 @@ import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { formatManilaDate, formatManilaTime } from '@/utils/date';
+import { isAutoRejected } from '@/utils/appointmentActions';
 import NotificationBell from '@/components/NotificationBell';
 import RefreshButton from '@/components/RefreshButton';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
@@ -116,6 +117,8 @@ interface Appointment {
   isToday: boolean;
   cancelledBy: 'student' | 'faculty' | 'system' | 'system_expired' | 'student_no_show' | 'system_not_entertained' | null;
   cancelReason?: string | null;
+  rejectionReason?: string | null;
+  studentFeedback?: { text: string; createdAt: string | null } | null;
 }
 
 const CANCELLED_BY_LABELS: Record<string, string> = {
@@ -833,6 +836,31 @@ function AppointmentDetailsModal({
                   <Text style={styles.detailsValue}>{appointment.cancelReason}</Text>
                 </View>
               )}
+              {appointment.status === 'rejected' && (
+                <View style={[styles.detailsField, styles.detailsFieldFull]}>
+                  <Text style={styles.detailsLabel}>Rejected By</Text>
+                  <Text style={styles.detailsValue}>
+                    {isAutoRejected(appointment) ? 'System (not approved in time)' : 'Faculty'}
+                  </Text>
+                </View>
+              )}
+              {appointment.status === 'rejected' && appointment.rejectionReason ? (
+                <View style={[styles.detailsField, styles.detailsFieldFull]}>
+                  <Text style={styles.detailsLabel}>Rejection Reason</Text>
+                  <Text style={styles.detailsValue}>{appointment.rejectionReason}</Text>
+                </View>
+              ) : null}
+              {appointment.studentFeedback ? (
+                <View style={[styles.detailsField, styles.detailsFieldFull]}>
+                  <Text style={styles.detailsLabel}>Student Feedback</Text>
+                  <Text style={styles.detailsValue}>{appointment.studentFeedback.text}</Text>
+                  {appointment.studentFeedback.createdAt ? (
+                    <Text style={styles.detailsLabel}>
+                      Submitted on {formatManilaDate(appointment.studentFeedback.createdAt, { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
             </View>
           </ScrollView>
 

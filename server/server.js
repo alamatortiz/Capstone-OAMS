@@ -106,6 +106,8 @@ const {
   startAppointmentReminderSweeper,
 } = require("./jobs/appointmentReminderSweeper");
 const { initSocketServer } = require("./sockets");
+const pool = require("./db");
+const { ensureTrackingCounters } = require("./utils/trackingNumber");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/student", studentRoutes);
@@ -155,10 +157,41 @@ app.use((err, req, res, next) => {
 initSocketServer(server);
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
-startNoShowSweeper();
-startExpirySweeper();
-startDocumentPickupSweeper();
-startDocumentSubmissionStaleSweeper();
-startAppointmentReminderSweeper();
+// Creates/seeds the tracking-number counter table (see
+// utils/trackingNumber.js) before taking traffic, so a database that never
+// had the table applied by hand still works. A few quick retries cover a
+// database that's still waking up; if it still fails, the server starts
+// anyway and keeps retrying in the background -- a slow database should
+// delay startup slightly, never prevent it.
+async function prepareTrackingCounters(attempts = 3) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await ensureTrackingCounters(pool);
+      return true;
+    } catch (err) {
+      console.error(`[startup] Tracking counter setup failed (attempt ${attempt}/${attempts}):`, err.message);
+      if (attempt < attempts) await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
+  return false;
+}
+
+async function start() {
+  const countersReady = await prepareTrackingCounters();
+  if (!countersReady) {
+    const retry = setInterval(async () => {
+      if (await prepareTrackingCounters(1)) clearInterval(retry);
+    }, 60 * 1000);
+  }
+
+  server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+  startNoShowSweeper();
+  startExpirySweeper();
+  startDocumentPickupSweeper();
+  startDocumentSubmissionStaleSweeper();
+  startAppointmentReminderSweeper();
+}
+
+start();

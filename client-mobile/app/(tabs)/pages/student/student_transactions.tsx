@@ -772,6 +772,14 @@ export default function StudentTransactionsScreen() {
                       </Text>
                     )}
 
+                    {/* Rejected and cancelled share one bucket in this feed, and older
+                        rows with this value were cancelled -- hence neutral wording. */}
+                    {t.type === 'appointment' && t.cancelledBy === 'system_expired' && (
+                      <Text style={styles.txDetails}>
+                        Closed automatically — not approved before its scheduled time ended
+                      </Text>
+                    )}
+
                     {t.type === 'appointment' && t.cancelledBy === 'system_not_entertained' && (
                       <Text style={styles.txDetails}>
                         Automatically cancelled — not marked as served in time{t.cancelReason ? `: ${t.cancelReason}` : ''}

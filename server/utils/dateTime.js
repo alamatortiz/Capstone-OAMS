@@ -69,6 +69,25 @@ function manilaDayEndExclusiveUTC(dateStr) {
   return start ? new Date(start.getTime() + 24 * 60 * 60 * 1000) : null;
 }
 
+const MANILA_DATE_LABEL_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Asia/Manila",
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+
+// Human-readable calendar date for notification/message text, e.g.
+// "Mon, Oct 5, 2026". Accepts a DATE column as mysql2 returns it (a Date at
+// UTC midnight, since db.js runs the connection in "Z" mode) or a plain
+// "YYYY-MM-DD" string. Falls back to the raw date string if unparseable.
+function formatManilaDateLabel(value) {
+  if (!value) return "";
+  const dateStr = value instanceof Date ? getManilaDateString(value) : String(value).slice(0, 10);
+  const start = manilaDayStartUTC(dateStr);
+  return start ? MANILA_DATE_LABEL_FORMATTER.format(start) : dateStr;
+}
+
 // Expects a real Date object -- callers pass `new Date(someTimestamp)`.
 function formatRelativeTime(date) {
   const now = new Date();
@@ -90,4 +109,5 @@ module.exports = {
   formatRelativeTime,
   manilaDayStartUTC,
   manilaDayEndExclusiveUTC,
+  formatManilaDateLabel,
 };

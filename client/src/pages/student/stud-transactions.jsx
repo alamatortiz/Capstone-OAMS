@@ -553,6 +553,13 @@ export default function TransactionsPage() {
                         Reported not served{transaction.cancelReason ? `: ${transaction.cancelReason}` : ""}
                       </p>
                     )}
+                    {/* Rejected and cancelled share one bucket in this feed, and older
+                        rows with this value were cancelled -- hence neutral wording. */}
+                    {transaction.type === "appointment" && transaction.cancelledBy === "system_expired" && (
+                      <p className="transaction-details">
+                        Closed automatically — not approved before its scheduled time ended
+                      </p>
+                    )}
                     {transaction.type === "appointment" && transaction.cancelledBy === "system_not_entertained" && (
                       <p className="transaction-details">
                         Automatically cancelled — not marked as served in time{transaction.cancelReason ? `: ${transaction.cancelReason}` : ""}

@@ -450,8 +450,9 @@ html, body {
   transition: all 0.3s ease;
 }
 
-/* Orange, matching the tracking-number pill color used everywhere else in
-   the app (Transaction History, document status pages). */
+/* Purple, matching the other badges on this card (student id, type) and
+   the appointment screens' purple theme -- same values as
+   .appt-card-student-id-badge above, light override included. */
 .appt-card-tracking-badge {
   display: inline-flex;
   align-items: center;
@@ -460,9 +461,9 @@ html, body {
   border-radius: 0.5rem;
   font-size: 0.62rem;
   font-weight: 700;
-  background: rgba(249, 115, 22, 0.12);
-  color: #fb923c;
-  border: 1px solid rgba(249, 115, 22, 0.3);
+  background: rgba(168, 85, 247, 0.12);
+  color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, 0.3);
   text-transform: uppercase;
   letter-spacing: 0.3px;
   white-space: nowrap;
@@ -470,9 +471,9 @@ html, body {
 }
 
 [data-theme="light"] .appt-card-tracking-badge {
-  background: rgba(234, 88, 12, 0.08);
-  color: #9a3412;
-  border-color: rgba(234, 88, 12, 0.2);
+  background: rgba(147, 51, 234, 0.1);
+  color: #7c3aed;
+  border-color: rgba(147, 51, 234, 0.25);
 }
 
 [data-theme="light"] .appt-card-student-id-badge {
@@ -881,6 +882,17 @@ html, body {
   opacity: 0.85;
 }
 
+/* Rejected variant -- red, matching the rejected status badge. */
+.appt-not-served-notice--rejected {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+}
+[data-theme="light"] .appt-not-served-notice--rejected {
+  background: rgba(220, 38, 38, 0.06);
+  color: #991b1b;
+}
+
 .appt-comment-section-header {
   display: flex;
   align-items: center;
@@ -936,6 +948,9 @@ html, body {
 .appt-comment-body { margin-top: 0.1rem; }
 
 .appt-comment-edit-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   background: none;
   border: none;
   color: #a855f7;
@@ -944,7 +959,14 @@ html, body {
   cursor: pointer;
   padding: 0;
   flex-shrink: 0;
+  transition: opacity 0.2s ease;
 }
+.appt-comment-edit-link svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  flex-shrink: 0;
+}
+.appt-comment-edit-link:hover { opacity: 0.8; text-decoration: underline; }
 [data-theme="light"] .appt-comment-edit-link { color: #9333ea; }
 
 .appt-comment-empty {

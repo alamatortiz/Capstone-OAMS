@@ -24,6 +24,7 @@ import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
 import { formatManilaDate, formatManilaTime, getManilaDateString } from '@/utils/date';
 import { filterByRange } from '@/utils/dateRange';
+import { isAutoRejected } from '@/utils/appointmentActions';
 import NotificationBell from '@/components/NotificationBell';
 import RefreshButton from '@/components/RefreshButton';
 import QueueReasonModal from '@/components/QueueReasonModal';
@@ -113,6 +114,8 @@ interface Appointment {
   sharedComment?: string | null;
   commentUpdatedBy?: 'student' | 'faculty' | null;
   commentUpdatedAt?: string | null;
+  rejectionReason?: string | null;
+  studentFeedback?: { text: string; createdAt: string | null } | null;
 }
 
 const manilaTimeNow = () =>
@@ -209,7 +212,11 @@ const CONFIRM_META: Record<
   }),
   complete: (apt) => ({
     title: 'Mark as Completed?',
-    message: `Mark the appointment with ${apt.studentName} as completed?`,
+    // Actions taken are only editable while approved, so completing without
+    // them locks the appointment with none recorded.
+    message: `Mark the appointment with ${apt.studentName} as completed?${
+      apt.sharedComment?.trim() ? '' : ' No actions taken have been recorded yet. Once completed, they can no longer be added.'
+    }`,
     confirmText: 'Mark Complete',
     cancelText: 'Cancel',
     icon: 'checkmark-circle-outline',
@@ -271,6 +278,14 @@ export default function ProfessorAppointmentScreen() {
   const [openComments, setOpenComments] = useState<Set<number>>(new Set());
   const toggleComment = (id: number) =>
     setOpenComments((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  // Student Feedback starts collapsed too (matches web StudentFeedbackBlock).
+  const [openFeedback, setOpenFeedback] = useState<Set<number>>(new Set());
+  const toggleFeedback = (id: number) =>
+    setOpenFeedback((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
@@ -702,6 +717,20 @@ export default function ProfessorAppointmentScreen() {
                       )}
                     </View>
 
+                    {apt.status === 'rejected' && (
+                      <View style={styles.rejectedNotice}>
+                        <Ionicons name="close-circle-outline" size={17} color="#ef4444" />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.rejectedNoticeTitle}>
+                            {isAutoRejected(apt) ? 'Automatically rejected — not approved in time.' : 'You rejected this request.'}
+                          </Text>
+                          {apt.rejectionReason ? (
+                            <Text style={styles.rejectedNoticeReason}>Reason: {apt.rejectionReason}</Text>
+                          ) : null}
+                        </View>
+                      </View>
+                    )}
+
                     <View style={styles.commentSection}>
                       <View style={styles.commentHeaderRow}>
                         <Pressable style={styles.commentHeaderTitleRow} onPress={() => toggleComment(apt.id)} hitSlop={8}>
@@ -711,7 +740,10 @@ export default function ProfessorAppointmentScreen() {
                         </Pressable>
                         {apt.status === 'approved' && (
                           <Pressable onPress={() => openCommentModal(apt)} hitSlop={8}>
-                            <Text style={styles.commentEditLink}>{apt.sharedComment ? 'Edit' : 'Add'}</Text>
+                            <View style={styles.commentEditLinkRow}>
+                              <Ionicons name="pencil" size={12} color="#a855f7" />
+                              <Text style={styles.commentEditLink}>{apt.sharedComment ? 'Edit' : 'Add'}</Text>
+                            </View>
                           </Pressable>
                         )}
                       </View>
@@ -730,15 +762,40 @@ export default function ProfessorAppointmentScreen() {
                       ))}
                     </View>
 
+                    {/* Student's one-shot feedback -- read-only, collapsed by default
+                        (mirrors web prof-appointments.jsx StudentFeedbackBlock). */}
+                    {apt.studentFeedback ? (
+                      <View style={styles.commentSection}>
+                        <View style={styles.commentHeaderRow}>
+                          <Pressable style={styles.commentHeaderTitleRow} onPress={() => toggleFeedback(apt.id)} hitSlop={8}>
+                            <Ionicons name={openFeedback.has(apt.id) ? 'chevron-down' : 'chevron-forward'} size={14} color={theme.tertiary} />
+                            <Text style={styles.commentHeaderTitle}>Student Feedback</Text>
+                            {!openFeedback.has(apt.id) && <Text style={styles.commentRecordedPill}>Received</Text>}
+                          </Pressable>
+                        </View>
+                        {openFeedback.has(apt.id) && (
+                          <>
+                            <Text style={styles.commentText}>{apt.studentFeedback.text}</Text>
+                            {apt.studentFeedback.createdAt ? (
+                              <Text style={styles.commentMeta}>
+                                Submitted on{' '}
+                                {formatManilaDate(apt.studentFeedback.createdAt, { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </Text>
+                            ) : null}
+                          </>
+                        )}
+                      </View>
+                    ) : null}
+
                     <View style={styles.apptFooter}>
                       {apt.status === 'pending' && (
                         <View style={styles.apptActionsRow}>
                           <Pressable style={[styles.apptBtn, styles.apptBtnApprove, !!approveBlockedReason(apt) && { opacity: 0.45 }]} onPress={() => requestAction('approve', apt)}>
-                            <Ionicons name="checkmark-outline" size={14} color="#ffffff" />
+                            <Ionicons name="checkmark-circle-outline" size={14} color="#ffffff" />
                             <Text style={styles.apptBtnText}>Approve</Text>
                           </Pressable>
                           <Pressable style={[styles.apptBtn, styles.apptBtnReject]} onPress={() => requestAction('reject', apt)}>
-                            <Ionicons name="close-outline" size={14} color="#ffffff" />
+                            <Ionicons name="close-circle-outline" size={14} color="#ffffff" />
                             <Text style={styles.apptBtnText}>Reject</Text>
                           </Pressable>
                         </View>
@@ -746,10 +803,11 @@ export default function ProfessorAppointmentScreen() {
                       {apt.status === 'approved' && (
                         <View style={styles.apptActionsRow}>
                           <Pressable style={[styles.apptBtn, styles.apptBtnComplete, isFutureAppointment(apt) && { opacity: 0.45 }]} onPress={() => requestAction('complete', apt)}>
-                            <Ionicons name="checkmark-outline" size={14} color="#ffffff" />
+                            <Ionicons name="checkmark-circle-outline" size={14} color="#ffffff" />
                             <Text style={styles.apptBtnText}>Mark Complete</Text>
                           </Pressable>
                           <Pressable style={[styles.apptBtn, styles.apptBtnCancel]} onPress={() => requestAction('cancel', apt)}>
+                            <Ionicons name="close-circle-outline" size={14} color={theme.text} />
                             <Text style={styles.apptBtnCancelText}>Cancel</Text>
                           </Pressable>
                         </View>
@@ -1272,10 +1330,10 @@ function createStyles(theme: ThemePalette) {
       paddingVertical: 2,
       borderRadius: 999,
       borderWidth: 1,
-      backgroundColor: 'rgba(59, 130, 246, 0.12)',
-      borderColor: 'rgba(59, 130, 246, 0.3)',
+      backgroundColor: 'rgba(168, 85, 247, 0.12)',
+      borderColor: 'rgba(168, 85, 247, 0.3)',
     },
-    trackingBadgeText: { fontSize: 11, fontWeight: '700', color: '#3b82f6', fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }) },
+    trackingBadgeText: { fontSize: 11, fontWeight: '700', color: '#a855f7', fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }) },
     studentIdBadge: {
       alignSelf: 'flex-start',
       marginTop: 4,
@@ -1326,8 +1384,15 @@ function createStyles(theme: ThemePalette) {
     commentHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     commentHeaderTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     commentHeaderTitle: { fontSize: 11, fontWeight: '700', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
-    commentRecordedPill: { fontSize: 10, fontWeight: '700', color: '#16a34a', backgroundColor: 'rgba(34,197,94,0.15)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
-    commentEditLink: { fontSize: 12, fontWeight: '700', color: '#16a34a' },
+    commentRecordedPill: { fontSize: 10, fontWeight: '700', color: '#a855f7', backgroundColor: 'rgba(168,85,247,0.15)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
+    commentEditLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    commentEditLink: { fontSize: 12, fontWeight: '700', color: '#a855f7' },
+    rejectedNotice: {
+      flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 10, padding: 10, borderRadius: 10,
+      borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)', backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    },
+    rejectedNoticeTitle: { fontSize: 12.5, fontWeight: '700', color: '#ef4444' },
+    rejectedNoticeReason: { fontSize: 12, color: theme.text, marginTop: 3, lineHeight: 17 },
     commentText: { fontSize: 12.5, fontWeight: '600', color: theme.text, lineHeight: 17 },
     commentMeta: { fontSize: 10.5, color: theme.tertiary, marginTop: 2 },
     commentEmpty: { fontSize: 12, color: theme.tertiary, fontStyle: 'italic' },

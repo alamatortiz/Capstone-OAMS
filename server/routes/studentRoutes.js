@@ -189,11 +189,15 @@ router.get(
         [studentId],
       );
 
+      // Ordered by updated_at (the latest change), not created_at -- titles
+      // describe the CURRENT status, so an item completed/rejected today must
+      // surface as recent even if it was created last week. Same column the
+      // transactions feed sorts by.
       const [recentActivity] = await pool.query(
         `(
            SELECT 'queue' AS type, COALESCE(q.service_label_snapshot, s.service_name) AS service_name, NULL AS professor_name, NULL AS request_type,
                   d.department_name AS college, q.status, q.admin_reason, NULL AS cancelled_by,
-                  q.created_at AS event_time
+                  q.updated_at AS event_time
            FROM queues q
            JOIN services s ON q.service_id = s.service_id
            JOIN departments d ON s.department_id = d.department_id
@@ -203,7 +207,7 @@ router.get(
          (
            SELECT 'appointment' AS type, NULL AS service_name, CONCAT(f.first_name, ' ', f.last_name) AS professor_name,
                   NULL AS request_type, d.department_name AS college, a.status, NULL AS admin_reason, a.cancelled_by,
-                  a.created_at AS event_time
+                  a.updated_at AS event_time
            FROM appointments a
            JOIN faculty f ON a.faculty_id = f.faculty_id
            JOIN departments d ON f.department_id = d.department_id
@@ -213,7 +217,7 @@ router.get(
          (
            SELECT 'document' AS type, NULL AS service_name, NULL AS professor_name, dr.request_type,
                   d.department_name AS college, dr.status, NULL AS admin_reason, NULL AS cancelled_by,
-                  dr.created_at AS event_time
+                  dr.updated_at AS event_time
            FROM document_requests dr
            JOIN document_services s ON dr.service_id = s.service_id
            JOIN departments d ON s.department_id = d.department_id
@@ -223,7 +227,7 @@ router.get(
          (
            SELECT 'submission' AS type, NULL AS service_name, NULL AS professor_name, ds.title AS request_type,
                   d.department_name AS college, ds.status, NULL AS admin_reason, NULL AS cancelled_by,
-                  ds.created_at AS event_time
+                  ds.updated_at AS event_time
            FROM document_submissions ds
            JOIN departments d ON ds.department_id = d.department_id
            WHERE ds.student_id = ?
@@ -381,6 +385,10 @@ function buildAppointmentActivityTitle(row) {
       return `You reported that ${row.professor_name} did not serve you`;
     return `You cancelled the appointment with ${row.professor_name}`;
   }
+  // cancelled_by on a REJECTED row marks a system auto-rejection (see
+  // utils/appointmentAutoResolution.js) -- don't attribute it to the professor.
+  if (row.status === "rejected" && row.cancelled_by === "system_expired")
+    return `Appointment request to ${row.professor_name} auto-rejected — not approved in time`;
   const map = {
     pending: `Appointment request sent to ${row.professor_name}`,
     approved: `Appointment confirmed with ${row.professor_name}`,
@@ -876,7 +884,7 @@ router.post(
         }
 
         const serviceSnapshot = await buildDocumentServiceSnapshot(conn, serviceId);
-        const trackingNumber = await nextTrackingNumber(conn, "document_requests", "request_id", "REQ");
+        const trackingNumber = await nextTrackingNumber(conn, "REQ");
         [result] = await conn.query(
           `INSERT INTO document_requests
              (tracking_number, student_id, service_id, request_type, purpose, copies, status, estimated_completion, needed_by, service_snapshot, created_at)
@@ -1029,7 +1037,7 @@ router.post(
       try {
         await conn.beginTransaction();
 
-        const submissionTrackingNumber = await nextTrackingNumber(conn, "document_submissions", "submission_id", "SUB");
+        const submissionTrackingNumber = await nextTrackingNumber(conn, "SUB");
         const [result] = await conn.query(
           `INSERT INTO document_submissions (tracking_number, student_id, department_id, title, purpose, needed_by, status, created_at)
            VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW())`,
@@ -2638,7 +2646,8 @@ router.get(
 // them to this field, by design.
 
 // DELETE /api/student/appointments/:appointmentId
-// Cancels a pending or approved appointment. Only the owning student may cancel.
+// Cancels a pending appointment, or an approved one with no actions taken
+// recorded yet. Only the owning student may cancel.
 router.delete(
   "/appointments/:appointmentId",
   authenticateToken,
@@ -2657,7 +2666,7 @@ router.delete(
 
       const [[appt]] = await conn.query(
         `SELECT a.appointment_id, a.student_id, a.status, a.faculty_id, a.department_id,
-                a.appointment_date, a.appointment_time, s.first_name, s.last_name,
+                a.appointment_date, a.appointment_time, a.shared_comment, s.first_name, s.last_name,
                 sv.service_name
          FROM appointments a
          JOIN students s ON a.student_id = s.student_id
@@ -2680,6 +2689,15 @@ router.delete(
         await conn.rollback();
         return res.status(409).json({
           error: `Cannot cancel an appointment that is already ${appt.status}`,
+        });
+      }
+      // Actions taken can only be recorded once the meeting has happened, so
+      // cancelling after that would erase a served appointment (and dodge
+      // the sweeper's auto-complete). Mirrors report-not-served's same guard.
+      if (appt.status === "approved" && appt.shared_comment && appt.shared_comment.trim()) {
+        await conn.rollback();
+        return res.status(409).json({
+          error: "This appointment can't be cancelled — the professor has already recorded actions taken for it.",
         });
       }
 
@@ -2835,7 +2853,7 @@ router.post(
 // Lets a student manually close out an APPROVED appointment they've already
 // attended, in case the professor forgets to. Mirrors the professor's
 // approved -> completed transition (same event + notification shape as
-// appointmentReminderSweeper.js:sweepStaleApproved). approved -> completed only.
+// appointmentReminderSweeper.js:resolveStaleApproved). approved -> completed only.
 router.patch(
   "/appointments/:appointmentId/complete",
   authenticateToken,
@@ -3849,7 +3867,7 @@ router.post(
       // never collides with that history -- only with a second genuinely
       // active booking for the same slot, which the dup-guard above should
       // already have caught (see the catch block below for the backstop).
-      const trackingNumber = await nextTrackingNumber(conn, "appointments", "appointment_id", "APT");
+      const trackingNumber = await nextTrackingNumber(conn, "APT");
       const [result] = await conn.query(
         `INSERT INTO appointments
            (tracking_number, student_id, faculty_id, department_id, service_id, availability_id,
@@ -3992,10 +4010,15 @@ router.post(
       await conn.rollback();
       // Backstop for uq_active_booking (see oams_db.sql): the dup-guard above
       // should already prevent this in every normal case, but if a genuine
-      // race slips past it, surface a clean 409 instead of a 500.
+      // race slips past it, surface a clean 409 instead of a 500. Only that
+      // index means "already booked" -- any other duplicate (e.g. a tracking
+      // number during a deploy overlap) is a retryable conflict.
       if (error.code === "ER_DUP_ENTRY") {
+        const alreadyBooked = String(error.sqlMessage ?? error.message).includes("uq_active_booking");
         return res.status(409).json({
-          error: "You already have an active booking for this date and time.",
+          error: alreadyBooked
+            ? "You already have an active booking for this date and time."
+            : "Your booking couldn't be completed because of a conflict. Please try again.",
         });
       }
       sendServerError(res, error, "Book slot error");

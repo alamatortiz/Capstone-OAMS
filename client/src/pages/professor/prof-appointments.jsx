@@ -30,34 +30,17 @@ import {
   CalendarClock,
   MessageSquare,
   AlertCircle,
+  Pencil,
 } from "lucide-react";
+import { useLiveRefetch } from "../../hooks/useLiveRefetch";
+import { isAutoRejected } from "../../utils/appointmentActions";
 
-// ── Appointment-specific icons ─────────────────────────────────────────────────
-const CheckCircle2Icon = () => (
-  <svg
-    className="appt-icon-sm"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-    <polyline points="22 4 12 14.01 9 11.01" />
-  </svg>
-);
-const XCircleIcon = () => (
-  <svg
-    className="appt-icon-sm"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <circle cx="12" cy="12" r="10" />
-    <line x1="15" y1="9" x2="9" y2="15" />
-    <line x1="9" y1="9" x2="15" y2="15" />
-  </svg>
-);
+// Module-level so useLiveRefetch's listeners stay bound across renders.
+const APPOINTMENT_LIVE_EVENTS = [
+  "appointment:slot-updated",
+  "appointment:status-updated",
+  "appointment:comment-updated",
+];
 
 const TAB_ICON_MAP = {
   all: LayoutList,
@@ -94,6 +77,13 @@ const CONFIRM_META = {
       <>
         Mark the appointment with <strong>{apt.studentName}</strong> as
         completed?
+        {/* Actions taken are only editable while approved, so completing
+            without them locks the appointment with none recorded. */}
+        {!apt.sharedComment?.trim() && (
+          <>
+            {" "}No actions taken have been recorded yet. Once completed, they can no longer be added.
+          </>
+        )}
       </>
     ),
     confirmText: "Mark Complete",
@@ -164,6 +154,7 @@ function CommentBlock({ appointment, onSaved }) {
         </button>
         {canEdit && (
           <button type="button" className="appt-comment-edit-link" onClick={() => setShowModal(true)}>
+            <Pencil aria-hidden="true" />
             {appointment.sharedComment ? "Edit Actions Taken" : "Add Actions Taken"}
           </button>
         )}
@@ -367,14 +358,14 @@ function AppointmentCard({
                 disabled={!!approveBlockedReason}
                 title={approveBlockedReason ?? "Approve"}
               >
-                <CheckCircle2Icon /> Approve
+                <CheckCircle2 /> Approve
               </button>
               <button
                 className="appt-btn-sm appt-btn-sm-reject"
                 onClick={() => onReject(appointment.id)}
                 title="Reject"
               >
-                <XCircleIcon /> Reject
+                <XCircle /> Reject
               </button>
             </div>
           )}
@@ -386,14 +377,14 @@ function AppointmentCard({
                 disabled={isFutureDate}
                 title={isFutureDate ? "This appointment hasn't happened yet" : "Mark Complete"}
               >
-                <CheckCircle2Icon /> Complete
+                <CheckCircle2 /> Complete
               </button>
               <button
                 className="appt-btn-sm appt-btn-sm-cancel"
                 onClick={() => onCancel(appointment.id)}
                 title="Cancel"
               >
-                Cancel
+                <XCircle /> Cancel
               </button>
             </div>
           )}
@@ -433,6 +424,21 @@ function AppointmentCard({
                   </span>
                 </div>
               )}
+            </div>
+          )}
+          {appointment.status === "rejected" && (
+            <div className="appt-not-served-notice appt-not-served-notice--rejected">
+              <XCircle style={{ width: "1.1rem", height: "1.1rem" }} />
+              <div>
+                <p>
+                  {isAutoRejected(appointment)
+                    ? "Automatically rejected — not approved in time."
+                    : "You rejected this request."}
+                </p>
+                {appointment.rejectionReason && (
+                  <p className="appt-not-served-reason">Reason: {appointment.rejectionReason}</p>
+                )}
+              </div>
             </div>
           )}
           {appointment.status === "cancelled" && appointment.cancelledBy === "student_no_show" && (
@@ -518,6 +524,21 @@ export default function ProfessorAppointmentsPage() {
 
   useEffect(() => {
     fetchAppointments();
+  }, [fetchAppointments]);
+
+  // Live updates: students booking/cancelling and the system auto-resolving
+  // past-due appointments all emit these events -- without them this page
+  // sat stale (and offered buttons on already-closed cards) until reloaded.
+  useLiveRefetch(APPOINTMENT_LIVE_EVENTS, fetchAppointments);
+
+  // Fallback poll for a missed event while the socket reconnects. Also
+  // re-renders the cards so the time-based Approve gate stays current.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      fetchAppointments();
+    }, 30000);
+    return () => clearInterval(interval);
   }, [fetchAppointments]);
 
   const TABS = [

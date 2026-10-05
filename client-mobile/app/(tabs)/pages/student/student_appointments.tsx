@@ -5,8 +5,10 @@ import {
   Animated,
   Easing,
   Image,
+  KeyboardAvoidingView,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StatusBar,
@@ -20,7 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import {
   Calendar, CalendarDays, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, ClipboardList,
-  Clock, FileText, GraduationCap, Home as HomeIcon, Loader2, MapPin, Megaphone, StickyNote, Users, X, XCircle,
+  Clock, FileText, GraduationCap, Home as HomeIcon, Loader2, MapPin, Megaphone, MessageSquare, StickyNote, Users, X, XCircle,
 } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
@@ -29,6 +31,7 @@ import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
+import { canStudentCancel } from '@/utils/appointmentActions';
 import RefreshButton from '@/components/RefreshButton';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 
@@ -139,6 +142,9 @@ interface Booking {
   purpose: string;
   appointmentType?: string;
   status: BookingStatus;
+  trackingNumber: string | null;
+  hasFeedback: boolean;
+  sharedComment: string | null;
 }
 
 const toDateStr = (d: Date) =>
@@ -207,13 +213,17 @@ const formatDate = (dateString: string) => {
 };
 
 const formatTime = (time: string) => {
+  // Bookings (GET /student/appointments) already arrive as "2:17 PM" --
+  // re-formatting those produced "2:17 PM AM". Only raw "HH:MM:SS" slot
+  // times need converting.
+  if (/\s?[AP]M$/i.test(time.trim())) return time.trim();
   const [hours, minutes] = time.split(':');
   const hour = parseInt(hours, 10);
   return `${hour % 12 || 12}:${minutes} ${hour >= 12 ? 'PM' : 'AM'}`;
 };
 
 type ActiveFilter = 'college' | 'professor' | null;
-type ActiveTab = 'slots' | 'bookings';
+type ActiveTab = 'slots' | 'bookings' | 'feedback';
 
 export default function StudentAppointmentsScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
@@ -322,6 +332,9 @@ export default function StudentAppointmentsScreen() {
           purpose: b.purpose ?? '',
           appointmentType: b.appointmentType ?? undefined,
           status: b.status,
+          trackingNumber: b.trackingNumber ?? null,
+          hasFeedback: !!b.hasFeedback,
+          sharedComment: b.sharedComment ?? null,
         })),
       );
       setBookingsError(null);
@@ -449,6 +462,40 @@ export default function StudentAppointmentsScreen() {
   }, {}), [visibleSlots]);
 
   const activeBookings = bookings.filter((b) => b.status === 'pending' || b.status === 'approved');
+  // Completed and not yet rated (hasFeedback comes with the list itself) --
+  // mirrors web stud-appointments.jsx's Needs Feedback tab.
+  const awaitingFeedback = bookings.filter((b) => b.status === 'completed' && !b.hasFeedback);
+  // The Needs Feedback tab hides itself once nothing is left to rate -- fall
+  // back to Active Bookings rather than leaving an orphaned section.
+  const effectiveTab: ActiveTab =
+    activeTab === 'feedback' && awaitingFeedback.length === 0 ? 'bookings' : activeTab;
+
+  // ── Inline feedback (same one-shot POST web uses) ──
+  const [feedbackTarget, setFeedbackTarget] = useState<Booking | null>(null);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackSaving, setFeedbackSaving] = useState(false);
+
+  const closeFeedbackDialog = () => {
+    if (feedbackSaving) return;
+    setFeedbackTarget(null);
+  };
+
+  const submitFeedback = async () => {
+    const text = feedbackText.trim();
+    if (!feedbackTarget || !text || feedbackSaving) return;
+    setFeedbackSaving(true);
+    try {
+      await api.post(`/student/appointments/${feedbackTarget.id}/feedback`, { feedback: text });
+      Toast.show({ type: 'success', text1: 'Thanks for your feedback.' });
+      setFeedbackTarget(null);
+      // Refetch so hasFeedback flips and the card (or the whole tab) disappears.
+      await fetchMyBookings();
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.error ?? "Couldn't send your feedback. Try again.");
+    } finally {
+      setFeedbackSaving(false);
+    }
+  };
 
   const bookedSlotKeys = useMemo(() => new Set(
     bookings
@@ -797,21 +844,35 @@ export default function StudentAppointmentsScreen() {
           </View>
 
           {/* Tabs */}
-          <View style={styles.tabsRow}>
-            <Pressable style={[styles.tab, activeTab === 'slots' && styles.tabActive]} onPress={() => setActiveTab('slots')}>
-              <CalendarDays size={15} color={activeTab === 'slots' ? theme.purple : theme.subtext} />
-              <Text style={[styles.tabText, activeTab === 'slots' && styles.tabTextActive]}>Available Slots</Text>
-              <View style={styles.tabCountPill}><Text style={styles.tabCountText}>{visibleSlots.length}</Text></View>
-            </Pressable>
-            <Pressable style={[styles.tab, activeTab === 'bookings' && styles.tabActive]} onPress={() => setActiveTab('bookings')}>
-              <ClipboardList size={15} color={activeTab === 'bookings' ? theme.purple : theme.subtext} />
-              <Text style={[styles.tabText, activeTab === 'bookings' && styles.tabTextActive]}>Active Bookings</Text>
-              <View style={styles.tabCountPill}><Text style={styles.tabCountText}>{activeBookings.length}</Text></View>
-            </Pressable>
-          </View>
+          {/* Horizontal scroll so a third tab (Needs Feedback) still fits a
+              phone -- same pattern as student_appointment_status.tsx. */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll}>
+            <View style={styles.tabsRow}>
+              <Pressable style={[styles.tab, effectiveTab === 'slots' && styles.tabActive]} onPress={() => setActiveTab('slots')}>
+                <CalendarDays size={15} color={effectiveTab === 'slots' ? theme.purple : theme.subtext} />
+                <Text style={[styles.tabText, effectiveTab === 'slots' && styles.tabTextActive]}>Available Slots</Text>
+                <View style={styles.tabCountPill}><Text style={styles.tabCountText}>{visibleSlots.length}</Text></View>
+              </Pressable>
+              <Pressable style={[styles.tab, effectiveTab === 'bookings' && styles.tabActive]} onPress={() => setActiveTab('bookings')}>
+                <ClipboardList size={15} color={effectiveTab === 'bookings' ? theme.purple : theme.subtext} />
+                <Text style={[styles.tabText, effectiveTab === 'bookings' && styles.tabTextActive]}>Active Bookings</Text>
+                <View style={styles.tabCountPill}><Text style={styles.tabCountText}>{activeBookings.length}</Text></View>
+              </Pressable>
+              {/* Finished appointments not yet rated -- hidden when empty. */}
+              {awaitingFeedback.length > 0 && (
+                <Pressable style={[styles.tab, effectiveTab === 'feedback' && styles.tabActive]} onPress={() => setActiveTab('feedback')}>
+                  <MessageSquare size={15} color={effectiveTab === 'feedback' ? theme.purple : theme.subtext} />
+                  <Text style={[styles.tabText, effectiveTab === 'feedback' && styles.tabTextActive]}>Needs Feedback</Text>
+                  <View style={[styles.tabCountPill, styles.tabCountPillAttention]}>
+                    <Text style={[styles.tabCountText, styles.tabCountTextAttention]}>{awaitingFeedback.length}</Text>
+                  </View>
+                </Pressable>
+              )}
+            </View>
+          </ScrollView>
 
           {/* Available Slots */}
-          {activeTab === 'slots' && (
+          {effectiveTab === 'slots' && (
             <View style={styles.tabPanel}>
               {slotsLoading ? (
                 <View style={styles.emptyCard}>
@@ -866,7 +927,7 @@ export default function StudentAppointmentsScreen() {
           )}
 
           {/* My Bookings */}
-          {activeTab === 'bookings' && (
+          {effectiveTab === 'bookings' && (
             <View style={styles.tabPanel}>
               {bookingsLoading ? (
                 <View style={styles.emptyCard}>
@@ -912,8 +973,15 @@ export default function StudentAppointmentsScreen() {
                           <Text style={styles.bookingPersonName}>{booking.person}</Text>
                           <Text style={styles.bookingCollegeText}>{collegeLabel(booking.college)}</Text>
                         </View>
-                        <View style={[styles.statusBadge, { backgroundColor: s.bg, borderColor: s.border }]}>
-                          <Text style={[styles.statusBadgeText, { color: s.color }]}>{booking.status}</Text>
+                        <View style={styles.bookingHeaderRight}>
+                          {booking.trackingNumber ? (
+                            <View style={styles.trackingPill}>
+                              <Text style={styles.trackingPillText}>{booking.trackingNumber}</Text>
+                            </View>
+                          ) : null}
+                          <View style={[styles.statusBadge, { backgroundColor: s.bg, borderColor: s.border }]}>
+                            <Text style={[styles.statusBadgeText, { color: s.color }]}>{booking.status}</Text>
+                          </View>
                         </View>
                       </View>
                       {booking.appointmentType && (
@@ -945,14 +1013,18 @@ export default function StudentAppointmentsScreen() {
                           </View>
                         ) : null}
                       </View>
-                      <Pressable
-                        style={styles.cancelBtn}
-                        onPress={() => setCancelConfirmId(booking.id)}
-                        disabled={cancellingId === booking.id}
-                      >
-                        <XCircle size={16} color="#ef4444" />
-                        <Text style={styles.cancelBtnText}>{cancellingId === booking.id ? 'Cancelling…' : 'Cancel'}</Text>
-                      </Pressable>
+                      {/* Hidden once the professor has recorded actions taken
+                          (the meeting happened) -- the server refuses it too. */}
+                      {canStudentCancel(booking) ? (
+                        <Pressable
+                          style={styles.cancelBtn}
+                          onPress={() => setCancelConfirmId(booking.id)}
+                          disabled={cancellingId === booking.id}
+                        >
+                          <XCircle size={16} color="#ef4444" />
+                          <Text style={styles.cancelBtnText}>{cancellingId === booking.id ? 'Cancelling…' : 'Cancel'}</Text>
+                        </Pressable>
+                      ) : null}
                       {booking.status === 'approved' ? (
                         <Pressable
                           style={styles.completeBtn}
@@ -969,6 +1041,70 @@ export default function StudentAppointmentsScreen() {
                   );
                 })
               )}
+            </View>
+          )}
+
+          {/* Needs Feedback -- mirrors web stud-appointments.jsx */}
+          {effectiveTab === 'feedback' && (
+            <View style={styles.tabPanel}>
+              <Text style={styles.feedbackIntro}>
+                These appointments are finished. Rating them is optional, and you can only send it once.
+              </Text>
+              {awaitingFeedback.map((booking) => {
+                const s = isDarkMode ? STATUS_STYLES_DARK[booking.status] : STATUS_STYLES_LIGHT[booking.status];
+                return (
+                  <Pressable
+                    key={booking.id}
+                    style={styles.bookingCard}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/pages/student/student_appointment_status',
+                        params: { appointmentId: booking.id, fromBookings: 'true' },
+                      })
+                    }
+                  >
+                    <View style={styles.bookingHeaderRow}>
+                      <View style={styles.bookingIconWrap}>
+                        <Calendar size={18} color={theme.purple} />
+                      </View>
+                      <View style={styles.bookingTitleSection}>
+                        <Text style={styles.bookingPersonName}>{booking.person}</Text>
+                        <Text style={styles.bookingCollegeText}>{collegeLabel(booking.college)}</Text>
+                      </View>
+                      <View style={styles.bookingHeaderRight}>
+                        {booking.trackingNumber ? (
+                          <View style={styles.trackingPill}>
+                            <Text style={styles.trackingPillText}>{booking.trackingNumber}</Text>
+                          </View>
+                        ) : null}
+                        <View style={[styles.statusBadge, { backgroundColor: s.bg, borderColor: s.border }]}>
+                          <Text style={[styles.statusBadgeText, { color: s.color }]}>{booking.status}</Text>
+                        </View>
+                      </View>
+                    </View>
+                    <View style={styles.fieldGrid}>
+                      <View style={styles.fieldGridItem}>
+                        <Text style={styles.fieldLabel}>Date</Text>
+                        <Text style={styles.fieldValue}>{formatDate(booking.date)}</Text>
+                      </View>
+                      <View style={styles.fieldGridItem}>
+                        <Text style={styles.fieldLabel}>Time Slot</Text>
+                        <Text style={styles.fieldValue}>
+                          {booking.windowStart && booking.windowEnd
+                            ? `${formatTime(booking.windowStart)} – ${formatTime(booking.windowEnd)}` : '—'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Pressable
+                      style={styles.feedbackBtn}
+                      onPress={() => { setFeedbackTarget(booking); setFeedbackText(''); }}
+                    >
+                      <MessageSquare size={16} color={theme.purple} />
+                      <Text style={styles.feedbackBtnText}>Provide Feedback</Text>
+                    </Pressable>
+                  </Pressable>
+                );
+              })}
             </View>
           )}
         </ScrollView>
@@ -1054,6 +1190,7 @@ export default function StudentAppointmentsScreen() {
                       style={styles.textInput}
                       placeholder="e.g., 1 CS-A, 1 IT-A"
                       placeholderTextColor={theme.tertiary}
+                      selectionColor={theme.purple}
                       value={yearProgram}
                       onChangeText={setYearProgram}
                     />
@@ -1065,6 +1202,7 @@ export default function StudentAppointmentsScreen() {
                       style={styles.textInput}
                       placeholder="e.g., CS 101"
                       placeholderTextColor={theme.tertiary}
+                      selectionColor={theme.purple}
                       value={courseCode}
                       onChangeText={setCourseCode}
                     />
@@ -1096,6 +1234,7 @@ export default function StudentAppointmentsScreen() {
                       style={styles.textarea}
                       placeholder="e.g., Thesis consultation, Grade inquiry, Academic advising..."
                       placeholderTextColor={theme.tertiary}
+                      selectionColor={theme.purple}
                       value={purpose}
                       onChangeText={setPurpose}
                       multiline
@@ -1117,6 +1256,86 @@ export default function StudentAppointmentsScreen() {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Provide Feedback Dialog -- same shell/styles as the Book Slot
+          dialog above so both appointment popups look identical. */}
+      <Modal visible={feedbackTarget !== null} animationType="fade" transparent onRequestClose={closeFeedbackDialog}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={styles.dialogOverlay}>
+            <View style={styles.dialogCard}>
+              <View style={styles.dialogHeaderRow}>
+                <Text style={styles.dialogHeaderTitle}>Provide Feedback</Text>
+                <Pressable onPress={closeFeedbackDialog} hitSlop={8} disabled={feedbackSaving}>
+                  <X size={20} color={theme.subtext} />
+                </Pressable>
+              </View>
+              <ScrollView style={styles.dialogBody} keyboardShouldPersistTaps="handled">
+                {feedbackTarget && (
+                  <>
+                    <View style={styles.slotSummary}>
+                      <View style={styles.feedbackSummaryTitleRow}>
+                        <Text style={[styles.slotSummaryName, { flexShrink: 1 }]}>{feedbackTarget.person}</Text>
+                        {feedbackTarget.trackingNumber ? (
+                          <View style={styles.trackingPill}>
+                            <Text style={styles.trackingPillText}>{feedbackTarget.trackingNumber}</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      <View style={styles.summaryDetails}>
+                        <View style={styles.slotDetailRow}>
+                          <Calendar size={15} color={theme.purple} />
+                          <Text style={styles.slotDetailText}>{formatDate(feedbackTarget.date)}</Text>
+                        </View>
+                        {feedbackTarget.windowStart && feedbackTarget.windowEnd ? (
+                          <View style={styles.slotDetailRow}>
+                            <Clock size={15} color={theme.purple} />
+                            <Text style={styles.slotDetailText}>{formatTime(feedbackTarget.windowStart)} – {formatTime(feedbackTarget.windowEnd)}</Text>
+                          </View>
+                        ) : null}
+                        <View style={styles.slotDetailRow}>
+                          <MapPin size={15} color={theme.purple} />
+                          <Text style={styles.slotDetailText}>{feedbackTarget.location}</Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    <View style={styles.formGroup}>
+                      <Text style={styles.formLabel}>Your Feedback</Text>
+                      <TextInput
+                        style={styles.textarea}
+                        placeholder="How's the appointment/service?"
+                        placeholderTextColor={theme.tertiary}
+                        selectionColor={theme.purple}
+                        value={feedbackText}
+                        onChangeText={setFeedbackText}
+                        maxLength={2000}
+                        multiline
+                        numberOfLines={4}
+                      />
+                      <Text style={styles.feedbackCount}>
+                        Optional, and you can only send it once. · {feedbackText.length}/2000
+                      </Text>
+                    </View>
+                  </>
+                )}
+              </ScrollView>
+              <View style={styles.dialogActions}>
+                <Pressable style={styles.btnSecondary} onPress={closeFeedbackDialog} disabled={feedbackSaving}>
+                  <Text style={styles.btnSecondaryText}>Cancel</Text>
+                </Pressable>
+                <Pressable onPress={submitFeedback} disabled={!feedbackText.trim() || feedbackSaving}>
+                  <LinearGradient
+                    colors={['#a855f7', '#9333ea']}
+                    style={[styles.btnPrimary, (!feedbackText.trim() || feedbackSaving) && { opacity: 0.6 }]}
+                  >
+                    <Text style={styles.btnPrimaryText}>{feedbackSaving ? 'Sending…' : 'Send Feedback'}</Text>
+                  </LinearGradient>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Cancel Appointment Confirm Modal */}
@@ -1499,6 +1718,10 @@ function createStyles(theme: ThemePalette) {
       paddingHorizontal: 5, backgroundColor: 'rgba(168, 85, 247, 0.15)',
     },
     tabCountText: { fontSize: 10, fontWeight: '700', color: theme.purple },
+    // Amber: a nudge ("you owe these a rating"), matching web .ab-tab-count--attention.
+    tabCountPillAttention: { backgroundColor: 'rgba(245, 158, 11, 0.18)' },
+    tabCountTextAttention: { color: '#d97706' },
+    tabsScroll: { flexGrow: 0 },
 
     tabPanel: { gap: 16 },
 
@@ -1597,6 +1820,20 @@ function createStyles(theme: ThemePalette) {
       borderRadius: 16, padding: 14, gap: 11, marginBottom: 4,
     },
     bookingHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+    // Tracking pill stacked above the status badge (narrow screens).
+    bookingHeaderRight: { alignItems: 'flex-end', gap: 5, flexShrink: 0 },
+    // Purple twin of the documents' orange tracking pill (web .apt-list-tracking-pill).
+    trackingPill: { backgroundColor: theme.purple, borderRadius: 8, paddingVertical: 3, paddingHorizontal: 8 },
+    trackingPillText: { fontSize: 10.5, fontWeight: '700', color: '#ffffff', textTransform: 'uppercase', letterSpacing: 0.3 },
+    feedbackIntro: { fontSize: 12.5, color: theme.subtext, lineHeight: 18 },
+    feedbackBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+      marginTop: 4, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.35)',
+      paddingHorizontal: 10,
+    },
+    feedbackBtnText: { fontSize: 12.5, fontWeight: '600', color: theme.purple },
+    feedbackSummaryTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    feedbackCount: { fontSize: 11, color: theme.tertiary, textAlign: 'right' },
     bookingIconWrap: {
       width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
       backgroundColor: 'rgba(168, 85, 247, 0.12)', flexShrink: 0,

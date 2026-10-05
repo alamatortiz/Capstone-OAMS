@@ -13,6 +13,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,7 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import {
   AlertCircle, Calendar, CheckCircle, ChevronLeft, ChevronRight, Clock, FileText, GraduationCap,
-  Home as HomeIcon, LayoutList, Loader2, Megaphone, Users, XCircle, ClipboardList,
+  Home as HomeIcon, LayoutList, Loader2, Megaphone, MessageSquare, Users, XCircle, ClipboardList,
 } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
@@ -35,6 +36,7 @@ import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
 import { formatManilaDate, formatManilaTime, getManilaDateString } from '@/utils/date';
 import { filterByRange } from '@/utils/dateRange';
+import { canStudentCancel, isAutoRejected } from '@/utils/appointmentActions';
 
 // Mirrors web's CSS `spin 1s linear infinite` on Loader2 for loading states.
 function SpinningLoader({ size, color }: { size: number; color: string }) {
@@ -219,10 +221,105 @@ const formatDateShort = (dateString: string) => {
 };
 
 const formatTime = (time: string) => {
+  // GET /student/appointments already sends "2:17 PM" -- re-formatting it
+  // produced "2:17 PM AM". Only raw "HH:MM:SS" values need converting.
+  if (/\s?[AP]M$/i.test(time.trim())) return time.trim();
   const [hours, minutes] = time.split(':');
   const hour = parseInt(hours, 10);
   return `${hour % 12 || 12}:${minutes} ${hour >= 12 ? 'PM' : 'AM'}`;
 };
+
+// The student's own one-shot feedback on a finished appointment -- mirrors
+// web stud-appointment-status.jsx's FeedbackCard. Renders nothing until the
+// appointment is completed and we know whether they've already spoken; the
+// DB's PK on appointment_id is what enforces "exactly once".
+function FeedbackCard({
+  appointmentId,
+  theme,
+  styles,
+  onSubmitted,
+}: {
+  appointmentId: string;
+  theme: ThemePalette;
+  styles: ReturnType<typeof createStyles>;
+  onSubmitted: () => void;
+}) {
+  const [state, setState] = useState<{ canSubmit: boolean; feedback: { text: string; createdAt: string } | null } | null>(null);
+  const [text, setText] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .get(`/student/appointments/${appointmentId}/feedback`)
+      .then(({ data }) => { if (active) setState(data); })
+      .catch(() => { if (active) setState({ canSubmit: false, feedback: null }); });
+    return () => { active = false; };
+  }, [appointmentId]);
+
+  const submit = async () => {
+    const trimmed = text.trim();
+    if (!trimmed || saving) return;
+    setSaving(true);
+    try {
+      await api.post(`/student/appointments/${appointmentId}/feedback`, { feedback: trimmed });
+      setState({ canSubmit: false, feedback: { text: trimmed, createdAt: new Date().toISOString() } });
+      Alert.alert('Thank you', 'Thanks for your feedback.');
+      onSubmitted();
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.error ?? "Couldn't send your feedback. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!state || (!state.canSubmit && !state.feedback)) return null;
+
+  return (
+    <View style={styles.infoCard}>
+      <View style={styles.infoCardHeader}>
+        <MessageSquare size={18} color={theme.purple} />
+        <Text style={styles.infoCardTitle}>Your Feedback</Text>
+      </View>
+      <View style={styles.infoCardBody}>
+        {state.feedback ? (
+          <>
+            <Text style={styles.feedbackText}>{state.feedback.text}</Text>
+            <Text style={styles.feedbackMeta}>
+              Submitted on {formatManilaDate(state.feedback.createdAt, { month: 'short', day: 'numeric', year: 'numeric' })} — thanks for sharing.
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.feedbackMeta}>Optional, and you can only send it once.</Text>
+            <TextInput
+              style={styles.feedbackInput}
+              placeholder="How's the appointment/service?"
+              placeholderTextColor={theme.tertiary}
+              selectionColor={theme.purple}
+              value={text}
+              onChangeText={setText}
+              maxLength={2000}
+              multiline
+              numberOfLines={4}
+            />
+            <View style={styles.feedbackActions}>
+              <Text style={styles.feedbackMeta}>{text.length}/2000</Text>
+              <Pressable onPress={submit} disabled={!text.trim() || saving}>
+                <LinearGradient
+                  colors={['#a855f7', '#9333ea']}
+                  style={[styles.feedbackSendBtn, (!text.trim() || saving) && { opacity: 0.6 }]}
+                >
+                  <Text style={styles.feedbackSendText}>{saving ? 'Sending…' : 'Send Feedback'}</Text>
+                </LinearGradient>
+              </Pressable>
+            </View>
+          </>
+        )}
+      </View>
+    </View>
+  );
+}
 
 export default function StudentAppointmentStatusScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
@@ -588,6 +685,36 @@ export default function StudentAppointmentStatusScreen() {
                 </View>
               </View>
 
+              {/* Rejected notice (web shows this on the detail view too) */}
+              {selectedAppt.status === 'rejected' && selectedAppt.rejectionReason ? (
+                <View style={styles.infoCard}>
+                  <View style={styles.infoCardBody}>
+                    <View style={styles.rejectNotice}>
+                      <XCircle size={20} color="#ef4444" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.rejectNoticeTitle}>
+                          {isAutoRejected(selectedAppt)
+                            ? 'This appointment request was automatically rejected.'
+                            : 'This appointment request was rejected.'}
+                        </Text>
+                        <Text style={styles.rejectNoticeReason}>Reason: {selectedAppt.rejectionReason}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              ) : null}
+
+              {/* Feedback -- placed high so the keyboard doesn't cover it */}
+              {selectedAppt.status === 'completed' && (
+                <FeedbackCard
+                  key={selectedAppt.id}
+                  appointmentId={selectedAppt.id}
+                  theme={theme}
+                  styles={styles}
+                  onSubmitted={fetchAppointments}
+                />
+              )}
+
               {/* Not Served notice */}
               {selectedAppt.status === 'cancelled' && selectedAppt.cancelledBy === 'student_no_show' && (
                 <View style={styles.infoCard}>
@@ -623,7 +750,7 @@ export default function StudentAppointmentStatusScreen() {
               )}
 
               {/* Cancel */}
-              {(selectedAppt.status === 'pending' || selectedAppt.status === 'approved') && (
+              {canStudentCancel(selectedAppt) && (
                 <View style={[styles.infoCard, styles.cancelCard]}>
                   <View style={[styles.infoCardHeader, styles.cancelCardHeader]}>
                     <XCircle size={18} color="#ef4444" />
@@ -787,10 +914,16 @@ export default function StudentAppointmentStatusScreen() {
                           <View style={styles.listItemTitleWrap}>
                             <Text style={[styles.listItemName, isDim && styles.listItemNameDim]}>{appt.person}</Text>
                             <Text style={styles.listItemCollege}>{appt.college}</Text>
-                            {appt.trackingNumber ? <Text style={styles.listTrackingText}>{appt.trackingNumber}</Text> : null}
                           </View>
-                          <View style={[styles.statusBadge, { backgroundColor: s.bg, borderColor: s.border }]}>
-                            <Text style={[styles.statusBadgeText, { color: s.color }]}>{STATUS_LABELS[appt.status]}</Text>
+                          <View style={styles.listHeaderRight}>
+                            {appt.trackingNumber ? (
+                              <View style={styles.trackingPill}>
+                                <Text style={styles.trackingPillText}>{appt.trackingNumber}</Text>
+                              </View>
+                            ) : null}
+                            <View style={[styles.statusBadge, { backgroundColor: s.bg, borderColor: s.border }]}>
+                              <Text style={[styles.statusBadgeText, { color: s.color }]}>{STATUS_LABELS[appt.status]}</Text>
+                            </View>
                           </View>
                         </View>
                         <View style={styles.listItemGrid}>
@@ -851,7 +984,11 @@ export default function StudentAppointmentStatusScreen() {
                           <View style={styles.rejectNotice}>
                             <XCircle size={20} color="#ef4444" />
                             <View style={{ flex: 1 }}>
-                              <Text style={styles.rejectNoticeTitle}>This appointment request was rejected.</Text>
+                              <Text style={styles.rejectNoticeTitle}>
+                                {isAutoRejected(appt)
+                                  ? 'This appointment request was automatically rejected.'
+                                  : 'This appointment request was rejected.'}
+                              </Text>
                               <Text style={styles.rejectNoticeReason}>Reason: {appt.rejectionReason}</Text>
                             </View>
                           </View>
@@ -1172,7 +1309,21 @@ function createStyles(theme: ThemePalette) {
       borderColor: 'rgba(255, 255, 255, 0.35)',
     },
     heroTrackingBadgeText: { fontSize: 12, fontWeight: '800', color: '#ffffff', fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }) },
-    listTrackingText: { marginTop: 2, fontSize: 11, fontWeight: '700', color: theme.purple, fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }) },
+    // Tracking pill stacked above the status badge -- purple twin of the
+    // documents' orange tracking pill (web .apt-list-tracking-pill).
+    listHeaderRight: { alignItems: 'flex-end', gap: 5, flexShrink: 0 },
+    trackingPill: { backgroundColor: theme.purple, borderRadius: 8, paddingVertical: 3, paddingHorizontal: 8 },
+    trackingPillText: { fontSize: 10.5, fontWeight: '700', color: '#ffffff', textTransform: 'uppercase', letterSpacing: 0.3 },
+    // "Your Feedback" card (detail view).
+    feedbackText: { fontSize: 13, color: theme.text, lineHeight: 19 },
+    feedbackMeta: { fontSize: 11.5, color: theme.tertiary },
+    feedbackInput: {
+      backgroundColor: theme.background, borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.3)', borderRadius: 12,
+      padding: 12, color: theme.text, fontSize: 13, minHeight: 90, textAlignVertical: 'top', marginTop: 8,
+    },
+    feedbackActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
+    feedbackSendBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12 },
+    feedbackSendText: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
     heroCollegeText: { fontSize: 13, color: 'rgba(255,255,255,0.85)' },
 
     // Tabs

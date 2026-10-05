@@ -379,6 +379,7 @@ router.get(
           a.status,
           a.cancelled_by,
           a.cancel_reason,
+          a.rejection_reason,
           a.notes,
           a.created_at,
           CONCAT(s.first_name, ' ', s.last_name) AS student_name,
@@ -444,6 +445,7 @@ router.get(
           status: r.status,
           cancelledBy: r.cancelled_by ?? null,
           cancelReason: r.cancel_reason ?? null,
+          rejectionReason: r.rejection_reason ?? null,
           requestedAt: new Date(r.created_at).toLocaleString("en-US", {
             timeZone: "Asia/Manila",
             year: "numeric",

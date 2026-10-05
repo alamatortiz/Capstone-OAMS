@@ -18,6 +18,7 @@ import PageHeader from "../../components/PageHeader";
 import RefreshButton from "../../components/RefreshButton";
 import { formatManilaDate, formatManilaTime } from "../../utils/dateTime";
 import { filterByRange } from "../../utils/dateRange";
+import { isAutoRejected } from "../../utils/appointmentActions";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import { useLiveRefetch } from "../../hooks/useLiveRefetch";
 
@@ -504,6 +505,29 @@ export default function AdminAppointment() {
                           <span className="admin-appointment-modal-value">
                             {CANCELLED_BY_LABELS[selectedAppointment.cancelledBy] ??
                               selectedAppointment.cancelledBy}
+                          </span>
+                        </div>
+                      )}
+                    {selectedAppointment.status === "rejected" && (
+                      <div className="admin-appointment-modal-field admin-appointment-modal-field--full">
+                        <span className="admin-appointment-modal-label">
+                          Rejected By
+                        </span>
+                        <span className="admin-appointment-modal-value">
+                          {isAutoRejected(selectedAppointment)
+                            ? "System (not approved in time)"
+                            : "Faculty"}
+                        </span>
+                      </div>
+                    )}
+                    {selectedAppointment.status === "rejected" &&
+                      selectedAppointment.rejectionReason && (
+                        <div className="admin-appointment-modal-field admin-appointment-modal-field--full">
+                          <span className="admin-appointment-modal-label">
+                            Rejection Reason
+                          </span>
+                          <span className="admin-appointment-modal-value">
+                            {selectedAppointment.rejectionReason}
                           </span>
                         </div>
                       )}

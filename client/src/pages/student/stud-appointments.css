@@ -676,7 +676,9 @@ body {
   position: fixed;
   inset: 0;
   background-color: rgba(0,0,0,0.5);
-  z-index: 100;
+  /* Matches the app's other modals (ActionConfirmModal/FormModal) -- at 100
+     the floating tutorial button (z-index 500) sat on top of this dialog. */
+  z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -739,6 +741,9 @@ body {
 }
 
 .slot-summary h4 { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin: 0 0 0.75rem; transition: color 0.3s ease; }
+/* Feedback dialog: professor name + tracking pill on one line. */
+.slot-summary-title-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+.slot-summary-title-row h4 { margin: 0; }
 .summary-details { display: flex; flex-flow: row wrap; align-items: center; gap: 0.4rem 1rem; }
 .summary-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--text-tertiary); transition: color 0.3s ease; }
 .summary-item .appointment-icon { width: 1.25rem; height: 1.25rem; color: #a855f7; flex-shrink: 0; background: none; border: none; border-radius: 0; }
@@ -777,10 +782,13 @@ body {
 }
 
 .btn-primary { background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%); color: white; }
-.btn-primary:hover { box-shadow: 0 4px 12px rgba(168, 85, 247, 0.35); transform: translateY(-2px); }
+.btn-primary:hover:not(:disabled) { box-shadow: 0 4px 12px rgba(168, 85, 247, 0.35); transform: translateY(-2px); }
 
 .btn-secondary { background: transparent; color: var(--text-tertiary); border: 1px solid var(--card-border); }
-.btn-secondary:hover { background: rgba(168, 85, 247, 0.1); color: #a855f7; border-color: #a855f7; }
+.btn-secondary:hover:not(:disabled) { background: rgba(168, 85, 247, 0.1); color: #a855f7; border-color: #a855f7; }
+
+.btn-primary:disabled,
+.btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
 
 /* ===== Auto-assigned slot display ===== */
 .auto-slot-display {
@@ -900,26 +908,8 @@ body {
   color: var(--text-secondary);
 }
 
-.ab-feedback-input {
-  width: 100%;
-  padding: 0.65rem 0.75rem;
-  border-radius: 0.6rem;
-  border: 1px solid var(--card-border);
-  background: var(--input-bg, transparent);
-  color: var(--text-primary);
-  font-size: 0.9rem;
-  font-family: inherit;
-  resize: vertical;
-  min-height: 5.5rem;
-}
-
-.ab-feedback-input:focus {
-  outline: none;
-  border-color: #a855f7;
-}
-
 .ab-feedback-count {
-  margin: 0.4rem 0 0;
+  margin: 0;
   text-align: right;
   font-size: 0.75rem;
   color: var(--text-tertiary);

@@ -663,6 +663,12 @@ export default function ProfessorTransactionsScreen() {
                       </Text>
                     )}
 
+                    {txn.type === 'appointment' && txn.cancelledBy === 'system_expired' && (
+                      <Text style={styles.txnDetails}>
+                        Closed automatically — not approved before its scheduled time ended
+                      </Text>
+                    )}
+
                     {txn.type === 'appointment' && txn.cancelledBy === 'system_not_entertained' && (
                       <Text style={styles.txnDetails}>
                         Automatically cancelled — no actions taken recorded{txn.cancelReason ? `: ${txn.cancelReason}` : ''}

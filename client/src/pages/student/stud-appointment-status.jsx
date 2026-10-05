@@ -23,7 +23,7 @@ import PageHeader from "../../components/PageHeader";
 import RefreshButton from "../../components/RefreshButton";
 import AppointmentListItem from "../../components/AppointmentListItem";
 import { formatManilaDate, formatManilaTime } from "../../utils/dateTime";
-import { getAppointmentActions } from "../../utils/appointmentActions";
+import { getAppointmentActions, isAutoRejected } from "../../utils/appointmentActions";
 import { filterByRange } from "../../utils/dateRange";
 import { connectSocket } from "../../utils/socket";
 import { useAuth } from "../../context/AuthContext";
@@ -276,7 +276,11 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, com
                 <div className="apst-reject-notice">
                   <XCircle style={{ width: "1.25rem", height: "1.25rem" }} />
                   <div>
-                    <p>This appointment request was rejected.</p>
+                    <p>
+                      {isAutoRejected(appt)
+                        ? "This appointment request was automatically rejected."
+                        : "This appointment request was rejected."}
+                    </p>
                     <p className="apst-reject-reason">Reason: {appt.rejectionReason}</p>
                   </div>
                 </div>
