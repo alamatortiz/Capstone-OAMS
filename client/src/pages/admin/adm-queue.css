@@ -785,7 +785,7 @@ body {
 
 .queue-monitoring-stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
 }
 
@@ -1337,7 +1337,7 @@ body {
   }
 
   .queue-monitoring-stats {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -1436,7 +1436,7 @@ body {
   .queue-detail-row .queue-detail-grid { grid-template-columns: 1fr; }
 }
 
-/* ── Entry flags + relay ────────────────────────────────────────────── */
+/* ── Entry flags + pass to faculty ──────────────────────────────────── */
 .queue-entry-flag {
   font-size: 0.68rem;
   font-weight: 700;
@@ -1452,119 +1452,410 @@ body {
   color: #9333ea;
 }
 
-.queue-entry-flag--moved {
-  background: rgba(59, 130, 246, 0.16);
-  color: #2563eb;
+/* With a professor -- violet, matching Queue Hosting's "with faculty" pill. */
+.queue-entry-flag--faculty {
+  background: rgba(139, 92, 246, 0.15);
+  color: #8b5cf6;
+  border: 0.5px solid rgba(139, 92, 246, 0.4);
+}
+
+.queue-entry-flag--offline {
+  background: rgba(245, 158, 11, 0.15);
+  color: #d97706;
+  border: 0.5px solid rgba(245, 158, 11, 0.4);
 }
 
 .queue-entry-ready { color: #16a34a; font-weight: 600; }
 .queue-entry-not-ready { color: #d97706; font-weight: 600; }
 
-.queue-entry-move-btn {
+/* A ticket in a professor's line: still listed (it holds a seat here), but
+   visibly set apart from the office's own line. */
+.queue-entry-item.is-passed {
+  border-left: 3px solid #8b5cf6;
+}
+
+.queue-entry-pass-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   margin-top: 0.5rem;
-  padding: 0.35rem 0.7rem;
+}
+
+/* Admin action-button pattern: coloured outline on the card surface, filling
+   with that colour on hover. */
+.queue-entry-pass-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.4rem 0.8rem;
   font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1;
   border-radius: 0.5rem;
-  border: 1px solid var(--card-border);
-  background: transparent;
-  color: var(--text-secondary);
+  border: 1px solid #8b5cf6;
+  background: var(--card-bg);
+  color: #8b5cf6;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.queue-entry-move-btn:hover {
-  border-color: var(--blue, #3b82f6);
-  color: var(--blue, #3b82f6);
+.queue-entry-pass-btn svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex-shrink: 0;
 }
 
-.queue-move-overlay {
+.queue-entry-pass-btn:hover:not(:disabled) {
+  background: #8b5cf6;
+  color: #fff;
+}
+
+.queue-entry-pass-btn--return {
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.queue-entry-pass-btn--return:hover:not(:disabled) {
+  background: #3b82f6;
+  color: #fff;
+}
+
+.queue-entry-pass-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.queue-action-btn.queue-action-btn--faculty {
+  border-color: rgba(139, 92, 246, 0.4);
+  color: #8b5cf6;
+}
+.queue-action-btn.queue-action-btn--faculty:hover {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: #8b5cf6;
+  color: #8b5cf6;
+}
+
+/* ── Join-code card (top of the monitor view) ───────────────────────── */
+.queue-qr-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.queue-qr-card .queue-detail-header {
+  width: 100%;
+}
+
+.queue-qr-card-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.queue-qr-card .qjq-wrap {
+  padding: 0.5rem 0 0;
+}
+
+.queue-qr-unavailable {
+  margin: 0;
+  padding: 1.25rem 1rem;
+  width: 100%;
+  border: 1px dashed var(--card-border);
+  border-radius: 0.875rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* ── Pass-to-faculty modal (blue sheet, mirrors Queue Hosting's modal) ─ */
+.aqp-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: 60;
   background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 1.25rem;
 }
 
-.queue-move-sheet {
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--card-border);
-  border-radius: 1rem;
+.aqp-modal {
   width: 100%;
-  max-width: 25rem;
+  max-width: 560px;
+  max-height: 90vh;
+  max-height: 90dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1.25rem;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.35);
 }
 
-.queue-move-header {
+.aqp-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.5rem 1.5rem 1.25rem;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.aqp-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.aqp-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.aqp-close:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.aqp-close svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.aqp-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+  text-align: left;
+}
+
+.aqp-hero {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border-radius: 1rem;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 10px 30px rgba(59, 130, 246, 0.2);
+}
+
+.aqp-hero-label {
+  margin: 0 0 0.375rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.aqp-hero-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.aqp-hero-purpose {
+  margin: 0.75rem 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.aqp-note {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.aqp-faculty-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.aqp-faculty-option {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--card-border);
-}
-
-.queue-move-header h2 {
-  margin: 0;
-  font-size: 1.02rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.queue-move-header button {
-  background: transparent;
-  border: none;
-  font-size: 1.6rem;
-  line-height: 1;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.queue-move-body { padding: 1.1rem 1.25rem; }
-
-.queue-move-note {
-  margin: 0 0 0.85rem;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-}
-
-.queue-move-select {
   width: 100%;
-  padding: 0.55rem 0.7rem;
-  border-radius: 0.55rem;
-  border: 1px solid var(--card-border);
-  background: transparent;
+  padding: 0.85rem 1rem;
+  border: 1.5px solid var(--card-border);
+  border-radius: 0.875rem;
+  background: var(--card-bg);
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.queue-move-actions {
+.aqp-faculty-option:hover {
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.aqp-faculty-option.is-selected {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.08);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.aqp-faculty-main {
   display: flex;
-  justify-content: flex-end;
-  gap: 0.6rem;
-  padding: 1rem 1.25rem;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.aqp-faculty-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.aqp-faculty-load {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.aqp-faculty-status {
+  flex-shrink: 0;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.aqp-faculty-status--available {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--primary-color);
+  border: 0.5px solid rgba(34, 197, 94, 0.4);
+}
+
+.aqp-faculty-status--busy {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+  border: 0.5px solid rgba(59, 130, 246, 0.35);
+}
+
+.aqp-faculty-status--unavailable {
+  background: rgba(245, 158, 11, 0.15);
+  color: #d97706;
+  border: 0.5px solid rgba(245, 158, 11, 0.4);
+}
+
+.aqp-warning {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #d97706;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.aqp-empty {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.aqp-empty-card {
+  padding: 1.25rem;
+  border: 1px dashed var(--card-border);
+  border-radius: 0.875rem;
+  text-align: center;
+}
+
+.aqp-empty-card h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.aqp-empty-card p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.aqp-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 1.1rem 1.5rem;
   border-top: 1px solid var(--card-border);
 }
 
-.queue-move-cancel,
-.queue-move-confirm {
-  padding: 0.5rem 1rem;
-  border-radius: 0.6rem;
-  font-size: 0.88rem;
+.aqp-btn-cancel,
+.aqp-btn-submit {
+  flex: 1;
+  min-width: 120px;
+  padding: 0.65rem 1.25rem;
+  border-radius: 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.aqp-btn-cancel {
   border: 1px solid var(--card-border);
   background: transparent;
+  color: var(--text-secondary);
+}
+
+.aqp-btn-cancel:hover {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: #3b82f6;
   color: var(--text-primary);
 }
 
-.queue-move-confirm {
-  background: #3b82f6;
-  border-color: #3b82f6;
+.aqp-btn-submit {
+  border: none;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   color: #fff;
 }
 
-.queue-move-confirm:disabled {
+.aqp-btn-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(59, 130, 246, 0.35);
+}
+
+.aqp-btn-submit:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .aqp-footer {
+    flex-direction: column;
+  }
+  .aqp-btn-cancel,
+  .aqp-btn-submit {
+    width: 100%;
+  }
 }

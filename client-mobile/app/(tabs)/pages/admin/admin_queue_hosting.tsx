@@ -422,7 +422,7 @@ export default function AdminQueueHostingScreen() {
       : {
           title: 'Stop Queue',
           message:
-            'All students still waiting or being served will be removed from this queue and will see this reason. This cannot be undone.',
+            'All students still waiting or being served in the office line will be removed from this queue and will see this reason. This cannot be undone. Students already passed to faculty stay with them until served.',
           confirmText: 'Stop Queue',
           confirmColor: '#ef4444',
         };
@@ -639,9 +639,9 @@ export default function AdminQueueHostingScreen() {
 
                     <View style={styles.queueStatsRow}>
                       <View style={styles.queueStat}>
-                        <Text style={styles.queueStatLabel}>Waiting / Max</Text>
+                        <Text style={styles.queueStatLabel}>Occupied / Max</Text>
                         <Text style={styles.queueStatValue}>
-                          {queue.currentCount} / {queue.maxCapacity}
+                          {queue.totalInQueue} / {queue.maxCapacity}
                         </Text>
                       </View>
                       <View style={styles.queueStat}>
@@ -660,7 +660,7 @@ export default function AdminQueueHostingScreen() {
                           <View
                             style={[
                               styles.capacityBarFill,
-                              { width: `${Math.min(100, (queue.currentCount / queue.maxCapacity) * 100)}%` },
+                              { width: `${Math.min(100, (queue.totalInQueue / queue.maxCapacity) * 100)}%` },
                             ]}
                           />
                         </View>
@@ -724,9 +724,9 @@ export default function AdminQueueHostingScreen() {
 
                     <View style={styles.queueStatsRow}>
                       <View style={styles.queueStat}>
-                        <Text style={styles.queueStatLabel}>Waiting / Max</Text>
+                        <Text style={styles.queueStatLabel}>Occupied / Max</Text>
                         <Text style={styles.queueStatValue}>
-                          {queue.currentCount} / {queue.maxCapacity}
+                          {queue.totalInQueue} / {queue.maxCapacity}
                         </Text>
                       </View>
                       <View style={styles.queueStat}>
@@ -797,9 +797,9 @@ export default function AdminQueueHostingScreen() {
 
                       <View style={styles.queueStatsRow}>
                         <View style={styles.queueStat}>
-                          <Text style={styles.queueStatLabel}>Waiting / Max</Text>
+                          <Text style={styles.queueStatLabel}>Occupied / Max</Text>
                           <Text style={styles.queueStatValue}>
-                            {queue.currentCount} / {queue.maxCapacity}
+                            {queue.totalInQueue} / {queue.maxCapacity}
                           </Text>
                         </View>
                         <View style={styles.queueStat}>

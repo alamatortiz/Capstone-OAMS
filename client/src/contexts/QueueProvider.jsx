@@ -76,16 +76,33 @@ export function QueueProvider({ children }) {
       const prev = prevMap.get(q.queueId);
       if (!prev) continue;
 
+      // Passed to / taken back from a professor by the office. Checked first:
+      // passing someone the office had already called also moves them from
+      // serving back to waiting, and that must NOT read as "the queue was
+      // paused" below.
+      const justPassed = q.passedTo && q.passedTo.facultyId !== prev.passedTo?.facultyId;
+      const justReturned = !q.passedTo && prev.passedTo;
+      if (justPassed) {
+        toast.info(
+          `You've been passed to ${q.passedTo.name} for ${q.serviceName}. Please wait to be called — you kept your place in line.`,
+          { duration: 8000 },
+        );
+      } else if (justReturned) {
+        toast.info(`You've been moved back to the office line for ${q.serviceName}. You kept your place.`);
+      }
+
       if (prev.status === "waiting" && q.status === "serving") {
         toast.success(
-          `It's your turn for ${q.serviceName}! Please proceed to the designated location.`,
+          q.passedTo
+            ? `${q.passedTo.name} is ready for you for ${q.serviceName}! Please proceed${q.location ? ` to ${q.location}` : ""}.`
+            : `It's your turn for ${q.serviceName}! Please proceed to the designated location.`,
           { duration: 8000 },
         );
       }
       if (!prev.arrivedAt && q.arrivedAt) {
         toast.success(`You are now being served for ${q.serviceName}.`, { duration: 6000 });
       }
-      if (prev.status === "serving" && q.status === "waiting") {
+      if (prev.status === "serving" && q.status === "waiting" && !justPassed && !justReturned) {
         toast.warning(
           `Your call for ${q.serviceName} was reverted because the queue was paused. You're still in line.`,
         );
@@ -316,23 +333,27 @@ export function QueueProvider({ children }) {
       "queue:student-left",
       "queue:notes-updated",
       "queue:service-updated",
-      // Staff relayed this student to another queue -- their slot, service
-      // and position all change, so the ticket has to be refetched.
-      "queue:transferred",
+      // The office passed this student to a professor (or took them back) --
+      // their line and position change, so the ticket has to be refetched.
+      "queue:passed",
+      "queue:returned",
     ];
     events.forEach((event) => socket.on(event, refetch));
 
-    // The admin stopped a queue that this student was still in — their
-    // entry was force-cancelled server-side. Tell them directly (with the
-    // reason) instead of relying on the generic diff logic, which only
-    // ever notices "serving" entries vanishing, not "waiting" ones.
+    // This student's ticket ended before they were served -- the office
+    // stopped the queue, the queue's day ended, or they were handed back to a
+    // queue that had already been stopped. Their entry was cancelled (with a
+    // priority credit) server-side. Tell them directly, with the reason,
+    // instead of relying on the generic diff logic, which only ever notices
+    // "serving" entries vanishing, not "waiting" ones. Wording is neutral on
+    // purpose: it isn't always the admin who ended it.
     const onQueueStopped = (payload) => {
       if (payload.studentId !== user.userId) return;
       const stoppedQueue = queuesRef.current.find(
         (q) => q.queueId === payload.queueId,
       );
       toast.error(
-        `Your queue${stoppedQueue ? ` for ${stoppedQueue.serviceName}` : ""} was stopped by the admin. Reason: ${payload.reason}`,
+        `Your queue${stoppedQueue ? ` for ${stoppedQueue.serviceName}` : ""} ended before you were served. Reason: ${payload.reason}. You'll be placed at the front of the line next time you scan in for it.`,
         { duration: 10000 },
       );
       refetch();
@@ -367,6 +388,10 @@ export function QueueProvider({ children }) {
     async (qrToken, notes, serviceId = null) => {
       try {
         const { data } = await api.post("/student/queues/join", { qrToken, notes, serviceId });
+        // The socket only joins slot rooms on connect, so without this a
+        // student who just joined would miss that queue's live events until
+        // their next reconnect.
+        connectSocket(token)?.emit("queue:rejoin-rooms");
         setQueues((prev) => [...prev, data.queue]);
         await fetchAvailableSlots();
         await fetchActiveQueues();
@@ -378,7 +403,7 @@ export function QueueProvider({ children }) {
         throw new Error(msg);
       }
     },
-    [fetchAvailableSlots, fetchActiveQueues],
+    [fetchAvailableSlots, fetchActiveQueues, token],
   );
 
   // ── Leave a queue ─────────────────────────────────────────────────────────

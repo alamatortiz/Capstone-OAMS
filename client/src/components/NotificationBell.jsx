@@ -24,6 +24,10 @@ export const NOTIFICATION_EVENTS = [
   "queue:uncalled",
   "queue:queue-stopped",
   "queue:no-show",
+  // A student passed to (or back from) a professor -- both the student and
+  // the professor get a notification for it.
+  "queue:passed",
+  "queue:returned",
   "appointment:status-updated",
   "appointment:slot-updated",
   "appointment:comment-updated",

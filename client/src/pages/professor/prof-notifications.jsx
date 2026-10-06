@@ -23,22 +23,20 @@ const TYPE_META = {
   announcement: { label: "Announcement", updateLabel: "Announcement Update", icon: Megaphone, badgeClass: "notif-badge-announcement", iconClass: "notif-icon-announcement" },
 };
 
-// Queue is deliberately excluded from the filter: this system never creates
-// queue-type notifications for faculty. Announcement notifications are real
-// (adminRoutes.js's POST /admin/announcements inserts one per targeted
-// faculty member) and now route to a real screen (prof-announcements.jsx),
-// so they get a filter option like every other real type.
+// Faculty get queue notifications when the college office passes them a
+// student or assigns them a service, so Queue is a real filter option like
+// every other type.
 const TYPE_OPTIONS = [
   { value: "all", label: "All Types" },
+  { value: "queue", label: "Queue" },
   { value: "document", label: "Document" },
   { value: "appointment", label: "Appointment" },
   { value: "announcement", label: "Announcement" },
 ];
 
-// Mirrors ProfessorSidebar.jsx's NOTIFICATION_TYPE_PATHS. Professor has no
-// dedicated queue screen, so that one falls back to the dashboard.
+// Mirrors ProfessorSidebar.jsx's NOTIFICATION_TYPE_PATHS.
 const TYPE_PATHS = {
-  queue: "/professor/dashboard",
+  queue: "/professor/queue",
   document: "/professor/document-status",
   appointment: "/professor/appointments",
   announcement: "/professor/announcements",

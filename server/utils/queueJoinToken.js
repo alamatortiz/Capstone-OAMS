@@ -36,20 +36,23 @@ function generateRawToken() {
   return crypto.randomBytes(32).toString("base64url");
 }
 
-// Issues a token for a slot and revokes any still-live ones, so the code last
-// shown on screen is the only one that works. Runs on the caller's connection
-// so it can join an in-flight transaction.
+// Issues a token for a slot. Runs on the caller's connection so it can join
+// an in-flight transaction.
+//
+// Deliberately does NOT revoke the slot's other live tokens. It used to, so
+// that "the code last shown on screen is the only one that works" -- but a
+// queue's code is routinely on more than one screen at once (the hosting
+// popup on a kiosk plus the monitor view on the secretary's laptop, or two
+// tabs), and each screen's 45s rotation then killed the other's code, so
+// students scanning the other screen got "expired" at the counter. Every code
+// still dies on its own within TOKEN_TTL_MS, and pause/close still revoke all
+// of them at once (revokeSlotTokens), so a forwarded screenshot is exactly as
+// dead as before.
 async function issueSlotToken(db, { slotId, issuedBy }) {
   const rawToken = generateRawToken();
   const tokenHash = hashToken(rawToken);
   const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
 
-  await db.query(
-    `UPDATE queue_slot_tokens
-        SET revoked_at = NOW()
-      WHERE slot_id = ? AND revoked_at IS NULL AND expires_at > NOW()`,
-    [slotId],
-  );
   await db.query(
     `INSERT INTO queue_slot_tokens (slot_id, token_hash, issued_by, expires_at)
      VALUES (?, ?, ?, ?)`,

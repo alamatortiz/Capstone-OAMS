@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { FileText, Megaphone, Calendar, CalendarClock } from "lucide-react";
+import { FileText, Megaphone, Calendar, CalendarClock, Users } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
 import "./prof-dashboard.css";
 import api from "../../utils/api";
+import { useLiveRefetch } from "../../hooks/useLiveRefetch";
 import { getCollegeLogo } from "../../data/collegeLogo";
 import { formatManilaDateTime, parseOfficeHoursSchedule } from "../../utils/dateTime";
 
@@ -85,6 +86,9 @@ function formatActivityStatus(status, type) {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
+// Module-level so useLiveRefetch never resubscribes.
+const DASHBOARD_QUEUE_EVENTS = ["queue:passed", "queue:returned", "queue:student-left"];
+
 export default function ProfessorDashboard() {
   const { user: authUser } = useAuth();
   const user = authUser
@@ -131,6 +135,11 @@ export default function ProfessorDashboard() {
   useEffect(() => {
     if (authUser) fetchStats();
   }, [authUser, fetchStats]);
+
+  // Keeps the Queue tile's "N Waiting" badge current. Deliberately narrow --
+  // the events that change THIS professor's line -- so the rest of the
+  // department's queue traffic doesn't refetch the whole dashboard.
+  useLiveRefetch(DASHBOARD_QUEUE_EVENTS, fetchStats);
 
   // ── Announcements (for the Quick Actions tile's live pinned count) ────────
   // Kept separate from fetchStats/dashStats since it's an unrelated resource
@@ -260,6 +269,14 @@ export default function ProfessorDashboard() {
       path: "/professor/appointments",
       gradientIndex: 2,
       badge: `${s?.pendingAppointments ?? 0} Active`,
+    },
+    {
+      label: "Queue",
+      description: "Call and serve students passed to you by the college office.",
+      icon: Users,
+      path: "/professor/queue",
+      gradientIndex: 5,
+      badge: `${s?.queueWaiting ?? 0} Waiting`,
     },
     {
       label: "Document Requests and Submissions",

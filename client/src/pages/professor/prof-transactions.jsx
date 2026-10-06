@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { ChevronLeft, FileText } from "lucide-react";
+import { ChevronLeft, FileText, Users } from "lucide-react";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
 import FilterSelect from "../../components/FilterSelect";
@@ -53,6 +53,8 @@ const ClockIcon = () => (
 const TYPE_OPTIONS = [
   { value: "all", label: "All Types" },
   { value: "appointment", label: "Appointment" },
+  // Students the college office passed to this professor.
+  { value: "queue", label: "Queue" },
   { value: "document", label: "Document" },
 ];
 const STATUS_OPTIONS = [
@@ -65,6 +67,7 @@ const STATUS_OPTIONS = [
   { value: "completed", label: "Completed" },
   { value: "rejected", label: "Rejected" },
   { value: "cancelled", label: "Cancelled" },
+  { value: "no_show", label: "No Show" },
 ];
 
 export default function ProfessorTransactionsPage() {
@@ -97,6 +100,7 @@ export default function ProfessorTransactionsPage() {
   const typeBadgeClass = (type) =>
     ({
       appointment: "txn-badge txn-badge-appointment",
+      queue: "txn-badge txn-badge-queue",
       document: "txn-badge txn-badge-document",
       submission: "txn-badge txn-badge-document",
     }[type] ?? "txn-badge");
@@ -109,6 +113,7 @@ export default function ProfessorTransactionsPage() {
       approved: "txn-badge txn-badge-approved",
       rejected: "txn-badge txn-badge-rejected",
       cancelled: "txn-badge txn-badge-cancelled",
+      no_show: "txn-badge txn-badge-cancelled",
       pending: "txn-badge txn-badge-pending",
       processing: "txn-badge txn-badge-processing",
       ready: "txn-badge txn-badge-ready",
@@ -440,7 +445,7 @@ export default function ProfessorTransactionsPage() {
                 <div key={`${txn.type}-${txn.id}`} className={`txn-item txn-type-${txn.type}`}>
                   <div className="txn-item-icon">
                     <span className={`txn-icon-wrap txn-icon-${txn.type}`}>
-                      {txn.type === "appointment" ? <CalendarSmIcon /> : <FileText />}
+                      {txn.type === "appointment" ? <CalendarSmIcon /> : txn.type === "queue" ? <Users /> : <FileText />}
                     </span>
                   </div>
                   <div className="txn-item-content">
@@ -450,6 +455,9 @@ export default function ProfessorTransactionsPage() {
                         <span className={typeBadgeClass(txn.type)}>{typeLabel(txn.type)}</span>
                         {txn.trackingNumber && (
                           <span className="txn-tracking-pill">{txn.trackingNumber}</span>
+                        )}
+                        {txn.type === "queue" && txn.queueNumberBadge && (
+                          <span className="txn-tracking-pill txn-tracking-pill--queue">{txn.queueNumberBadge}</span>
                         )}
                         <span className={statusBadgeClass(txn.status)}>{statusLabel(txn.status)}</span>
                       </div>

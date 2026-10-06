@@ -594,7 +594,7 @@ router.get(
       // transaction (admins only have a read-only Appointments page).
       const REQUEST_TYPES = ["queue", "document", "submission"];
 
-      // Runs the 5-branch request UNION plus the admin_action audit query for
+      // Runs the 4-branch request UNION plus the admin_action audit query for
       // one (type, status[, search]) filter combination. Filtering (incl.
       // search) happens in SQL. mode "rows" returns the merged, recency-sorted
       // slice [offset, offset+limit) (each source fetches its top offset+limit
@@ -651,17 +651,27 @@ router.get(
                   WHEN q.status = 'cancelled' THEN 'Cancelled Queue Request'
                   WHEN q.status = 'serving'   THEN 'Currently Serving'
                   WHEN q.status = 'no_show'   THEN 'Missed Queue Turn'
+                  WHEN q.status = 'waiting' AND q.assigned_faculty_id IS NOT NULL THEN 'Passed to Faculty'
                   ELSE 'Queue Joined'
                 END AS action,
                 d.department_abbreviation AS college_abbrev,
                 CONCAT(st.first_name, ' ', st.last_name) AS student_name,
                 st.student_number AS student_id,
+                -- Whoever last acted on the ticket: an office admin, or the
+                -- professor it was passed to (who then served / no-showed it).
+                -- Both subqueries pick the SAME log row (same filter + order,
+                -- log_id as the tiebreak) so name and role always agree.
+                -- Two correlated subqueries rather than a LATERAL join, which
+                -- TiDB doesn't support.
                 COALESCE(
-                  (SELECT CONCAT(adm2.first_name, ' ', adm2.last_name)
+                  (SELECT COALESCE(CONCAT(adm2.first_name, ' ', adm2.last_name),
+                                   CONCAT(fac2.first_name, ' ', fac2.last_name))
                    FROM queue_status_logs qsl
-                   JOIN administrators adm2 ON qsl.changed_by = adm2.admin_id
+                   LEFT JOIN administrators adm2 ON qsl.changed_by = adm2.admin_id
+                   LEFT JOIN faculty fac2 ON qsl.changed_by = fac2.faculty_id
                    WHERE qsl.queue_id = q.queue_id
-                   ORDER BY qsl.created_at DESC LIMIT 1),
+                     AND (adm2.admin_id IS NOT NULL OR fac2.faculty_id IS NOT NULL)
+                   ORDER BY qsl.created_at DESC, qsl.log_id DESC LIMIT 1),
                   CONCAT(adm.first_name, ' ', adm.last_name)
                 ) AS processor,
                 COALESCE(q.admin_reason, q.service_label_snapshot, s.service_name) AS details,
@@ -676,6 +686,18 @@ router.get(
                 CAST(NULL AS DATETIME) AS comment_updated_at,
                 q.status AS raw_status,
                 q.updated_at AS event_time,
+                COALESCE(
+                  (SELECT CAST(CASE WHEN adm3.admin_id IS NOT NULL THEN 'admin' ELSE 'faculty' END
+                               AS CHAR(10) CHARACTER SET utf8mb4)
+                   FROM queue_status_logs qsl3
+                   LEFT JOIN administrators adm3 ON qsl3.changed_by = adm3.admin_id
+                   LEFT JOIN faculty fac3 ON qsl3.changed_by = fac3.faculty_id
+                   WHERE qsl3.queue_id = q.queue_id
+                     AND (adm3.admin_id IS NOT NULL OR fac3.faculty_id IS NOT NULL)
+                   ORDER BY qsl3.created_at DESC, qsl3.log_id DESC LIMIT 1),
+                  CASE WHEN adm.admin_id IS NOT NULL
+                       THEN CAST('admin' AS CHAR(10) CHARACTER SET utf8mb4) END
+                ) AS processor_role,
                 'student' AS requester_type
               FROM queues q
               JOIN services s ON q.service_id = s.service_id
@@ -719,6 +741,7 @@ router.get(
                 CAST(NULL AS DATETIME) AS comment_updated_at,
                 dr.status AS raw_status,
                 dr.updated_at AS event_time,
+                CAST(NULL AS CHAR(10) CHARACTER SET utf8mb4) AS processor_role,
                 'student' AS requester_type
               FROM document_requests dr
               JOIN document_services s ON dr.service_id = s.service_id
@@ -760,6 +783,7 @@ router.get(
                 CAST(NULL AS DATETIME) AS comment_updated_at,
                 fdr.status AS raw_status,
                 fdr.updated_at AS event_time,
+                CAST(NULL AS CHAR(10) CHARACTER SET utf8mb4) AS processor_role,
                 'faculty' AS requester_type
               FROM faculty_document_requests fdr
               JOIN document_services s ON fdr.service_id = s.service_id
@@ -800,6 +824,7 @@ router.get(
                 CAST(NULL AS DATETIME) AS comment_updated_at,
                 ds.status AS raw_status,
                 ds.updated_at AS event_time,
+                CAST(NULL AS CHAR(10) CHARACTER SET utf8mb4) AS processor_role,
                 ds.submitter_type AS requester_type
               FROM document_submissions ds
               JOIN departments d ON ds.department_id = d.department_id
@@ -906,7 +931,9 @@ router.get(
             studentId: r.student_id,
             requesterType: r.requester_type,
             processor: r.processor,
-            processorRole: r.type === "appointment" ? "faculty" : (r.processor ? "admin" : null),
+            processorRole:
+              r.processor_role ??
+              (r.type === "appointment" ? "faculty" : (r.processor ? "admin" : null)),
             details: r.details || "No additional details provided.",
             trackingNumber: r.tracking_number || null,
             queueNumberBadge,
@@ -2581,7 +2608,7 @@ async function serviceHasLiveQueue(db, serviceId, deptId) {
 }
 
 const SERVICE_LOCKED_MSG =
-  "A queue for this service is still active. Close the queue before editing the service.";
+  "Students are still being served for this service, in the office queue or by faculty. Finish or close them out before editing the service.";
 
 // Nudge everyone who should re-pull this service's details/requirements/steps
 // after an edit. The dept room covers admin hosting screens + same-dept

@@ -17,6 +17,9 @@ export const ADMIN_STATUSES_BY_TYPE = {
 
 export const PROFESSOR_STATUSES_BY_TYPE = {
   appointment: ["pending", "approved", "completed", "rejected", "cancelled"],
+  // Students passed to the professor: queues.status mapped server-side to the
+  // shared vocabulary (waiting -> pending, serving -> processing).
+  queue: ["pending", "processing", "completed", "cancelled", "no_show"],
   document: ["pending", "processing", "ready", "claimed", "rejected", "cancelled"],
 };
 

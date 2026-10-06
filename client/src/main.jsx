@@ -113,8 +113,8 @@ const ProfessorDocumentStatusPage = React.lazy(
 const ProfessorScheduleManagerPage = React.lazy(
   () => import("./pages/professor/prof-schedule-manager.jsx"),
 );
-const ProfessorQueueHostingPage = React.lazy(
-  () => import("./pages/professor/prof-queue-hosting.jsx"),
+const ProfessorQueuePage = React.lazy(
+  () => import("./pages/professor/prof-queue.jsx"),
 );
 const ProfessorNotifications = React.lazy(
   () => import("./pages/professor/prof-notifications.jsx"),
@@ -316,15 +316,20 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
-              {/* ★ Queue hosting — for services the college office has
-                  delegated to this faculty member */}
+              {/* ★ Queue — students the college office passed to this
+                  professor for the services it assigned them */}
               <Route
-                path="/professor/queue-hosting"
+                path="/professor/queue"
                 element={
                   <Suspense fallback={<LoadingFallback />}>
-                    <ProfessorQueueHostingPage />
+                    <ProfessorQueuePage />
                   </Suspense>
                 }
+              />
+              {/* Old address (professors used to host their own queues) */}
+              <Route
+                path="/professor/queue-hosting"
+                element={<Navigate to="/professor/queue" replace />}
               />
               {/* ★ Notifications page */}
               <Route

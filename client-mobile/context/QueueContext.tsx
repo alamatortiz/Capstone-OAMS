@@ -69,13 +69,28 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
       const prev = prevMap.get(q.queueId);
       if (!prev) continue;
 
+      // Passed to / taken back from a professor by the office -- checked
+      // first, since passing a called student also moves them serving ->
+      // waiting, which must not read as "the queue was paused" below.
+      const justPassed = q.passedTo && q.passedTo.facultyId !== prev.passedTo?.facultyId;
+      const justReturned = !q.passedTo && prev.passedTo;
+      if (justPassed) {
+        Toast.show({ type: "info", text1: `You've been passed to ${q.passedTo.name}`, text2: `For ${q.serviceName}. Please wait to be called — you kept your place.` });
+      } else if (justReturned) {
+        Toast.show({ type: "info", text1: "You've been moved back to the office line", text2: `For ${q.serviceName}. You kept your place.` });
+      }
+
       if (prev.status === "waiting" && q.status === "serving") {
-        Toast.show({ type: "success", text1: `It's your turn for ${q.serviceName}!`, text2: "Please proceed to the designated location." });
+        Toast.show(
+          q.passedTo
+            ? { type: "success", text1: `${q.passedTo.name} is ready for you!`, text2: q.location ? `Please proceed to ${q.location}.` : "Please proceed." }
+            : { type: "success", text1: `It's your turn for ${q.serviceName}!`, text2: "Please proceed to the designated location." },
+        );
       }
       if (!prev.arrivedAt && q.arrivedAt) {
         Toast.show({ type: "success", text1: `You are now being served for ${q.serviceName}.` });
       }
-      if (prev.status === "serving" && q.status === "waiting") {
+      if (prev.status === "serving" && q.status === "waiting" && !justPassed && !justReturned) {
         Toast.show({ type: "info", text1: `Your call for ${q.serviceName} was reverted`, text2: "The queue was paused. You're still in line." });
       }
       // A completed entry stays in the active list for a short grace period
@@ -261,6 +276,9 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
       "queue:student-left",
       "queue:notes-updated",
       "queue:service-updated",
+      // Passed to / back from a professor: line and position change.
+      "queue:passed",
+      "queue:returned",
     ];
     events.forEach((event) => socket.on(event, refetch));
 
@@ -269,8 +287,10 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
       const stoppedQueue = queuesRef.current.find((q) => q.queueId === payload.queueId);
       Toast.show({
         type: "error",
-        text1: `Your queue${stoppedQueue ? ` for ${stoppedQueue.serviceName}` : ""} was stopped by the admin.`,
-        text2: `Reason: ${payload.reason}`,
+        // Neutral on purpose: the office stopping the queue, the queue's day
+        // ending, or a hand-back to a stopped queue all land here.
+        text1: `Your queue${stoppedQueue ? ` for ${stoppedQueue.serviceName}` : ""} ended before you were served.`,
+        text2: `Reason: ${payload.reason}. You'll go first next time you scan in.`,
       });
       refetch();
     };

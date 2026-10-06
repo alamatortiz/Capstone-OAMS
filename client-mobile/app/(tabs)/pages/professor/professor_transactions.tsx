@@ -94,7 +94,7 @@ function OamsLogo({
 // queries appointments + faculty_document_requests, it never returns a
 // queue-type row for this role. On mobile the two <select> dropdowns become
 // modal pickers, same pattern as the other professor screens. ───
-type TxnType = 'appointment' | 'document' | 'submission';
+type TxnType = 'appointment' | 'document' | 'submission' | 'queue';
 type TxnStatus =
   | 'pending'
   | 'approved'
@@ -148,7 +148,16 @@ const TYPE_META: Record<TxnType, { label: string; icon: IoniconName; bg: string;
   // Shares document's visual family -- opposite direction, disambiguated by
   // the "Document Submission: ..." title text from the server.
   submission: { label: 'Document Submission', icon: 'document-text-outline', bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.3)', color: '#fb923c' },
+  // Students the college office passed to this professor -- blue like every
+  // queue surface.
+  queue: { label: 'Queue', icon: 'people-outline', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6' },
 };
+
+// Fallbacks so a type/status this screen doesn't know yet (e.g. a new
+// transaction type added server-side) renders neutrally instead of crashing
+// the entire list on its first render.
+const DEFAULT_TYPE_META = { label: 'Transaction', icon: 'time-outline' as IoniconName, bg: 'rgba(148, 163, 184, 0.15)', border: 'rgba(148, 163, 184, 0.3)', color: '#94a3b8' };
+const DEFAULT_STATUS_META = { label: 'Unknown', bg: 'rgba(148, 163, 184, 0.15)', border: 'rgba(148, 163, 184, 0.3)', color: '#94a3b8' };
 
 const STATUS_META: Record<TxnStatus, { label: string; bg: string; border: string; color: string }> = {
   completed: { label: 'Completed', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
@@ -171,6 +180,7 @@ type SelectField = 'type' | 'status' | null;
 const TYPE_OPTIONS: { value: TypeFilter; label: string }[] = [
   { value: 'all', label: 'All Types' },
   { value: 'appointment', label: 'Appointment' },
+  { value: 'queue', label: 'Queue' },
   { value: 'document', label: 'Document' },
   { value: 'submission', label: 'Document Submission' },
 ];
@@ -347,8 +357,8 @@ export default function ProfessorTransactionsScreen() {
       ...(withComment ? ['Comment'] : []), 'Date', 'Time',
     ];
     const rows = filtered.map((t) => [
-      TYPE_META[t.type].label,
-      STATUS_META[t.status].label,
+      (TYPE_META[t.type] ?? DEFAULT_TYPE_META).label,
+      (STATUS_META[t.status] ?? DEFAULT_STATUS_META).label,
       t.details,
       t.studentName ?? '',
       t.studentId ?? '',
@@ -610,8 +620,8 @@ export default function ProfessorTransactionsScreen() {
           ) : filtered.length > 0 ? (
             <View style={styles.txnList}>
               {filtered.map((txn) => {
-                const typeMeta = TYPE_META[txn.type];
-                const statusMeta = STATUS_META[txn.status];
+                const typeMeta = TYPE_META[txn.type] ?? DEFAULT_TYPE_META;
+                const statusMeta = STATUS_META[txn.status] ?? DEFAULT_STATUS_META;
                 const action = `${statusMeta.label} ${typeMeta.label}`;
                 return (
                   <View key={txn.id} style={[styles.txnCard, { borderColor: typeMeta.border }]}>

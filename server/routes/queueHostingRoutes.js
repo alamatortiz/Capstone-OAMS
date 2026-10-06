@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { getTxConnection } = require("../utils/txConnection");
 const {
   authenticateToken,
   authorizeRoles,
@@ -12,7 +13,11 @@ const {
   formatTime12h: formatTime,
 } = require("../utils/dateTime");
 const { voidQueueEntry, emitVoidEvents } = require("../jobs/queueNoShowSweeper");
-const { settleSlotAfterEntryChange, isValidSlotId } = require("../utils/queueSlotSettlement");
+const {
+  settleSlotAfterEntryChange,
+  resolveClosedStatus,
+  isValidSlotId,
+} = require("../utils/queueSlotSettlement");
 const { createNotification } = require("../utils/notifications");
 const { notifyAlmostUp } = require("../utils/queuePositionNudge");
 const { queueOrderBy } = require("../utils/queueDisplay");
@@ -22,24 +27,31 @@ const {
   resolveHostContext,
   getHostableSlotOrRespond,
   getHostableServices,
-  canFacultyHostService,
+  canFacultyHandleService,
 } = require("../utils/queueHosting");
+const {
+  cancelUnservedEntry,
+  emitUnservedCancelled,
+  returnEntryToOffice,
+} = require("../utils/queueHandoff");
+const { getFacultyAvailabilityToday } = require("../utils/facultyAvailability");
 const { issueSlotToken, revokeSlotTokens } = require("../utils/queueJoinToken");
 const { STRIKE_LIMIT } = require("../utils/queueStrikes");
-const { PRIORITY_CREDIT_DAYS } = require("../utils/queuePriorityCredits");
 
 // ─────────────────────────────────────────────────────────────────────────────
-// QUEUE HOSTING
+// QUEUE HOSTING (college office only)
 //
-// Extracted verbatim from adminRoutes.js so the identical handlers can be
-// mounted under more than one prefix: today `/api/admin/queue-hosting/*` (via
-// router.use() in adminRoutes.js), and `/api/faculty/queue-hosting/*` once a
-// secretary can delegate a service to a faculty member. Forking ~1100 lines
-// per role would guarantee the two drift apart.
+// Mounted at `/api/admin/*` via router.use() in adminRoutes.js. Only the
+// office hosts queues; professors are assigned to SERVICES and receive
+// individual students the office passes to them (POST .../pass below), which
+// they serve from routes/facultyQueueRoutes.js.
 //
-// Every route still declares authorizeRoles("admin", "faculty") -- the faculty mount and
-// the host-aware ownership checks land in a later stage, deliberately keeping
-// this step behaviour-neutral.
+// A slot therefore has an OFFICE LINE (queues.assigned_faculty_id IS NULL)
+// and, alongside it, tickets that are with a professor. Capacity and served
+// counts stay slot-wide -- a passed ticket still occupies its seat and counts
+// as served here when the professor finishes -- but every "who is being
+// served / who is next" lookup in this file is office-line only, or the
+// office would act on a student a professor is handling.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // GET /queue-hosting/services
@@ -48,7 +60,7 @@ const { PRIORITY_CREDIT_DAYS } = require("../utils/queuePriorityCredits");
 router.get(
   "/queue-hosting/services",
   authenticateToken,
-  authorizeRoles("admin", "faculty"),
+  authorizeRoles("admin"),
   async (req, res) => {
     try {
       const host = await resolveHostContext(req.user);
@@ -76,7 +88,7 @@ router.get(
 router.get(
   "/queue-hosting",
   authenticateToken,
-  authorizeRoles("admin", "faculty"),
+  authorizeRoles("admin"),
   async (req, res) => {
     try {
       const host = await resolveHostContext(req.user);
@@ -110,10 +122,20 @@ router.get(
            d.department_abbreviation,
            d.office_location,
            l.location_name,
+           -- Office line only: tickets passed to a professor aren't the
+           -- office's to call, and are counted separately in passed_count.
            (
              SELECT COUNT(*) FROM queues q
              WHERE q.slot_id = qs.slot_id AND q.status = 'waiting'
+               AND q.assigned_faculty_id IS NULL
            ) AS waiting_count,
+           (
+             SELECT COUNT(*) FROM queues qp
+             WHERE qp.slot_id = qs.slot_id AND qp.status IN ('waiting', 'serving')
+               AND qp.assigned_faculty_id IS NOT NULL
+           ) AS passed_count,
+           -- Slot-wide on purpose: a professor-served ticket counts as served
+           -- on the office's queue, and a passed one still holds its seat.
            (
              SELECT COUNT(*) FROM queues q2
              WHERE q2.slot_id = qs.slot_id AND q2.status = 'completed'
@@ -127,6 +149,7 @@ router.get(
              FROM queues q3
              JOIN students st ON q3.student_id = st.student_id
              WHERE q3.slot_id = qs.slot_id AND q3.status = 'serving'
+               AND q3.assigned_faculty_id IS NULL
              ORDER BY q3.called_at DESC
              LIMIT 1
            ) AS currently_serving_student_number,
@@ -135,6 +158,7 @@ router.get(
              FROM queues q3c
              JOIN students st3c ON q3c.student_id = st3c.student_id
              WHERE q3c.slot_id = qs.slot_id AND q3c.status = 'serving'
+               AND q3c.assigned_faculty_id IS NULL
              ORDER BY q3c.called_at DESC
              LIMIT 1
            ) AS currently_serving_student_name,
@@ -142,23 +166,27 @@ router.get(
              SELECT q3b.arrived_at
              FROM queues q3b
              WHERE q3b.slot_id = qs.slot_id AND q3b.status = 'serving'
+               AND q3b.assigned_faculty_id IS NULL
              ORDER BY q3b.called_at DESC
              LIMIT 1
            ) AS currently_serving_arrived_at,
+           (
+             SELECT q3d.queue_id
+             FROM queues q3d
+             WHERE q3d.slot_id = qs.slot_id AND q3d.status = 'serving'
+               AND q3d.assigned_faculty_id IS NULL
+             ORDER BY q3d.called_at DESC
+             LIMIT 1
+           ) AS currently_serving_queue_id,
            qs.service_time_minutes AS avg_service_minutes
          FROM queue_slots qs
          LEFT JOIN services s ON qs.service_id = s.service_id
          LEFT JOIN locations l ON s.location_id = l.location_id
          JOIN departments d ON qs.department_id = d.department_id
          WHERE qs.department_id = ?
-           ${host.role === "faculty" ? "AND qs.host_user_id = ?" : ""}
            AND qs.slot_date IN (?, ?, ?)
          ORDER BY qs.created_at DESC`,
-        // A faculty member sees only the lines they are running; an admin
-        // sees the whole department's, including faculty-hosted ones.
-        host.role === "faculty"
-          ? [deptId, host.userId, today, yesterday, twoDaysAgo]
-          : [deptId, today, yesterday, twoDaysAgo],
+        [deptId, today, yesterday, twoDaysAgo],
       );
 
       const formatted = slots.map((q) => {
@@ -185,7 +213,11 @@ router.get(
           college: q.department_abbreviation || "ALL",
           maxCapacity,
           noShowTimeoutMinutes: q.no_show_timeout_minutes,
+          // Waiting in the OFFICE line -- what the office's Call Next acts on.
           currentCount: q.waiting_count || 0,
+          // Tickets currently with a professor (waiting for or being served
+          // by them). Still occupy seats in totalInQueue.
+          passedCount: q.passed_count || 0,
           servedCount,
           totalInQueue,
           queueOccupancyPercent,
@@ -203,6 +235,7 @@ router.get(
             q.currently_serving_student_number || null,
           currentlyServingStudentName: q.currently_serving_student_name || null,
           currentlyServingArrivedAt: q.currently_serving_arrived_at || null,
+          currentlyServingQueueId: q.currently_serving_queue_id || null,
           avgServiceMinutes:
             q.avg_service_minutes != null ? Number(q.avg_service_minutes) : null,
           serviceHours: {
@@ -227,7 +260,7 @@ router.get(
 router.post(
   "/queue-hosting",
   authenticateToken,
-  authorizeRoles("admin", "faculty"),
+  authorizeRoles("admin"),
   async (req, res) => {
     const hostId = req.user.userId;
     const { serviceId, maxCapacity, noShowTimeoutMinutes, serviceTimeMinutes } = req.body;
@@ -291,39 +324,17 @@ router.post(
         .json({ error: "noShowTimeoutMinutes must be a positive number" });
     }
 
-    const conn = await pool.getConnection();
+    const conn = await getTxConnection();
     try {
       await conn.beginTransaction();
 
-      const host = await resolveHostContext(req.user);
+      const host = await resolveHostContext(req.user, conn);
       const deptId = host.deptId;
       if (!deptId) {
         await conn.rollback();
         return res
           .status(403)
           .json({ error: "Your account has no department assigned" });
-      }
-
-      // A Universal Service Queue spans every service in the department, so
-      // it is the secretary's to run -- a faculty member's authority comes
-      // from a delegation on one specific service.
-      if (hostAllServices && host.role === "faculty") {
-        await conn.rollback();
-        return res.status(403).json({
-          error: "Only the college office can host a Universal Service Queue.",
-        });
-      }
-      if (!hostAllServices && host.role === "faculty") {
-        const allowed = await canFacultyHostService(conn, {
-          facultyId: host.userId,
-          serviceId: parseInt(serviceId, 10),
-        });
-        if (!allowed) {
-          await conn.rollback();
-          return res.status(403).json({
-            error: "This service hasn't been assigned to you by the college office.",
-          });
-        }
       }
 
       const today = getManilaDateString();
@@ -396,9 +407,8 @@ router.post(
         // One host can't staff two counters at the same time, so a second
         // overlapping window for the same host is rejected. But two
         // different hosts running at once is normal and now allowed --
-        // e.g. the secretary runs Enrollment at the counter while a
-        // delegated faculty member runs their own line from their room,
-        // or two staff open parallel windows for the SAME busy service.
+        // e.g. two office staff open parallel windows for the SAME busy
+        // service.
         //
         // (Previously this keyed on service_id, which blocked that second
         // case even though two separate people were available to serve it.)
@@ -420,9 +430,8 @@ router.post(
 
         // Same person-based rule against their OWN universal queue: a host
         // running the catch-all can't simultaneously run a single-service
-        // line. Another host may, though -- a faculty member's delegated
-        // queue running alongside the office's universal one is a normal
-        // arrangement, not a conflict.
+        // line. Another host may, though -- a second staff member's queue
+        // running alongside the universal one is not a conflict.
         const [[uniOverlap]] = await conn.query(
           `SELECT slot_id FROM queue_slots
            WHERE is_universal = TRUE AND host_user_id = ? AND slot_date = ?
@@ -443,10 +452,9 @@ router.post(
 
       const [result] = await conn.query(
         // admin_id = who configured the window, host_user_id = who is running
-        // it. For an admin they're the same person. For a faculty member
-        // opening their own delegated queue there is no configuring admin,
-        // so admin_id is NULL and host_role records which table to read the
-        // host's name from.
+        // it -- always the same office account now that only the office
+        // hosts. (host_role / a NULL admin_id still describe legacy slots a
+        // faculty member opened before professors became pass-receivers.)
         `INSERT INTO queue_slots
            (service_id, department_id, is_universal, admin_id, host_user_id, host_role,
             slot_date, start_time, end_time,
@@ -456,9 +464,9 @@ router.post(
           hostAllServices ? null : serviceId,
           deptId,
           hostAllServices,
-          host.role === "admin" ? hostId : null,
           hostId,
-          host.role,
+          hostId,
+          "admin",
           today,
           startTime,
           endTime,
@@ -469,6 +477,10 @@ router.post(
       );
 
       await conn.commit();
+
+      // Hand the connection back now -- see utils/txConnection.js.
+
+      conn.release();
 
       emitToDept(deptId, "queue:slot-opened", {
         slotId: result.insertId,
@@ -514,15 +526,15 @@ router.post(
 router.post(
   "/queue-hosting/:slotId/qr-token",
   authenticateToken,
-  authorizeRoles("admin", "faculty"),
+  authorizeRoles("admin"),
   async (req, res) => {
     const slotId = parseInt(req.params.slotId, 10);
     const hostId = req.user.userId;
-    const conn = await pool.getConnection();
+    const conn = await getTxConnection();
     try {
       await conn.beginTransaction();
 
-      const host = await resolveHostContext(req.user);
+      const host = await resolveHostContext(req.user, conn);
       const deptId = host.deptId;
       const slot = await getHostableSlotOrRespond(conn, res, { slotId, host });
       if (!slot) return;
@@ -541,6 +553,8 @@ router.post(
 
       const issued = await issueSlotToken(conn, { slotId, issuedBy: hostId });
       await conn.commit();
+      // Hand the connection back now -- see utils/txConnection.js.
+      conn.release();
 
       res.json({
         token: issued.token,
@@ -565,7 +579,7 @@ router.post(
 router.patch(
   "/queue-hosting/:slotId/pause",
   authenticateToken,
-  authorizeRoles("admin", "faculty"),
+  authorizeRoles("admin"),
   async (req, res) => {
     const slotId = parseInt(req.params.slotId, 10);
     const reason = (req.body?.reason ?? "").trim();
@@ -573,11 +587,11 @@ router.patch(
       return res.status(400).json({ error: "A reason is required to pause a queue" });
     }
     const hostId = req.user.userId;
-    const conn = await pool.getConnection();
+    const conn = await getTxConnection();
     try {
       await conn.beginTransaction();
 
-      const host = await resolveHostContext(req.user);
+      const host = await resolveHostContext(req.user, conn);
       const deptId = host.deptId;
       const slot = await getHostableSlotOrRespond(conn, res, { slotId, host });
       if (!slot) return;
@@ -589,7 +603,7 @@ router.patch(
       }
 
       const [[serving]] = await conn.query(
-        `SELECT queue_id, student_id FROM queues WHERE slot_id = ? AND status = 'serving' LIMIT 1 FOR UPDATE`,
+        `SELECT queue_id, student_id FROM queues WHERE slot_id = ? AND status = 'serving' AND assigned_faculty_id IS NULL LIMIT 1 FOR UPDATE`,
         [slotId],
       );
       if (serving) {
@@ -615,6 +629,10 @@ router.patch(
       await revokeSlotTokens(conn, slotId);
 
       await conn.commit();
+
+      // Hand the connection back now -- see utils/txConnection.js.
+
+      conn.release();
 
       await logAudit(hostId, "UPDATE", "queue_slots", slotId, { status: "open" }, { status: "paused", reason });
 
@@ -650,15 +668,15 @@ router.patch(
 router.patch(
   "/queue-hosting/:slotId/resume",
   authenticateToken,
-  authorizeRoles("admin", "faculty"),
+  authorizeRoles("admin"),
   async (req, res) => {
     const slotId = parseInt(req.params.slotId, 10);
     const hostId = req.user.userId;
-    const conn = await pool.getConnection();
+    const conn = await getTxConnection();
     try {
       await conn.beginTransaction();
 
-      const host = await resolveHostContext(req.user);
+      const host = await resolveHostContext(req.user, conn);
       const deptId = host.deptId;
       const slot = await getHostableSlotOrRespond(conn, res, { slotId, host });
       if (!slot) return;
@@ -675,6 +693,10 @@ router.patch(
       );
 
       await conn.commit();
+
+      // Hand the connection back now -- see utils/txConnection.js.
+
+      conn.release();
 
       await logAudit(hostId, "UPDATE", "queue_slots", slotId, { status: "paused" }, { status: "open" });
 
@@ -702,7 +724,7 @@ router.patch(
 router.patch(
   "/queue-hosting/:slotId/reopen",
   authenticateToken,
-  authorizeRoles("admin", "faculty"),
+  authorizeRoles("admin"),
   async (req, res) => {
     const slotId = parseInt(req.params.slotId, 10);
     const hostId = req.user.userId;
@@ -720,11 +742,11 @@ router.patch(
       return res.status(400).json({ error: "Max capacity must be a positive number" });
     }
 
-    const conn = await pool.getConnection();
+    const conn = await getTxConnection();
     try {
       await conn.beginTransaction();
 
-      const host = await resolveHostContext(req.user);
+      const host = await resolveHostContext(req.user, conn);
       const deptId = host.deptId;
       const slot = await getHostableSlotOrRespond(conn, res, { slotId, host });
       if (!slot) return;
@@ -779,6 +801,10 @@ router.patch(
 
       await conn.commit();
 
+      // Hand the connection back now -- see utils/txConnection.js.
+
+      conn.release();
+
       await logAudit(hostId, "UPDATE", "queue_slots", slotId, { status: "expired" }, { status: "open", endTime: normalizedEndTime });
 
       emitToSlot(slotId, "queue:slot-status", { slotId, status: "open" });
@@ -797,7 +823,7 @@ router.patch(
 router.patch(
   "/queue-hosting/:slotId/close",
   authenticateToken,
-  authorizeRoles("admin", "faculty"),
+  authorizeRoles("admin"),
   async (req, res) => {
     const slotId = parseInt(req.params.slotId, 10);
     const reason = (req.body?.reason ?? "").trim();
@@ -805,11 +831,11 @@ router.patch(
       return res.status(400).json({ error: "A reason is required to stop a queue" });
     }
     const hostId = req.user.userId;
-    const conn = await pool.getConnection();
+    const conn = await getTxConnection();
     try {
       await conn.beginTransaction();
 
-      const host = await resolveHostContext(req.user);
+      const host = await resolveHostContext(req.user, conn);
       const deptId = host.deptId;
       const slot = await getHostableSlotOrRespond(conn, res, { slotId, host });
       if (!slot) return;
@@ -818,66 +844,40 @@ router.patch(
         return res.status(409).json({ error: "This queue is already closed" });
       }
 
-      // Every student still waiting or being served has their entry force-
-      // cancelled with the admin's reason — otherwise these rows would be
-      // orphaned in the DB forever (see queueNoShowSweeper.js for the
-      // analogous no-show cleanup path).
+      // Every student still waiting or being served IN THE OFFICE LINE has
+      // their entry force-cancelled with the admin's reason (and a priority
+      // credit) -- otherwise these rows would be orphaned forever. Students
+      // already passed to a professor are deliberately left alone: the
+      // professor finishes them (served / no-show) under this now-closed
+      // slot, and settleSlotAfterEntryChange relabels it once they're done.
       const [affected] = await conn.query(
         `SELECT queue_id, student_id, status, service_id FROM queues
-         WHERE slot_id = ? AND status IN ('waiting', 'serving')`,
+         WHERE slot_id = ? AND status IN ('waiting', 'serving')
+           AND assigned_faculty_id IS NULL
+         FOR UPDATE`,
         [slotId],
       );
 
-      const [[servedRow]] = await conn.query(
-        `SELECT COUNT(*) AS n FROM queues WHERE slot_id = ? AND status = 'completed'`,
+      const [[countsRow]] = await conn.query(
+        `SELECT
+           COALESCE(SUM(status = 'completed'), 0) AS served,
+           COALESCE(SUM(status IN ('waiting', 'serving') AND assigned_faculty_id IS NOT NULL), 0) AS lane_unserved
+         FROM queues WHERE slot_id = ? FOR UPDATE`,
         [slotId],
       );
 
-      // Completed only when nobody's currently waiting AND real service
-      // already happened -- a queue that never served anyone stays Closed
-      // even if closed early, matching the "zero activity isn't an
-      // accomplishment" rule already used elsewhere (the Accomplished-Queues
-      // analytics count, the sweeper's zero-activity path). Closed covers
-      // every other admin-close: someone still waiting (force-cancelled
-      // below), or nobody ever served at all.
-      const newStatus = affected.length === 0 && servedRow.n > 0 ? "completed" : "closed";
+      const newStatus = resolveClosedStatus({
+        officeCancelled: affected.length,
+        laneUnserved: Number(countsRow.lane_unserved),
+        served: Number(countsRow.served),
+      });
 
       for (const entry of affected) {
-        await conn.query(
-          // cancelled_by distinguishes "the office ran out of time before
-          // reaching you" from an ordinary cancellation, mirroring what
-          // appointments already do via the sweeper's
-          // cancelled_by='system_not_entertained'. Answers the panel's
-          // "what happens to the students who weren't catered?".
-          `UPDATE queues
-              SET status = 'cancelled', cancelled_at = NOW(),
-                  admin_reason = ?, cancelled_by = 'system_not_entertained'
-            WHERE queue_id = ?`,
-          [reason, entry.queue_id],
-        );
-        await conn.query(
-          `INSERT INTO queue_status_logs (queue_id, old_status, new_status, changed_by, notes, created_at)
-           VALUES (?, ?, 'cancelled', ?, ?, NOW())`,
-          [entry.queue_id, entry.status, hostId, `Queue stopped by admin: ${reason}`],
-        );
-
-        // Being failed by the office shouldn't cost them their place next
-        // time. The credit is inert -- it reserves nothing and does nothing
-        // until they physically come back and scan in again, which is what
-        // keeps this from reintroducing the online reservation the panel
-        // removed. Unclaimed credits simply expire.
-        await conn.query(
-          `INSERT INTO queue_priority_credits
-             (student_id, service_id, source_queue_id, reason, expires_at)
-           VALUES (?, ?, ?, ?, NOW() + INTERVAL ? DAY)`,
-          [
-            entry.student_id,
-            entry.service_id,
-            entry.queue_id,
-            "Queue closed before you were served",
-            PRIORITY_CREDIT_DAYS,
-          ],
-        );
+        await cancelUnservedEntry(conn, entry, {
+          reason,
+          changedBy: hostId,
+          note: `Queue stopped by admin: ${reason}`,
+        });
       }
 
       await conn.query(
@@ -890,22 +890,23 @@ router.patch(
 
       await conn.commit();
 
+      // Hand the connection back now -- see utils/txConnection.js.
+
+      conn.release();
+
       await logAudit(hostId, "UPDATE", "queue_slots", slotId, { status: slot.status }, { status: newStatus, reason, cancelledCount: affected.length });
 
       emitToSlot(slotId, "queue:slot-status", { slotId, status: newStatus, reason });
       emitToDept(deptId, "queue:slot-status", { slotId, status: newStatus, reason });
       for (const entry of affected) {
-        const stoppedPayload = { slotId, queueId: entry.queue_id, studentId: entry.student_id, reason };
-        emitToUser(entry.student_id, "queue:queue-stopped", stoppedPayload);
-        // Tell them about the credit in the same breath as the bad news --
-        // "you weren't served" lands very differently alongside "and you go
-        // first next time".
-        createNotification(
-          entry.student_id,
-          `The ${slot.service_name} queue closed before you were served (${reason}). ` +
-            `Next time you scan in for it within ${PRIORITY_CREDIT_DAYS} days, you'll be placed at the front of the line.`,
-          "queue",
-        );
+        emitUnservedCancelled({
+          slotId,
+          deptId,
+          queueId: entry.queue_id,
+          studentId: entry.student_id,
+          reason,
+          serviceName: slot.service_name,
+        });
       }
 
       res.json({
@@ -914,6 +915,7 @@ router.patch(
         status: newStatus,
         reason,
         cancelledCount: affected.length,
+        passedRemaining: Number(countsRow.lane_unserved),
       });
     } catch (error) {
       await conn.rollback();
@@ -932,14 +934,14 @@ router.patch(
 router.patch(
   "/queue-hosting/:slotId/call-next",
   authenticateToken,
-  authorizeRoles("admin", "faculty"),
+  authorizeRoles("admin"),
   async (req, res) => {
     const slotId = parseInt(req.params.slotId, 10);
-    const conn = await pool.getConnection();
+    const conn = await getTxConnection();
     try {
       await conn.beginTransaction();
 
-      const host = await resolveHostContext(req.user);
+      const host = await resolveHostContext(req.user, conn);
       const deptId = host.deptId;
       const slot = await getHostableSlotOrRespond(conn, res, { slotId, host });
       if (!slot) return;
@@ -951,7 +953,7 @@ router.patch(
       }
 
       const [[alreadyServing]] = await conn.query(
-        `SELECT queue_id FROM queues WHERE slot_id = ? AND status = 'serving' LIMIT 1 FOR UPDATE`,
+        `SELECT queue_id FROM queues WHERE slot_id = ? AND status = 'serving' AND assigned_faculty_id IS NULL LIMIT 1 FOR UPDATE`,
         [slotId],
       );
       if (alreadyServing) {
@@ -967,7 +969,7 @@ router.patch(
          FROM queues q
          JOIN services s ON q.service_id = s.service_id
          LEFT JOIN locations l ON s.location_id = l.location_id
-         WHERE q.slot_id = ? AND q.status = 'waiting'
+         WHERE q.slot_id = ? AND q.status = 'waiting' AND q.assigned_faculty_id IS NULL
          ORDER BY ${queueOrderBy("q")}
          LIMIT 1
          FOR UPDATE`,
@@ -977,7 +979,7 @@ router.patch(
         await conn.rollback();
         return res
           .status(404)
-          .json({ error: "No students waiting in this queue" });
+          .json({ error: "No students waiting in the office line" });
       }
 
       const [updateResult] = await conn.query(
@@ -996,6 +998,10 @@ router.patch(
       );
 
       await conn.commit();
+
+      // Hand the connection back now -- see utils/txConnection.js.
+
+      conn.release();
 
       const calledPayload = {
         slotId,
@@ -1019,7 +1025,7 @@ router.patch(
 
       // The line just advanced -- nudge whoever's now #2/#3. Best-effort.
       try {
-        await notifyAlmostUp(slotId);
+        await notifyAlmostUp({ slotId });
       } catch (nudgeErr) {
         console.error("[call-next] almost-up nudge failed:", nudgeErr.message);
       }
@@ -1042,14 +1048,14 @@ router.patch(
 router.patch(
   "/queue-hosting/:slotId/mark-arrived",
   authenticateToken,
-  authorizeRoles("admin", "faculty"),
+  authorizeRoles("admin"),
   async (req, res) => {
     const slotId = parseInt(req.params.slotId, 10);
-    const conn = await pool.getConnection();
+    const conn = await getTxConnection();
     try {
       await conn.beginTransaction();
 
-      const host = await resolveHostContext(req.user);
+      const host = await resolveHostContext(req.user, conn);
       const deptId = host.deptId;
       const slot = await getHostableSlotOrRespond(conn, res, { slotId, host });
       if (!slot) return;
@@ -1057,6 +1063,7 @@ router.patch(
       const [[serving]] = await conn.query(
         `SELECT queue_id, student_id FROM queues
          WHERE slot_id = ? AND status = 'serving' AND arrived_at IS NULL
+           AND assigned_faculty_id IS NULL
          LIMIT 1 FOR UPDATE`,
         [slotId],
       );
@@ -1087,6 +1094,10 @@ router.patch(
 
       await conn.commit();
 
+      // Hand the connection back now -- see utils/txConnection.js.
+
+      conn.release();
+
       const arrivedPayload = { slotId, queueId: serving.queue_id, studentId: serving.student_id };
       emitToSlot(slotId, "queue:arrived", arrivedPayload);
       emitToUser(serving.student_id, "queue:arrived", arrivedPayload);
@@ -1107,20 +1118,20 @@ router.patch(
 router.patch(
   "/queue-hosting/:slotId/serve",
   authenticateToken,
-  authorizeRoles("admin", "faculty"),
+  authorizeRoles("admin"),
   async (req, res) => {
     const slotId = parseInt(req.params.slotId, 10);
-    const conn = await pool.getConnection();
+    const conn = await getTxConnection();
     try {
       await conn.beginTransaction();
 
-      const host = await resolveHostContext(req.user);
+      const host = await resolveHostContext(req.user, conn);
       const deptId = host.deptId;
       const slot = await getHostableSlotOrRespond(conn, res, { slotId, host });
       if (!slot) return;
 
       const [[serving]] = await conn.query(
-        `SELECT queue_id, student_id FROM queues WHERE slot_id = ? AND status = 'serving' LIMIT 1 FOR UPDATE`,
+        `SELECT queue_id, student_id FROM queues WHERE slot_id = ? AND status = 'serving' AND assigned_faculty_id IS NULL LIMIT 1 FOR UPDATE`,
         [slotId],
       );
       if (!serving) {
@@ -1151,6 +1162,10 @@ router.patch(
       const settleResult = await settleSlotAfterEntryChange(conn, slotId);
 
       await conn.commit();
+
+      // Hand the connection back now -- see utils/txConnection.js.
+
+      conn.release();
 
       const servedPayload = {
         slotId,
@@ -1191,7 +1206,7 @@ router.patch(
 router.patch(
   "/queue-hosting/:slotId/skip",
   authenticateToken,
-  authorizeRoles("admin", "faculty"),
+  authorizeRoles("admin"),
   async (req, res) => {
     const slotId = parseInt(req.params.slotId, 10);
     const hostId = req.user.userId;
@@ -1199,17 +1214,17 @@ router.patch(
     if (!reason) {
       return res.status(400).json({ error: "A reason is required to skip a student" });
     }
-    const conn = await pool.getConnection();
+    const conn = await getTxConnection();
     try {
       await conn.beginTransaction();
 
-      const host = await resolveHostContext(req.user);
+      const host = await resolveHostContext(req.user, conn);
       const deptId = host.deptId;
       const slot = await getHostableSlotOrRespond(conn, res, { slotId, host });
       if (!slot) return;
 
       const [[serving]] = await conn.query(
-        `SELECT queue_id, student_id FROM queues WHERE slot_id = ? AND status = 'serving' LIMIT 1 FOR UPDATE`,
+        `SELECT queue_id, student_id FROM queues WHERE slot_id = ? AND status = 'serving' AND assigned_faculty_id IS NULL LIMIT 1 FOR UPDATE`,
         [slotId],
       );
       if (!serving) {
@@ -1227,6 +1242,10 @@ router.patch(
       });
 
       await conn.commit();
+
+      // Hand the connection back now -- see utils/txConnection.js.
+
+      conn.release();
 
       if (result.voided) {
         emitVoidEvents({
@@ -1259,7 +1278,7 @@ router.patch(
 router.get(
   "/queue-hosting/:slotId/entries",
   authenticateToken,
-  authorizeRoles("admin", "faculty"),
+  authorizeRoles("admin"),
   async (req, res) => {
     const slotId = parseInt(req.params.slotId, 10);
     // A non-numeric path segment parses to NaN, which mysql2 renders as a
@@ -1274,15 +1293,12 @@ router.get(
         return res.status(403).json({ error: "Your account has no department assigned" });
       }
 
-      // Faculty see entries only for the line they're hosting; admins for
-      // anything in their department. Same split as the mutation routes'
-      // getHostableSlotOrRespond, applied inline because this read doesn't
-      // need the row lock that helper takes.
+      // Same department scope as the mutation routes' getHostableSlotOrRespond,
+      // applied inline because this read doesn't need that helper's row lock.
       const [[slot]] = await pool.query(
         `SELECT qs.slot_id FROM queue_slots qs
-         WHERE qs.slot_id = ? AND qs.department_id = ?
-           ${host.role === "faculty" ? "AND qs.host_user_id = ?" : ""}`,
-        host.role === "faculty" ? [slotId, deptId, host.userId] : [slotId, deptId],
+         WHERE qs.slot_id = ? AND qs.department_id = ?`,
+        [slotId, deptId],
       );
       if (!slot) {
         return res.status(404).json({ error: "Queue slot not found or not in your department" });
@@ -1303,7 +1319,17 @@ router.get(
            q.created_at,
            q.arrived_at,
            q.priority_rank,
-           q.transferred_from_slot_id,
+           q.service_id,
+           q.assigned_faculty_id,
+           q.assigned_at,
+           CONCAT(f.first_name, ' ', f.last_name) AS assigned_faculty_name,
+           -- Same presence test as facultyAvailability.js: toggled available
+           -- AND holding a live session. Lets the monitor flag a student
+           -- passed to someone who has since gone offline.
+           (f.availability_status = 'available' AND EXISTS (
+             SELECT 1 FROM user_sessions us
+             WHERE us.user_id = f.faculty_id AND us.logout_at IS NULL AND us.expires_at > NOW()
+           )) AS assigned_faculty_online,
            COALESCE(q.service_label_snapshot, s.service_name) AS service_label,
            l.location_name AS service_location,
            CONCAT(st.first_name, ' ', st.last_name) AS student_name,
@@ -1312,6 +1338,7 @@ router.get(
          JOIN students st ON q.student_id = st.student_id
          LEFT JOIN services s ON q.service_id = s.service_id
          LEFT JOIN locations l ON s.location_id = l.location_id
+         LEFT JOIN faculty f ON f.faculty_id = q.assigned_faculty_id
          WHERE q.slot_id = ?
          ORDER BY ${queueOrderBy("q")}`,
         [slotId],
@@ -1360,9 +1387,19 @@ router.get(
           joinedAt: formatTime(getManilaTimeString(r.created_at)),
           status: r.status,
           arrivedAt: r.arrived_at,
-          // Badges the host screen uses to explain an out-of-order position.
+          serviceId: r.service_id,
+          // Badge the host screen uses to explain an out-of-order position.
           isPriority: r.priority_rank > 0,
-          wasTransferred: r.transferred_from_slot_id != null,
+          // Non-null when the office passed this ticket to a professor -- it
+          // is then in that professor's line, not the office's.
+          passedTo: r.assigned_faculty_id
+            ? {
+                facultyId: r.assigned_faculty_id,
+                name: r.assigned_faculty_name,
+                isOnline: !!r.assigned_faculty_online,
+              }
+            : null,
+          passedAt: r.assigned_at,
           requirements,
           // Null (not 0/0) when the service defines no requirements, so the
           // UI can omit the chip entirely rather than imply "nothing ready".
@@ -1379,166 +1416,287 @@ router.get(
   },
 );
 
-// POST /queue-hosting/:slotId/entries/:queueId/transfer
-// Body: { targetSlotId }
-//
-// The "relay" half of the panel's "queue tracking/relay" note: move someone
-// who lined up at the wrong counter into the right queue WITHOUT sending
-// them to the back. They keep their original created_at, which under the
-// canonical ordering (see utils/queueDisplay.js) lands them in the
-// destination at the position their original arrival time earns -- so the
-// fix for staff's mistake doesn't cost the student their place.
-router.post(
-  "/queue-hosting/:slotId/entries/:queueId/transfer",
+// GET /queue-hosting/faculty-handlers?serviceId=
+// The professors the office may pass a student to for this service: active
+// delegations on it, in this department, whose accounts are active. Each
+// carries the same Available / Busy / Unavailable status the Faculty
+// Availability page shows (unavailable = toggled off OR not logged in), plus
+// their current load, so the secretary can see who is actually free. An
+// offline professor stays pickable -- the UI warns rather than blocks.
+router.get(
+  "/queue-hosting/faculty-handlers",
   authenticateToken,
-  authorizeRoles("admin", "faculty"),
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const serviceId = parseInt(req.query.serviceId, 10);
+    if (!Number.isInteger(serviceId) || serviceId <= 0) {
+      return res.status(400).json({ error: "A valid serviceId is required" });
+    }
+    try {
+      const host = await resolveHostContext(req.user);
+      if (!host.deptId) {
+        return res.status(403).json({ error: "Your account has no department assigned" });
+      }
+
+      const [delegates] = await pool.query(
+        `SELECT f.faculty_id
+           FROM service_delegations sd
+           JOIN services s ON sd.service_id = s.service_id
+           JOIN faculty f ON f.faculty_id = sd.faculty_id
+           JOIN users u ON u.user_id = f.faculty_id
+          WHERE sd.service_id = ? AND sd.is_active = TRUE
+            AND s.department_id = ? AND f.department_id = s.department_id
+            AND u.status = 'active'`,
+        [serviceId, host.deptId],
+      );
+      if (delegates.length === 0) return res.json({ faculty: [] });
+
+      const ids = delegates.map((d) => d.faculty_id);
+      const [loads] = await pool.query(
+        `SELECT assigned_faculty_id AS faculty_id,
+                COALESCE(SUM(status = 'waiting'), 0) AS waiting_count,
+                COALESCE(SUM(status = 'serving'), 0) AS serving_count
+           FROM queues
+          WHERE assigned_faculty_id IN (?) AND status IN ('waiting', 'serving')
+          GROUP BY assigned_faculty_id`,
+        [ids],
+      );
+      const loadById = new Map(loads.map((l) => [l.faculty_id, l]));
+      const availability = await getFacultyAvailabilityToday(host.deptId);
+
+      const faculty = availability
+        .filter((f) => ids.includes(f.id))
+        .map((f) => ({
+          facultyId: f.id,
+          name: f.name,
+          position: f.position,
+          status: f.status, // 'available' | 'busy' | 'unavailable'
+          waitingCount: Number(loadById.get(f.id)?.waiting_count ?? 0),
+          servingNow: Number(loadById.get(f.id)?.serving_count ?? 0) > 0,
+        }));
+
+      res.json({ faculty });
+    } catch (error) {
+      sendServerError(res, error, "Faculty handlers fetch error:");
+    }
+  },
+);
+
+// POST /queue-hosting/:slotId/entries/:queueId/pass
+// Body: { facultyId }  -- a number to pass/reassign, null to pull back.
+//
+// The office hands a student to a professor assigned to THEIR service. The
+// ticket stays on this slot (so the seat stays taken and a professor-served
+// visit counts as served here); only assigned_faculty_id changes, which moves
+// it from the office's line into that professor's line.
+//
+//   - From the office line: 'waiting', or 'serving' (the usual flow -- call
+//     the student up, hear the concern, pass them on). A called student goes
+//     back to 'waiting' in the professor's line with their call cleared.
+//   - Reassign / pull back: only while still 'waiting' -- once a professor
+//     has called them, that conversation is theirs to finish.
+//   - Pulling back into a queue the office already stopped cancels the ticket
+//     with a priority credit instead (there's no office line left).
+//
+// Lock order: faculty row (the FK check on assigned_faculty_id takes a shared
+// lock on it -- see utils/queueHandoff.js) -> slot -> entry.
+router.post(
+  "/queue-hosting/:slotId/entries/:queueId/pass",
+  authenticateToken,
+  authorizeRoles("admin"),
   async (req, res) => {
     const hostId = req.user.userId;
     const slotId = parseInt(req.params.slotId, 10);
     const queueId = parseInt(req.params.queueId, 10);
-    const targetSlotId = parseInt(req.body?.targetSlotId, 10);
+    const rawFacultyId = req.body?.facultyId;
+    const facultyId =
+      rawFacultyId === null || rawFacultyId === undefined ? null : parseInt(rawFacultyId, 10);
 
-    if (!isValidSlotId(slotId) || !isValidSlotId(targetSlotId) || !Number.isInteger(queueId) || queueId <= 0) {
-      return res.status(400).json({ error: "A valid source slot, entry and destination are required" });
+    if (!isValidSlotId(slotId) || !Number.isInteger(queueId) || queueId <= 0) {
+      return res.status(400).json({ error: "A valid queue and student are required" });
     }
-    if (slotId === targetSlotId) {
-      return res.status(400).json({ error: "That student is already in this queue" });
+    if (facultyId !== null && (!Number.isInteger(facultyId) || facultyId <= 0)) {
+      return res.status(400).json({ error: "Choose a faculty member to pass this student to" });
     }
 
-    const conn = await pool.getConnection();
+    const conn = await getTxConnection();
     try {
       await conn.beginTransaction();
 
-      const host = await resolveHostContext(req.user);
+      const host = await resolveHostContext(req.user, conn);
       if (!host.deptId) {
         await conn.rollback();
         return res.status(403).json({ error: "Your account has no department assigned" });
       }
 
-      // Lock BOTH slots, always in ascending slot_id order. Two hosts
-      // transferring between the same pair in opposite directions would
-      // otherwise deadlock; a consistent lock order makes that impossible.
-      const [lowId, highId] = slotId < targetSlotId ? [slotId, targetSlotId] : [targetSlotId, slotId];
-      const [lockedSlots] = await conn.query(
-        `SELECT slot_id, status, department_id, host_user_id, service_id, is_universal,
-                max_capacity, end_time
-           FROM queue_slots WHERE slot_id IN (?, ?) ORDER BY slot_id FOR UPDATE`,
-        [lowId, highId],
-      );
-      const source = lockedSlots.find((s) => s.slot_id === slotId);
-      const target = lockedSlots.find((s) => s.slot_id === targetSlotId);
-      if (!source || !target) {
-        await conn.rollback();
-        return res.status(404).json({ error: "Queue slot not found" });
+      let faculty = null;
+      if (facultyId !== null) {
+        [[faculty]] = await conn.query(
+          `SELECT faculty_id, CONCAT(first_name, ' ', last_name) AS name
+             FROM faculty WHERE faculty_id = ? FOR UPDATE`,
+          [facultyId],
+        );
+        if (!faculty) {
+          await conn.rollback();
+          return res.status(404).json({ error: "Faculty member not found" });
+        }
       }
 
-      // The caller must be able to host the SOURCE (it's their line the
-      // student is leaving). The destination only has to be in the same
-      // department -- a faculty member must be able to hand a mis-queued
-      // student back to the office counter.
-      const mayHostSource =
-        host.role === "faculty" ? source.host_user_id === host.userId : source.department_id === host.deptId;
-      if (!mayHostSource) {
-        await conn.rollback();
-        return res.status(403).json({ error: "You can only move students out of a queue you are hosting" });
-      }
-      if (target.department_id !== host.deptId) {
-        await conn.rollback();
-        return res.status(403).json({ error: "You can only move students within your own department" });
-      }
-      if (target.status !== "open") {
-        await conn.rollback();
-        return res.status(409).json({ error: "The destination queue isn't open" });
-      }
+      const slot = await getHostableSlotOrRespond(conn, res, { slotId, host });
+      if (!slot) return;
 
-      // Only a waiting entry. A student already being served is mid-
-      // transaction at the counter; moving them would strand that session.
       const [[entry]] = await conn.query(
-        `SELECT queue_id, student_id, status, created_at, service_id FROM queues
-          WHERE queue_id = ? AND slot_id = ? FOR UPDATE`,
+        `SELECT q.queue_id, q.student_id, q.status, q.service_id, q.assigned_faculty_id,
+                COALESCE(q.service_label_snapshot, s.service_name) AS service_name
+           FROM queues q
+           JOIN services s ON q.service_id = s.service_id
+          WHERE q.queue_id = ? AND q.slot_id = ?
+          FOR UPDATE`,
         [queueId, slotId],
       );
       if (!entry) {
         await conn.rollback();
-        return res.status(404).json({ error: "Queue entry not found in this queue" });
+        return res.status(404).json({ error: "That student isn't in this queue" });
       }
-      if (entry.status !== "waiting") {
+
+      const previousFacultyId = entry.assigned_faculty_id;
+      const inOfficeLine = previousFacultyId === null;
+      if (inOfficeLine && facultyId === null) {
         await conn.rollback();
-        return res.status(409).json({ error: "Only a student who is still waiting can be moved" });
+        return res.status(400).json({ error: "That student is already in the office line" });
       }
-
-      // Destination must have room under its own daily cap.
-      const [[claimedRow]] = await conn.query(
-        `SELECT COUNT(*) AS claimed FROM queues
-          WHERE slot_id = ? AND status IN ('waiting', 'serving', 'completed')`,
-        [targetSlotId],
-      );
-      if (claimedRow.claimed >= target.max_capacity) {
+      if (!inOfficeLine && previousFacultyId === facultyId) {
         await conn.rollback();
-        return res.status(409).json({ error: "The destination queue is already at capacity" });
+        return res.status(400).json({ error: "That student is already with this professor" });
       }
-
-      // Already in the destination? (They could have scanned into both.)
-      const [[dup]] = await conn.query(
-        `SELECT queue_id FROM queues
-          WHERE student_id = ? AND slot_id = ? AND status IN ('waiting', 'serving') LIMIT 1`,
-        [entry.student_id, targetSlotId],
-      );
-      if (dup) {
+      const allowed = inOfficeLine
+        ? ["waiting", "serving"].includes(entry.status)
+        : entry.status === "waiting";
+      if (!allowed) {
         await conn.rollback();
-        return res.status(409).json({ error: "That student is already in the destination queue" });
+        return res.status(409).json({
+          error: inOfficeLine
+            ? "Only a student who is waiting or currently called can be passed"
+            : "The professor has already called this student, so they can't be moved now",
+        });
       }
 
-      const [[maxRow]] = await conn.query(
-        `SELECT COALESCE(MAX(queue_number), 0) AS n FROM queues WHERE slot_id = ?`,
-        [targetSlotId],
-      );
-      const newNumber = maxRow.n + 1;
+      let cancelled = false;
+      if (facultyId === null) {
+        ({ cancelled } = await returnEntryToOffice(conn, entry, slot, {
+          changedBy: hostId,
+          note: "Returned to office line by admin",
+        }));
+      } else {
+        const canHandle = await canFacultyHandleService(conn, {
+          facultyId,
+          serviceId: entry.service_id,
+        });
+        if (!canHandle) {
+          await conn.rollback();
+          return res.status(403).json({
+            error: "That faculty member isn't assigned to this student's service.",
+          });
+        }
+        await conn.query(
+          // A called office-line student goes back to waiting -- in the
+          // professor's line now, keeping their original created_at (and so
+          // their fair place in it). position_reminder_sent_at resets so the
+          // "almost up" nudge can fire for the new line.
+          `UPDATE queues
+              SET assigned_faculty_id = ?, assigned_at = NOW(), assigned_by = ?,
+                  status = 'waiting', called_at = NULL, arrived_at = NULL,
+                  position_reminder_sent_at = NULL
+            WHERE queue_id = ?`,
+          [facultyId, hostId, queueId],
+        );
+        await conn.query(
+          `INSERT INTO queue_status_logs (queue_id, old_status, new_status, changed_by, notes, created_at)
+           VALUES (?, ?, 'waiting', ?, ?, NOW())`,
+          [queueId, entry.status, hostId, `Passed to ${faculty.name} by admin`],
+        );
+      }
 
-      // created_at is deliberately NOT touched -- that's what preserves
-      // their place. updated_at is pinned too, so the transactions feed
-      // doesn't reorder on what is not a status change.
-      await conn.query(
-        `UPDATE queues
-            SET slot_id = ?, queue_number = ?, service_id = ?,
-                transferred_from_slot_id = ?, updated_at = updated_at
-          WHERE queue_id = ?`,
-        // A Universal Service Queue covers every service, so the student
-        // keeps the specific service they were queueing for. A normal
-        // destination IS a service, so the entry adopts it.
-        // queues.service_id is NOT NULL, and a universal SLOT's service_id
-        // is NULL -- so this must never fall back to the slot's own value.
-        [targetSlotId, newNumber, target.is_universal ? entry.service_id : target.service_id, slotId, queueId],
-      );
-      await conn.query(
-        `INSERT INTO queue_status_logs (queue_id, old_status, new_status, changed_by, notes, created_at)
-         VALUES (?, 'waiting', 'waiting', ?, ?, NOW())`,
-        [queueId, hostId, `Moved from queue #${slotId} to #${targetSlotId} by staff`],
-      );
-
-      // The source may now be empty/under capacity.
-      const settle = await settleSlotAfterEntryChange(conn, slotId);
+      const settle = cancelled ? await settleSlotAfterEntryChange(conn, slotId) : null;
 
       await conn.commit();
 
-      emitToSlot(slotId, "queue:transferred", { queueId, fromSlotId: slotId, toSlotId: targetSlotId });
-      emitToSlot(targetSlotId, "queue:transferred", { queueId, fromSlotId: slotId, toSlotId: targetSlotId });
-      emitToUser(entry.student_id, "queue:transferred", { queueId, fromSlotId: slotId, toSlotId: targetSlotId });
-      emitToDept(host.deptId, "queue:student-joined", { slotId: targetSlotId, queueId });
+      // Hand the connection back now -- see utils/txConnection.js.
+
+      conn.release();
+
+      if (cancelled) {
+        emitUnservedCancelled({
+          slotId,
+          deptId: slot.department_id,
+          queueId,
+          studentId: entry.student_id,
+          facultyId: previousFacultyId,
+          reason: "The office queue had already been stopped",
+          serviceName: entry.service_name,
+        });
+      } else {
+        const event = facultyId === null ? "queue:returned" : "queue:passed";
+        const payload = { slotId, queueId, studentId: entry.student_id, facultyId, previousFacultyId };
+        emitToSlot(slotId, event, payload);
+        emitToDept(slot.department_id, event, payload);
+        emitToUser(entry.student_id, event, payload);
+        if (facultyId) emitToUser(facultyId, event, payload);
+        if (previousFacultyId) emitToUser(previousFacultyId, event, payload);
+
+        if (facultyId) {
+          createNotification(
+            entry.student_id,
+            `You've been passed to ${faculty.name} for ${entry.service_name}. Please wait to be called — you kept your place in line.`,
+            "queue",
+          );
+          createNotification(
+            facultyId,
+            `A student was passed to you for ${entry.service_name}. Open your Queue to call them.`,
+            "queue",
+          );
+        } else {
+          createNotification(
+            entry.student_id,
+            `You've been moved back to the office line for ${entry.service_name}. You kept your place.`,
+            "queue",
+          );
+        }
+        if (previousFacultyId && previousFacultyId !== facultyId) {
+          createNotification(
+            previousFacultyId,
+            `A student waiting for you for ${entry.service_name} was moved by the college office.`,
+            "queue",
+          );
+        }
+      }
       if (settle) {
         emitToSlot(slotId, "queue:slot-status", { slotId, status: settle.newStatus });
-        emitToDept(host.deptId, "queue:slot-status", { slotId, status: settle.newStatus });
+        emitToDept(slot.department_id, "queue:slot-status", { slotId, status: settle.newStatus });
       }
-      createNotification(
-        entry.student_id,
-        "Staff moved you to the correct queue for your concern. You kept your place in line.",
-        "queue",
-      );
 
-      res.json({ message: "Student moved", queueId, targetSlotId });
+      // Both lines this ticket left/joined may have advanced. Best-effort.
+      try {
+        if (inOfficeLine || facultyId === null) await notifyAlmostUp({ slotId });
+        if (facultyId) await notifyAlmostUp({ facultyId });
+        if (previousFacultyId) await notifyAlmostUp({ facultyId: previousFacultyId });
+      } catch (nudgeErr) {
+        console.error("[pass] almost-up nudge failed:", nudgeErr.message);
+      }
+
+      res.json({
+        message: cancelled
+          ? "The office queue was already stopped, so the student's ticket was cancelled with priority for next time"
+          : facultyId === null
+            ? "Student moved back to the office line"
+            : `Student passed to ${faculty.name}`,
+        queueId,
+        facultyId,
+        cancelled,
+      });
     } catch (error) {
       await conn.rollback();
-      sendServerError(res, error, "Queue transfer error:");
+      sendServerError(res, error, "Queue pass error:");
     } finally {
       conn.release();
     }
@@ -1553,7 +1711,7 @@ router.post(
 router.get(
   "/queue-blocked-students",
   authenticateToken,
-  authorizeRoles("admin", "faculty"),
+  authorizeRoles("admin"),
   async (req, res) => {
     try {
       const host = await resolveHostContext(req.user);
@@ -1599,7 +1757,7 @@ router.get(
 router.post(
   "/queue-blocked-students/:studentId/clear",
   authenticateToken,
-  authorizeRoles("admin", "faculty"),
+  authorizeRoles("admin"),
   async (req, res) => {
     const hostId = req.user.userId;
     const studentId = parseInt(req.params.studentId, 10);
@@ -1757,7 +1915,7 @@ router.post(
       await logAudit(adminId, "CREATE", "service_delegations", serviceId, null, { facultyId });
       createNotification(
         facultyId,
-        "You can now host the queue for a service assigned by the college office.",
+        "The college office assigned you to a service. Students who need it can now be passed to you, and they'll appear on your Queue page.",
         "queue",
       );
 

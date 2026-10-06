@@ -114,12 +114,10 @@ app.use("/api/student", studentRoutes);
 app.use("/api/professor", professorRoutes);
 app.use("/api/admin", adminRoutes);
 
-// The SAME queue-hosting router adminRoutes already mounts, exposed a second
-// time for faculty who have had a service delegated to them. Mounting one
-// router twice (rather than forking ~1100 lines per role) is what keeps the
-// two hosts' behaviour identical; which slots a caller may actually touch is
-// decided per-request from req.user.role -- see utils/queueHosting.js.
-app.use("/api/professor", require("./routes/queueHostingRoutes"));
+// Professors don't host queues: the college office passes them students for
+// the services it assigned them, and they serve those from here. Queue
+// hosting itself is office-only (mounted inside adminRoutes).
+app.use("/api/professor", require("./routes/facultyQueueRoutes"));
 
 // Surfaces multer upload failures (file too large, too many files, or an
 // unsupported type from upload.js's fileFilter) as a clear 400 instead of

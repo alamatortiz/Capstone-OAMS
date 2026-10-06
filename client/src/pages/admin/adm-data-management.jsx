@@ -9,7 +9,6 @@ import api from "../../utils/api";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
-import FormModal from "../../components/FormModal";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -128,9 +127,10 @@ export default function AdminDataManagement() {
   const [serviceForm, setServiceForm] = useState(emptyServiceForm());
   const [serviceSaving, setServiceSaving] = useState(false);
 
-  // ── Queue delegation (which faculty may run a service's queue) ─────────
-  // Kept next to Service Settings because "who runs this queue" is part of
-  // configuring the service, not a separate concern.
+  // ── Service assignment (which faculty the office may pass this service's
+  // students to) ─────────────────────────────────────────────────────────
+  // Kept next to Service Settings because "who handles this service" is part
+  // of configuring the service, not a separate concern.
   const [delegationsByService, setDelegationsByService] = useState({});
   const [facultyList, setFacultyList] = useState([]);
   const [assignTarget, setAssignTarget] = useState(null); // { serviceId, serviceName }
@@ -931,70 +931,90 @@ export default function AdminDataManagement() {
             </div>
           )}
 
-          {/* Assign this service's queue to a faculty member. Revoking
-              leaves any queue they already opened running -- see the DELETE
-              route's comment for why. */}
-          {/* Shared FormModal rather than another hand-rolled overlay --
-              same chrome, focus handling and body-scroll lock as the rest
-              of the app's forms. */}
-          <FormModal
-            show={!!assignTarget}
-            icon={<UsersIcon />}
-            title="Who can run this queue?"
-            description={
-              assignTarget
-                ? `${assignTarget.serviceName} — the college office can always run this queue. Anyone assigned here can run it too, from their own account.`
-                : ""
-            }
-            onCancel={() => setAssignTarget(null)}
-            onSubmit={handleAssignFaculty}
-            submitText="Assign"
-            cancelText="Close"
-            submitDisabled={!assignFacultyId}
-            submitting={assignSaving}
-          >
-            {assignTarget && (
-              <>
-                {(delegationsByService[assignTarget.serviceId]?.length ?? 0) > 0 && (
-                  <div className="adm-assign-list">
-                    {delegationsByService[assignTarget.serviceId].map((d) => (
-                      <div key={d.delegationId} className="adm-assign-row">
-                        <span>{d.facultyName}</span>
-                        <button
-                          type="button"
-                          className="adm-btn-icon adm-btn-delete"
-                          title="Remove assignment"
-                          onClick={() => handleRevokeFaculty(d.delegationId)}
-                        >
-                          <TrashIcon />
-                        </button>
-                      </div>
-                    ))}
+          {/* Assign this service to faculty: the office can then pass
+              students who need it to them (Queue → Manage → Pass to
+              Faculty). Same modal shell as Add Service. Removing someone
+              leaves students already passed to them in their line -- the
+              office can reassign or take those back from the queue. */}
+          {assignTarget && (
+            <div className="adm-modal-overlay">
+              <div className="adm-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="adm-modal-header">
+                  <div>
+                    <h3 className="adm-modal-title">Assign Service to Faculty</h3>
+                    <p className="adm-modal-subtitle">
+                      {assignTarget.serviceName} — the office can pass students who need this
+                      service to anyone assigned here.
+                    </p>
                   </div>
-                )}
+                  <button className="adm-modal-close-btn" onClick={() => setAssignTarget(null)} aria-label="Close">
+                    <CloseIcon />
+                  </button>
+                </div>
 
-                <label className="adm-form-group">
-                  <span className="adm-form-label">Assign a faculty member</span>
-                  <select
-                    className="adm-form-input"
-                    value={assignFacultyId}
-                    onChange={(e) => setAssignFacultyId(e.target.value)}
+                <div className="adm-modal-body">
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">Assigned Faculty</label>
+                    {(delegationsByService[assignTarget.serviceId]?.length ?? 0) > 0 ? (
+                      <div className="adm-assign-list">
+                        {delegationsByService[assignTarget.serviceId].map((d) => (
+                          <div key={d.delegationId} className="adm-assign-row">
+                            <span className="adm-assign-name">
+                              <UsersIcon />
+                              {d.facultyName}
+                            </span>
+                            <button
+                              type="button"
+                              className="adm-btn-icon adm-btn-delete"
+                              title="Remove assignment"
+                              onClick={() => handleRevokeFaculty(d.delegationId)}
+                            >
+                              <TrashIcon />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="adm-assign-empty">No faculty assigned to this service yet.</p>
+                    )}
+                  </div>
+
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">Add a Faculty Member</label>
+                    <select
+                      className="adm-form-select"
+                      value={assignFacultyId}
+                      onChange={(e) => setAssignFacultyId(e.target.value)}
+                    >
+                      <option value="">Select faculty…</option>
+                      {facultyList
+                        .filter((f) => !(delegationsByService[assignTarget.serviceId] ?? [])
+                          .some((d) => d.facultyId === f.faculty_id))
+                        .map((f) => (
+                          <option key={f.faculty_id} value={f.faculty_id}>{f.faculty_name}</option>
+                        ))}
+                    </select>
+                    {facultyList.length === 0 && (
+                      <p className="adm-assign-empty">No faculty are listed under this department yet.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="adm-modal-footer">
+                  <button className="adm-btn-outline" onClick={() => setAssignTarget(null)}>
+                    Close
+                  </button>
+                  <button
+                    className="adm-btn-primary"
+                    onClick={handleAssignFaculty}
+                    disabled={!assignFacultyId || assignSaving}
                   >
-                    <option value="">Select faculty…</option>
-                    {facultyList
-                      .filter((f) => !(delegationsByService[assignTarget.serviceId] ?? [])
-                        .some((d) => d.facultyId === f.faculty_id))
-                      .map((f) => (
-                        <option key={f.faculty_id} value={f.faculty_id}>{f.faculty_name}</option>
-                      ))}
-                  </select>
-                </label>
-                {facultyList.length === 0 && (
-                  <p className="adm-card-desc">No faculty are listed under this department yet.</p>
-                )}
-              </>
-            )}
-          </FormModal>
+                    {assignSaving ? "Assigning..." : "Assign"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <ActionConfirmModal
             show={!!deleteDocTarget}
@@ -1157,34 +1177,30 @@ export default function AdminDataManagement() {
                           </div>
                         </div>
                         {s.description && <p className="adm-item-desc">{s.description}</p>}
-                        {/* Who may run this queue besides the office itself.
-                            Rendered as a labelled control rather than a bare
-                            icon in the action cluster -- delegation is a
-                            significant permission, and buried next to
-                            Edit/Delete nobody finds it. */}
+                      </div>
+                      <div className="adm-item-actions adm-item-actions--stacked">
+                        <div className="adm-item-actions-row">
+                          <button className="adm-btn-icon adm-btn-edit" onClick={() => openEditServiceModal(s)} title="Edit">
+                            <EditSvgIcon />
+                          </button>
+                          <button className="adm-btn-icon adm-btn-delete" onClick={() => setDeleteServiceTarget(s)} title="Delete">
+                            <TrashIcon />
+                          </button>
+                        </div>
+                        {/* Which faculty the office may pass this service's
+                            students to. A labelled button rather than a bare
+                            icon -- it's a meaningful permission and should be
+                            findable at a glance. */}
                         <button
                           type="button"
-                          className={`adm-delegate-chip ${(delegationsByService[s.id]?.length ?? 0) > 0 ? "is-assigned" : ""}`}
+                          className="adm-assign-btn"
                           onClick={() => { setAssignTarget({ serviceId: s.id, serviceName: s.name }); setAssignFacultyId(""); }}
                         >
                           <UsersIcon />
-                          {(delegationsByService[s.id]?.length ?? 0) > 0 ? (
-                            <span>
-                              Queue handled by{" "}
-                              <strong>{delegationsByService[s.id].map((d) => d.facultyName).join(", ")}</strong>
-                            </span>
-                          ) : (
-                            <span>Assign queue to faculty</span>
-                          )}
-                        </button>
-                      </div>
-                      <div className="adm-item-actions">
-                        <button className="adm-btn-icon adm-btn-edit" onClick={() => openEditServiceModal(s)} title="Edit">
-
-                          <EditSvgIcon />
-                        </button>
-                        <button className="adm-btn-icon adm-btn-delete" onClick={() => setDeleteServiceTarget(s)} title="Delete">
-                          <TrashIcon />
+                          <span>
+                            Assign Service to Faculty
+                            {(delegationsByService[s.id]?.length ?? 0) > 0 && ` (${delegationsByService[s.id].length})`}
+                          </span>
                         </button>
                       </div>
                     </div>

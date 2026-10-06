@@ -7,6 +7,31 @@ const { authenticateToken, authorizeRoles } = require("../../middleware/authMidd
 const { getManilaDateString, manilaDayStartUTC, manilaDayEndExclusiveUTC } = require("../../utils/dateTime");
 const { sendServerError } = require("../../utils/errorResponse");
 const { logAudit } = require("../../utils/auditLog");
+const { releaseFacultyLane, emitFacultyLaneReleased } = require("../../utils/queueHandoff");
+
+// A professor who is deleted, suspended/deactivated or moved to another
+// department can no longer serve the queue students the college office passed
+// to them, so those students go back to the office line (keeping their place;
+// cancelled with a priority credit if that office queue was already stopped).
+// `alsoInTx` runs extra writes in the SAME transaction, under the faculty-row
+// lock -- used by delete so the professor can't call a student in between the
+// release and the account disappearing.
+async function releaseFacultyQueueStudents(facultyId, changedBy, alsoInTx = null) {
+  const conn = await pool.getConnection();
+  let result;
+  try {
+    await conn.beginTransaction();
+    result = await releaseFacultyLane(conn, facultyId, { changedBy });
+    if (alsoInTx) await alsoInTx(conn);
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+  emitFacultyLaneReleased(result);
+}
 
 // Mounted by routes/adminRoutes.js at its root, so every path below is still
 // served at /api/admin/<path> exactly as before. None of these paths overlap
@@ -650,6 +675,18 @@ router.put(
       const [firstName, ...rest] = (name || "").trim().split(" ");
       const lastName = rest.join(" ") || firstName;
 
+      if (userRow.role === "faculty") {
+        const [[facRow]] = await pool.query(
+          `SELECT department_id FROM faculty WHERE faculty_id = ?`,
+          [userId],
+        );
+        const deptChanging = deptId !== null && facRow && facRow.department_id !== deptId;
+        const deactivating = status && status !== "active" && status !== userRow.status;
+        if (deptChanging || deactivating) {
+          await releaseFacultyQueueStudents(userId, adminId);
+        }
+      }
+
       if (userRow.role === "student") {
         await pool.query(
           `UPDATE students SET first_name = ?, last_name = ?, email = ?, department_id = COALESCE(?, department_id), student_number = COALESCE(?, student_number) WHERE student_id = ?`,
@@ -708,6 +745,10 @@ router.patch(
         }
       }
 
+      if (userRow.role === "faculty" && status !== "active" && status !== userRow.status) {
+        await releaseFacultyQueueStudents(userId, adminId);
+      }
+
       await pool.query(`UPDATE users SET status = ? WHERE user_id = ?`, [status, userId]);
       await logAudit(adminId, "UPDATE", "users", userId, { status: userRow.status }, { status });
 
@@ -738,7 +779,13 @@ router.delete(
         return res.status(403).json({ error: "You cannot delete another system administrator" });
       }
 
-      await pool.query(`DELETE FROM users WHERE user_id = ?`, [userId]);
+      if (userRow.role === "faculty") {
+        await releaseFacultyQueueStudents(userId, adminId, (conn) =>
+          conn.query(`DELETE FROM users WHERE user_id = ?`, [userId]),
+        );
+      } else {
+        await pool.query(`DELETE FROM users WHERE user_id = ?`, [userId]);
+      }
       await logAudit(adminId, "DELETE", "users", userId, { role: userRow.role }, null);
 
       res.json({ message: "User deleted" });

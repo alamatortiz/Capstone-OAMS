@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ChevronLeft, Users, StopCircle, PauseCircle, UserX } from "lucide-react";
+import { ChevronLeft, Users, StopCircle, PauseCircle, UserX, QrCode, UserCheck, Undo2, Repeat } from "lucide-react";
 import "./adm-queue.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
@@ -9,6 +9,7 @@ import AdminPageShell from "../../components/AdminPageShell";
 import LoadingOverlay from "../../components/LoadingOverlay";
 import QueueReasonModal from "../../components/QueueReasonModal";
 import QueueProgressBars from "../../components/QueueProgressBars";
+import QueueJoinQrDisplay from "../../components/QueueJoinQrDisplay";
 import PageHeader from "../../components/PageHeader";
 import FilterSelect from "../../components/FilterSelect";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
@@ -160,11 +161,15 @@ export default function AdminQueue() {
   const [visibleEntryCount, setVisibleEntryCount] = useState(3);
   const ENTRIES_PAGE_SIZE = 3;
 
-  // ── Relay: move a mis-queued student without losing their place ─────────
-  const [moveTarget, setMoveTarget] = useState(null); // { queueId, name }
-  const [moveDestId, setMoveDestId] = useState("");
-  const [moving, setMoving] = useState(false);
-  useLockBodyScroll(!!moveTarget);
+  // ── Pass to faculty: hand a student to a professor assigned to their
+  // service. The ticket stays on this queue (its seat stays taken); only the
+  // line it's in changes. Also used to reassign to another professor. ──────
+  const [passTarget, setPassTarget] = useState(null); // { queueId, name, serviceId, service, concern, currentFacultyId }
+  const [passHandlers, setPassHandlers] = useState([]);
+  const [passHandlersLoading, setPassHandlersLoading] = useState(false);
+  const [passFacultyId, setPassFacultyId] = useState(null);
+  const [passing, setPassing] = useState(false);
+  useLockBodyScroll(!!passTarget);
 
   // Lets other pages (e.g. Queue Hosting Management) jump straight into this
   // queue's monitor view instead of requiring the in-page Monitor button.
@@ -199,24 +204,23 @@ export default function AdminQueue() {
     }
   }, [monitoringQueueId]);
 
-  const handleMove = useCallback(async () => {
-    if (!moveTarget || !moveDestId) return;
-    setMoving(true);
+  const openPassModal = useCallback(async (target) => {
+    setPassTarget(target);
+    setPassFacultyId(null);
+    setPassHandlers([]);
+    setPassHandlersLoading(true);
     try {
-      await api.post(
-        `/admin/queue-hosting/${monitoringQueueId}/entries/${moveTarget.queueId}/transfer`,
-        { targetSlotId: Number(moveDestId) },
-      );
-      toast.success(`${moveTarget.name} moved — they keep their place in line`);
-      setMoveTarget(null);
-      setMoveDestId("");
-      await fetchQueueEntries();
+      const res = await api.get("/admin/queue-hosting/faculty-handlers", {
+        params: { serviceId: target.serviceId },
+      });
+      setPassHandlers(res.data.faculty ?? []);
     } catch (err) {
-      toast.error(err?.response?.data?.error ?? "Could not move that student");
+      toast.error(err?.response?.data?.error ?? "Could not load the faculty for this service");
     } finally {
-      setMoving(false);
+      setPassHandlersLoading(false);
     }
-  }, [moveTarget, moveDestId, monitoringQueueId, fetchQueueEntries]);
+  }, []);
+
 
   useEffect(() => {
     fetchQueueEntries();
@@ -241,24 +245,54 @@ export default function AdminQueue() {
     handleReasonConfirm: handleReasonConfirmBase,
   } = useAdminQueueHosting({ onLiveUpdate: fetchQueueEntries });
 
+  // facultyId null = take them back into the office line.
+  const submitPass = useCallback(
+    async (queueId, facultyId) => {
+      setPassing(true);
+      try {
+        const res = await api.post(
+          `/admin/queue-hosting/${monitoringQueueId}/entries/${queueId}/pass`,
+          { facultyId },
+        );
+        if (res.data?.cancelled) toast.error(res.data.message);
+        else toast.success(res.data?.message ?? "Student moved");
+        setPassTarget(null);
+        await Promise.all([fetchQueueEntries(), fetchQueueDetails()]);
+      } catch (err) {
+        toast.error(err?.response?.data?.error ?? "Could not move that student");
+      } finally {
+        setPassing(false);
+      }
+    },
+    [monitoringQueueId, fetchQueueEntries, fetchQueueDetails],
+  );
+
   const getEntryStatusLabel = (entry) => {
     if (entry.status === "no_show") return "No-Show";
     if (entry.status === "serving") return entry.arrivedAt ? "Being Served" : "Called";
     return entry.status;
   };
 
+  // Last name only keeps the badge short ("With Prof. Ogalesco").
+  const profLabel = (name) => `Prof. ${(name ?? "").trim().split(/\s+/).pop()}`;
+
   // Displayed entries: cancelled/no-show are just clutter here (still
-  // recorded in the DB, just not shown), and the rest are grouped so
-  // whoever's about to be called/being served always leads, then everyone
-  // still waiting (in ticket order), then everyone already served at the
-  // bottom -- recomputed from live data on every refetch, so a just-served
-  // student drops down and the next one rises to the top automatically.
-  const STATUS_GROUP_ORDER = { serving: 0, waiting: 1, completed: 2 };
+  // recorded in the DB, just not shown). The OFFICE LINE leads -- whoever the
+  // office is serving, then the office's waiting students in ticket order --
+  // then students passed to faculty (being served, then waiting), then
+  // everyone already served at the bottom. Without the office/faculty split a
+  // professor's current student would sort to the top and look like the
+  // office's. Recomputed from live data on every refetch.
+  const entryGroup = (entry) => {
+    if (entry.status === "completed") return 4;
+    if (entry.passedTo) return entry.status === "serving" ? 2 : 3;
+    return entry.status === "serving" ? 0 : 1;
+  };
   const displayableEntries = queueEntries
     .filter((entry) => entry.status !== "cancelled" && entry.status !== "no_show")
     .map((entry, index) => ({ entry, index }))
     .sort((a, b) => {
-      const groupDiff = STATUS_GROUP_ORDER[a.entry.status] - STATUS_GROUP_ORDER[b.entry.status];
+      const groupDiff = entryGroup(a.entry) - entryGroup(b.entry);
       return groupDiff !== 0 ? groupDiff : a.index - b.index;
     })
     .map(({ entry }) => entry);
@@ -277,8 +311,14 @@ export default function AdminQueue() {
   // (so Queue Hosting can still offer Host Again/Reopen on them) -- excluded
   // here with isToday since this page's system stats are meant to be a
   // right-now snapshot, not blended across two days.
+  // A stopped queue whose passed students are still with faculty also stays
+  // here until they're finished -- otherwise it would vanish from the office's
+  // view while those students are still being handled.
   const activeQueueDetails = queueDetails.filter(
-    (q) => q.isToday && ["open", "paused", "full", "expired"].includes(q.status),
+    (q) =>
+      q.isToday &&
+      (["open", "paused", "full", "expired"].includes(q.status) ||
+        (q.status === "closed" && q.passedCount > 0)),
   );
 
   const serviceTypes = [...new Set(activeQueueDetails.map((q) => q.queueType))].sort();
@@ -358,7 +398,7 @@ export default function AdminQueue() {
   const handleSkipStudent = async (slotId, reason) => {
     try {
       await api.patch(`/admin/queue-hosting/${slotId}/skip`, { reason });
-      toast.message("Student skipped and marked as no-show");
+      toast.error("Student skipped and marked as no-show");
       await fetchQueueDetails();
     } catch (error) {
       toast.error(
@@ -384,8 +424,11 @@ export default function AdminQueue() {
   // a close actually goes through (the queue it was showing no longer has
   // an active/paused state to monitor).
   const handleReasonConfirm = async (reason) => {
+    const passedRemaining = monitoringQueue?.passedCount ?? 0;
     const result = await handleReasonConfirmBase(reason);
-    if (result?.mode === "close") setMonitoringQueueId(null);
+    // Stay on the monitor if professors are still finishing passed students,
+    // so the office can keep watching them.
+    if (result?.mode === "close" && passedRemaining === 0) setMonitoringQueueId(null);
   };
 
   // Skip requires a reason too (kept consistent with pause/close) — reuses
@@ -416,38 +459,88 @@ export default function AdminQueue() {
         mainClassName="admin-queue-main"
         overlay={
           <>
-            {/* Relay: pick which open queue to move this student into. Only
-                other OPEN queues in the department are offered, since the
-                server rejects anything else anyway. */}
-            {moveTarget && (
-              <div className="queue-move-overlay" role="dialog" aria-modal="true" aria-label="Move student" onClick={() => setMoveTarget(null)}>
-                <div className="queue-move-sheet" onClick={(e) => e.stopPropagation()}>
-                  <div className="queue-move-header">
-                    <h2>Move {moveTarget.name}</h2>
-                    <button type="button" onClick={() => setMoveTarget(null)} aria-label="Close">×</button>
+            {/* Pass to faculty: only professors the office assigned to THIS
+                student's service are offered (for a Universal queue, the
+                service the student picked). Offline professors stay
+                pickable but are flagged -- they won't see the student until
+                they log back in. */}
+            {passTarget && (
+              <div className="aqp-overlay" role="dialog" aria-modal="true" aria-label="Pass student to faculty" onClick={() => setPassTarget(null)}>
+                <div className="aqp-modal" onClick={(e) => e.stopPropagation()}>
+                  <div className="aqp-header">
+                    <h2 className="aqp-title">{passTarget.currentFacultyId ? "Reassign Student" : "Pass to Faculty"}</h2>
+                    <button type="button" className="aqp-close" onClick={() => setPassTarget(null)} aria-label="Close">
+                      <CloseIcon />
+                    </button>
                   </div>
-                  <div className="queue-move-body">
-                    <p className="queue-move-note">
-                      They keep their place in line — the destination orders them by when they
-                      originally joined, not by when they were moved.
+                  <div className="aqp-body">
+                    <div className="aqp-hero">
+                      <p className="aqp-hero-label">{passTarget.service}</p>
+                      <p className="aqp-hero-title">{passTarget.name}</p>
+                      <p className="aqp-hero-purpose">
+                        <strong>Concern:</strong> {passTarget.concern}
+                      </p>
+                    </div>
+                    <p className="aqp-note">
+                      They stay on this queue — their seat stays taken — and keep their
+                      place by the time they originally joined. When the professor marks
+                      them served it counts as served here; a no-show frees the seat.
                     </p>
-                    <select
-                      className="queue-move-select"
-                      value={moveDestId}
-                      onChange={(e) => setMoveDestId(e.target.value)}
-                    >
-                      <option value="">Choose a queue…</option>
-                      {queueDetails
-                        .filter((q) => q.id !== monitoringQueueId && q.status === "open")
-                        .map((q) => (
-                          <option key={q.id} value={q.id}>{q.queueType}</option>
-                        ))}
-                    </select>
+                    {passHandlersLoading ? (
+                      <p className="aqp-empty">Loading faculty…</p>
+                    ) : passHandlers.filter((f) => f.facultyId !== passTarget.currentFacultyId).length === 0 ? (
+                      <div className="aqp-empty-card">
+                        <h3>No Faculty Available</h3>
+                        <p>
+                          {passHandlers.length === 0
+                            ? `No faculty member is assigned to ${passTarget.service} yet. Assign one under Data Management → Service Settings.`
+                            : "There's no other faculty member assigned to this service."}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="aqp-faculty-list" role="radiogroup" aria-label="Faculty">
+                        {passHandlers
+                          .filter((f) => f.facultyId !== passTarget.currentFacultyId)
+                          .map((f) => (
+                            <button
+                              key={f.facultyId}
+                              type="button"
+                              role="radio"
+                              aria-checked={passFacultyId === f.facultyId}
+                              className={`aqp-faculty-option ${passFacultyId === f.facultyId ? "is-selected" : ""}`}
+                              onClick={() => setPassFacultyId(f.facultyId)}
+                            >
+                              <span className="aqp-faculty-main">
+                                <span className="aqp-faculty-name">{f.name}</span>
+                                <span className="aqp-faculty-load">
+                                  {f.waitingCount} waiting{f.servingNow ? " · serving now" : ""}
+                                </span>
+                              </span>
+                              <span className={`aqp-faculty-status aqp-faculty-status--${f.status}`}>
+                                {f.status === "unavailable" ? "Offline" : f.status === "busy" ? "Busy" : "Available"}
+                              </span>
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                    {passHandlers.find((f) => f.facultyId === passFacultyId)?.status === "unavailable" && (
+                      <p className="aqp-warning">
+                        This professor is offline right now, so they won't see this student until
+                        they log back in. You can take the student back at any time.
+                      </p>
+                    )}
                   </div>
-                  <div className="queue-move-actions">
-                    <button type="button" className="queue-move-cancel" onClick={() => setMoveTarget(null)}>Cancel</button>
-                    <button type="button" className="queue-move-confirm" onClick={handleMove} disabled={!moveDestId || moving}>
-                      {moving ? "Moving…" : "Move student"}
+                  <div className="aqp-footer">
+                    <button type="button" className="aqp-btn-cancel" onClick={() => setPassTarget(null)}>
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="aqp-btn-submit"
+                      onClick={() => submitPass(passTarget.queueId, passFacultyId)}
+                      disabled={!passFacultyId || passing}
+                    >
+                      {passing ? "Passing…" : passTarget.currentFacultyId ? "Reassign Student" : "Pass Student"}
                     </button>
                   </div>
                 </div>
@@ -458,14 +551,24 @@ export default function AdminQueue() {
               title={reasonModal?.mode === "pause" ? "Pause Queue" : "Stop Queue"}
               message={
                 reasonModal?.mode === "pause"
-                  ? monitoringQueue?.currentlyServingStudentNumber
+                  ? (monitoringQueue?.currentlyServingStudentNumber
                     ? "Students in this queue will see this reason while it's paused. A student is currently being served — pausing will return them to waiting instead of leaving their call in progress."
-                    : "Students in this queue will see this reason while it's paused."
-                  : !monitoringQueue?.currentlyServingStudentNumber && monitoringQueue?.currentCount === 0
-                    ? monitoringQueue?.servedCount > 0
-                      ? "This queue has no one left waiting and already served students — stopping it will mark it complete."
-                      : "This queue hasn't served any students yet — it will be marked closed."
-                    : "All students still waiting or being served will be removed from this queue and will see this reason. This cannot be undone."
+                    : "Students in this queue will see this reason while it's paused.") +
+                  (monitoringQueue?.passedCount > 0 ? " Students already passed to faculty aren't affected." : "")
+                  : (() => {
+                      const passed = monitoringQueue?.passedCount ?? 0;
+                      const passedNote =
+                        passed > 0
+                          ? ` The ${passed} student${passed === 1 ? "" : "s"} already passed to faculty stay with them until served.`
+                          : "";
+                      if (!monitoringQueue?.currentlyServingStudentNumber && monitoringQueue?.currentCount === 0) {
+                        if (passed > 0) return `No one is left in the office line.${passedNote}`;
+                        return monitoringQueue?.servedCount > 0
+                          ? "This queue has no one left waiting and already served students — stopping it will mark it complete."
+                          : "This queue hasn't served any students yet — it will be marked closed.";
+                      }
+                      return `All students still waiting or being served in the office line will be removed from this queue and will see this reason. This cannot be undone.${passedNote}`;
+                    })()
               }
               icon={reasonModal?.mode === "pause" ? <PauseCircle width={22} height={22} /> : <StopCircle width={22} height={22} />}
               variant={reasonModal?.mode === "pause" ? "warning" : "danger"}
@@ -539,6 +642,33 @@ export default function AdminQueue() {
               </p>
             )}
 
+            {/* The join code, front and centre: students can only join by
+                scanning it, so the screen the office runs the queue from
+                shows it too (safe alongside the Queue Hosting popup -- codes
+                no longer revoke each other). Only an open queue issues one. */}
+            <div className="queue-detail-card queue-qr-card">
+              <div className="queue-detail-header">
+                <h3>
+                  <QrCode />
+                  Scan to Join
+                </h3>
+                <span className="queue-qr-card-name">{monitoringQueue.queueType}</span>
+              </div>
+              {monitoringQueue.status === "open" ? (
+                <QueueJoinQrDisplay slotId={monitoringQueue.id} />
+              ) : (
+                <p className="queue-qr-unavailable">
+                  {monitoringQueue.status === "paused"
+                    ? "Join code unavailable — this queue is paused. Resume it to let students scan in."
+                    : monitoringQueue.status === "full"
+                      ? "Join code unavailable — this queue is full."
+                      : monitoringQueue.status === "expired"
+                        ? "Join code unavailable — this queue's hours have ended."
+                        : "Join code unavailable — this queue has been stopped."}
+                </p>
+              )}
+            </div>
+
             {/* Stats Cards */}
             <div className="queue-monitoring-stats">
               <div className="queue-stat-card">
@@ -562,6 +692,15 @@ export default function AdminQueue() {
                 <div className="queue-stat-label">Students Waiting</div>
                 <div className="queue-stat-value">
                   {monitoringQueue.currentCount}
+                </div>
+              </div>
+              <div className="queue-stat-card">
+                <div className="queue-stat-card-icon-box">
+                  <UserCheck />
+                </div>
+                <div className="queue-stat-label">Passed to Faculty</div>
+                <div className="queue-stat-value">
+                  {monitoringQueue.passedCount ?? 0}
                 </div>
               </div>
               <div className="queue-stat-card">
@@ -744,6 +883,31 @@ export default function AdminQueue() {
                     <CloseIcon />
                     Skip / No-Show
                   </button>
+                  {(() => {
+                    const servingEntry = queueEntries.find(
+                      (e) => e.queueId === monitoringQueue.currentlyServingQueueId,
+                    );
+                    return (
+                      <button
+                        className="queue-action-btn queue-action-btn--faculty"
+                        disabled={!servingEntry}
+                        onClick={() =>
+                          servingEntry &&
+                          openPassModal({
+                            queueId: servingEntry.queueId,
+                            name: servingEntry.studentName,
+                            serviceId: servingEntry.serviceId,
+                            service: servingEntry.service,
+                            concern: servingEntry.concern,
+                            currentFacultyId: null,
+                          })
+                        }
+                      >
+                        <UserCheck />
+                        Pass to Faculty
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -768,7 +932,7 @@ export default function AdminQueue() {
                   visibleEntries.map((entry, index) => (
                     <div
                       key={entry.queueNumber}
-                      className={`queue-entry-item ${entry.status === "serving" ? "is-serving" : ""}`}
+                      className={`queue-entry-item ${entry.status === "serving" && !entry.passedTo ? "is-serving" : ""} ${entry.passedTo ? "is-passed" : ""}`}
                     >
                       <div className="queue-entry-top">
                         <div className="queue-entry-number">{index + 1}</div>
@@ -786,9 +950,14 @@ export default function AdminQueue() {
                               Priority
                             </span>
                           )}
-                          {entry.wasTransferred && (
-                            <span className="queue-entry-flag queue-entry-flag--moved" title="Moved here from another queue">
-                              Moved
+                          {entry.passedTo && (
+                            <span className="queue-entry-flag queue-entry-flag--faculty" title={`Passed to ${entry.passedTo.name}`}>
+                              With {profLabel(entry.passedTo.name)}
+                            </span>
+                          )}
+                          {entry.passedTo && !entry.passedTo.isOnline && entry.status !== "completed" && (
+                            <span className="queue-entry-flag queue-entry-flag--offline" title="This professor is offline right now">
+                              Offline
                             </span>
                           )}
                           <span className={`queue-entry-status queue-entry-status--${entry.status}`}>
@@ -829,13 +998,56 @@ export default function AdminQueue() {
                           Joined at {entry.joinedAt}
                         </p>
                         {entry.status === "waiting" && (
-                          <button
-                            type="button"
-                            className="queue-entry-move-btn"
-                            onClick={() => setMoveTarget({ queueId: entry.queueId, name: entry.studentName })}
-                          >
-                            Move to another queue
-                          </button>
+                          <div className="queue-entry-pass-actions">
+                            {entry.passedTo ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="queue-entry-pass-btn"
+                                  onClick={() =>
+                                    openPassModal({
+                                      queueId: entry.queueId,
+                                      name: entry.studentName,
+                                      serviceId: entry.serviceId,
+                                      service: entry.service,
+                                      concern: entry.concern,
+                                      currentFacultyId: entry.passedTo.facultyId,
+                                    })
+                                  }
+                                >
+                                  <Repeat />
+                                  Reassign
+                                </button>
+                                <button
+                                  type="button"
+                                  className="queue-entry-pass-btn queue-entry-pass-btn--return"
+                                  disabled={passing}
+                                  onClick={() => submitPass(entry.queueId, null)}
+                                >
+                                  <Undo2 />
+                                  Return to Office Line
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                className="queue-entry-pass-btn"
+                                onClick={() =>
+                                  openPassModal({
+                                    queueId: entry.queueId,
+                                    name: entry.studentName,
+                                    serviceId: entry.serviceId,
+                                    service: entry.service,
+                                    concern: entry.concern,
+                                    currentFacultyId: null,
+                                  })
+                                }
+                              >
+                                <UserCheck />
+                                Pass to Faculty
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>

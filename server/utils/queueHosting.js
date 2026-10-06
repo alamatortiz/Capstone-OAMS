@@ -1,34 +1,32 @@
 const pool = require("../db");
 
-// Authorization core shared by the admin and faculty mounts of
-// queueHostingRoutes.js. Both mounts run the SAME handlers, so every
-// "may this person do this?" decision has to live in one place or the two
-// roles will quietly drift apart.
+// Authorization core for queue hosting (admin) and the professor hand-off.
 //
-// The two roles are deliberately not symmetric:
-//
-//   admin   — department-wide authority, including over queues a faculty
-//             member is hosting in that department. The secretary remains
-//             accountable for the office, so they can always step in.
-//   faculty — only the slots they are personally hosting, and they may only
-//             OPEN a queue for a service that has been delegated to them.
-//
-// Both roles' ids are PK-FKs onto users.user_id, so queue_slots.host_user_id
-// can point at either without ambiguity.
+// Only the college office hosts queues. A professor never owns a slot; they
+// are assigned to SERVICES (service_delegations), and the office passes them
+// individual students for those services (queues.assigned_faculty_id) --
+// see routes/facultyQueueRoutes.js. Legacy faculty-hosted slots (host_role =
+// 'faculty', from before this change) are still department slots, so the
+// office can manage them like any other.
 
 // Resolves the caller to { userId, role, deptId }. deptId is null when the
 // account has no department, which every caller must treat as "can't host".
-async function resolveHostContext(user) {
+//
+// Inside a transaction, pass the transaction's connection as `db`: reading
+// through `pool` there needs a SECOND connection while the first is held,
+// which under load exhausts the pool and hangs the server (see
+// utils/txConnection.js).
+async function resolveHostContext(user, db = pool) {
   const userId = user.userId;
   if (user.role === "admin") {
-    const [[row]] = await pool.query(
+    const [[row]] = await db.query(
       `SELECT department_id FROM administrators WHERE admin_id = ?`,
       [userId],
     );
     return { userId, role: "admin", deptId: row?.department_id ?? null };
   }
   if (user.role === "faculty") {
-    const [[row]] = await pool.query(
+    const [[row]] = await db.query(
       `SELECT department_id FROM faculty WHERE faculty_id = ?`,
       [userId],
     );
@@ -62,17 +60,6 @@ async function getHostableSlotOrRespond(conn, res, { slotId, host }) {
     return null;
   }
 
-  if (host.role === "faculty") {
-    // A faculty member runs their own line and nobody else's -- without this
-    // any delegated faculty could call-next on the secretary's counter.
-    if (slot.host_user_id !== host.userId) {
-      await conn.rollback();
-      res.status(403).json({ error: "You can only manage queues you are hosting" });
-      return null;
-    }
-    return slot;
-  }
-
   if (slot.department_id !== host.deptId) {
     await conn.rollback();
     res.status(403).json({ error: "You can only manage queues for your own department" });
@@ -81,9 +68,9 @@ async function getHostableSlotOrRespond(conn, res, { slotId, host }) {
   return slot;
 }
 
-// Which services this host may OPEN a queue for. An admin gets their whole
-// department; a faculty member gets only what has been delegated to them and
-// is still active.
+// Services a user may work with: an admin's whole department (to host queues
+// for), or for a faculty member only the services delegated to them and
+// still active (to receive passed students for).
 async function getHostableServices(host) {
   if (!host.deptId) return [];
   if (host.role === "faculty") {
@@ -109,17 +96,21 @@ async function getHostableServices(host) {
   return rows;
 }
 
-// Guard for opening a queue: faculty must hold an active delegation for the
-// service, and (defence in depth) it must sit in their own department.
-async function canFacultyHostService(db, { facultyId, serviceId }) {
+// May this faculty member receive students for this service? They need an
+// active delegation for it, the service must sit in their own department
+// (defence in depth), and their account must be active -- a suspended
+// professor can't be handed anyone.
+async function canFacultyHandleService(db, { facultyId, serviceId }) {
   const [[row]] = await db.query(
     `SELECT 1 AS ok
        FROM service_delegations sd
        JOIN services s ON sd.service_id = s.service_id
        JOIN faculty f ON f.faculty_id = sd.faculty_id
+       JOIN users u ON u.user_id = f.faculty_id
       WHERE sd.faculty_id = ? AND sd.service_id = ?
         AND sd.is_active = TRUE
         AND s.department_id = f.department_id
+        AND u.status = 'active'
       LIMIT 1`,
     [facultyId, serviceId],
   );
@@ -130,5 +121,5 @@ module.exports = {
   resolveHostContext,
   getHostableSlotOrRespond,
   getHostableServices,
-  canFacultyHostService,
+  canFacultyHandleService,
 };

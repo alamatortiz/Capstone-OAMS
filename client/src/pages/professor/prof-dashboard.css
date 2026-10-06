@@ -1087,6 +1087,11 @@ body {
 .professor-dashboard .action-gradient-4 {
   background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
 }
+/* Queue -- blue like every queue surface (matches the student dashboard's
+   Queues tile, stud-dashboard.css gradient-3). */
+.professor-dashboard .action-gradient-5 {
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+}
 
 .professor-dashboard .action-body {
   display: flex;
@@ -1168,6 +1173,36 @@ body {
   .quick-action-card:has(.action-gradient-3):hover
   .action-badge {
   background: rgba(147, 51, 234, 0.2);
+}
+
+/* Blue badge — Queue (gradient-5). Values copied verbatim from
+   stud-dashboard.css's blue Queues badge (gradient-3). */
+.professor-dashboard .quick-action-card:has(.action-gradient-5) .action-badge {
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+  border-color: rgba(59, 130, 246, 0.25);
+}
+
+.professor-dashboard
+  .quick-action-card:has(.action-gradient-5):hover
+  .action-badge {
+  background: rgba(59, 130, 246, 0.25);
+}
+
+[data-theme="light"]
+  .professor-dashboard
+  .quick-action-card:has(.action-gradient-5)
+  .action-badge {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+  border-color: rgba(37, 99, 235, 0.25);
+}
+
+[data-theme="light"]
+  .professor-dashboard
+  .quick-action-card:has(.action-gradient-5):hover
+  .action-badge {
+  background: rgba(37, 99, 235, 0.2);
 }
 
 /* Orange badge — Document Request (gradient-4), matches Documents' true orange theme */

@@ -49,6 +49,9 @@ export const WATCHED_EVENTS = [
   'queue:uncalled',
   'queue:queue-stopped',
   'queue:no-show',
+  // Passed to / back from a professor (student + professor both notified).
+  'queue:passed',
+  'queue:returned',
   'appointment:status-updated',
   'appointment:slot-updated',
   'appointment:comment-updated',

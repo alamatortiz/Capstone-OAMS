@@ -112,6 +112,8 @@ interface QueueRecord {
   status: QueueStatus;
   slotStatus: SlotStatus;
   slotPauseReason?: string;
+  // Set when the college office passed this student to a professor.
+  passedTo?: { facultyId: number; name: string } | null;
   position: number;
   totalWaiting: number;
   totalInQueue: number;
@@ -736,7 +738,22 @@ function QueueDetail({
           <Text style={styles.turnBannerText}>
             {queue.arrivedAt
               ? 'Service being processed'
-              : "It's your turn — please proceed to the designated location."}
+              : queue.passedTo
+                ? `${queue.passedTo.name} is ready for you — please proceed${queue.location ? ` to ${queue.location}` : ''}.`
+                : "It's your turn — please proceed to the designated location."}
+          </Text>
+        </View>
+      )}
+
+      {/* Passed to a professor by the office: still on the office's queue
+          (seat kept), but in that professor's line -- the office pausing its
+          own line doesn't affect them (the server reports their effective
+          status as open, so the paused banner below stays hidden). */}
+      {queue.passedTo && queue.status === 'waiting' && (
+        <View style={[styles.wideBanner, { backgroundColor: 'rgba(139, 92, 246, 0.1)', borderColor: 'rgba(139, 92, 246, 0.35)' }]}>
+          <AlertCircle size={20} color="#8b5cf6" />
+          <Text style={[styles.wideBannerText, { color: '#8b5cf6' }]}>
+            You&apos;re with {queue.passedTo.name}. The college office passed you to them for this service — wait to be called. You kept your place in line.
           </Text>
         </View>
       )}

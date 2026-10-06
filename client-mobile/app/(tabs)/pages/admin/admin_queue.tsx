@@ -128,6 +128,9 @@ interface QueueEntry {
   status: QueueEntryStatus;
   joinedAt: string;
   arrivedAt: string | null;
+  // Set when the office passed this student to a professor -- they're in
+  // that professor's line, not the office's (still holding a seat here).
+  passedTo?: { facultyId: number; name: string; isOnline: boolean } | null;
 }
 
 type LucideIconType = typeof Clock;
@@ -339,7 +342,13 @@ export default function AdminQueueScreen() {
   // but this monitoring screen's "active" totals should only ever reflect
   // today, matching web's adm-queue.jsx, or a stale carried-over slot that
   // hasn't been touched since would inflate these numbers.
-  const activeQueueDetails = queueDetails.filter((q: any) => q.isToday && ACTIVE_STATUSES.includes(q.status));
+  // A stopped queue whose passed students are still with faculty stays listed
+  // until they're finished (matches web adm-queue.jsx).
+  const activeQueueDetails = queueDetails.filter(
+    (q: any) =>
+      q.isToday &&
+      (ACTIVE_STATUSES.includes(q.status) || (q.status === 'closed' && q.passedCount > 0)),
+  );
   const serviceTypes = [...new Set(activeQueueDetails.map((q: any) => q.queueType))].sort();
   const filteredQueueDetails =
     serviceTypeFilter === 'all'
@@ -504,7 +513,10 @@ export default function AdminQueueScreen() {
       : {
           title: 'Stop Queue',
           message:
-            'All students still waiting or being served will be removed from this queue and will see this reason. This cannot be undone.',
+            'All students still waiting or being served in the office line will be removed from this queue and will see this reason. This cannot be undone.' +
+            (monitoringQueue?.passedCount > 0
+              ? ` The ${monitoringQueue.passedCount} student${monitoringQueue.passedCount === 1 ? '' : 's'} already passed to faculty stay with them until served.`
+              : ''),
           confirmText: 'Stop Queue',
           confirmColor: '#ef4444',
         };
@@ -801,7 +813,7 @@ Student Number: ${monitoringQueue.currentlyServingStudentNumber}`
                     return (
                       <View
                         key={entry.queueNumber}
-                        style={[styles.entryItem, entry.status === 'serving' && styles.entryItemServing]}
+                        style={[styles.entryItem, entry.status === 'serving' && !entry.passedTo && styles.entryItemServing]}
                       >
                         <View style={styles.entryTopRow}>
                           <View style={styles.entryNumberCircle}>
@@ -810,6 +822,12 @@ Student Number: ${monitoringQueue.currentlyServingStudentNumber}`
                           <View style={{ flex: 1 }}>
                             <Text style={styles.entryName}>{entry.studentName}</Text>
                             <Text style={styles.entryId}>ID: {entry.studentId}</Text>
+                            {entry.passedTo ? (
+                              <Text style={[styles.entryId, { color: '#8b5cf6', fontWeight: '700' }]}>
+                                With {entry.passedTo.name}
+                                {!entry.passedTo.isOnline && entry.status !== 'completed' ? ' (offline)' : ''}
+                              </Text>
+                            ) : null}
                           </View>
                           <View style={{ alignItems: 'flex-end', gap: 6 }}>
                             <View style={[styles.entryStatusPill, { backgroundColor: tint.bg, borderColor: tint.border }]}>

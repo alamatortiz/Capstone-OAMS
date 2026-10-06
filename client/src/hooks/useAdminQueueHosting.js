@@ -22,18 +22,14 @@ const QUEUE_HOSTING_EVENTS = [
   "queue:notes-updated",
   "queue:service-updated",
   // A student ticking their checklist changes what the host sees before
-  // calling them, and a relay changes who is in which line -- both have to
-  // land without a manual refresh.
+  // calling them, and passing a student to (or back from) a professor changes
+  // who is in which line -- both have to land without a manual refresh.
   "queue:requirements-updated",
-  "queue:transferred",
+  "queue:passed",
+  "queue:returned",
 ];
 
-// `apiBase` selects which mount of the (single) server-side hosting router to
-// talk to: "admin" for the college office, "professor" for a faculty member
-// running a delegated service. The endpoints and payloads are identical --
-// the server decides per-request which slots the caller may touch -- so the
-// whole page can be reused by swapping this one string.
-export function useAdminQueueHosting({ onLiveUpdate, apiBase = "admin" } = {}) {
+export function useAdminQueueHosting({ onLiveUpdate } = {}) {
   const { user: authUser } = useAuth();
 
   const [queues, setQueues] = useState([]);
@@ -42,7 +38,7 @@ export function useAdminQueueHosting({ onLiveUpdate, apiBase = "admin" } = {}) {
 
   const fetchQueues = useCallback(async () => {
     try {
-      const res = await api.get(`/${apiBase}/queue-hosting`);
+      const res = await api.get("/admin/queue-hosting");
       setQueues(res.data.queues ?? []);
       setError(null);
     } catch (error) {
@@ -50,7 +46,7 @@ export function useAdminQueueHosting({ onLiveUpdate, apiBase = "admin" } = {}) {
       toast.error("Could not load queue data");
       setError("Could not load queue data. Retrying automatically.");
     }
-  }, [apiBase]);
+  }, []);
 
   useEffect(() => {
     const init = async () => {
@@ -78,14 +74,14 @@ export function useAdminQueueHosting({ onLiveUpdate, apiBase = "admin" } = {}) {
   const handleResumeQueue = useCallback(
     async (id) => {
       try {
-        await api.patch(`/${apiBase}/queue-hosting/${id}/resume`);
+        await api.patch(`/admin/queue-hosting/${id}/resume`);
         toast.success("Queue resumed");
         await fetchQueues();
       } catch (error) {
         toast.error(error?.response?.data?.error ?? "Failed to resume queue");
       }
     },
-    [fetchQueues, apiBase],
+    [fetchQueues],
   );
 
   // Returns { mode, id } on success so callers can react to a completed
@@ -97,10 +93,11 @@ export function useAdminQueueHosting({ onLiveUpdate, apiBase = "admin" } = {}) {
       const { mode, id } = reasonModal;
       setReasonSubmitting(true);
       try {
-        await api.patch(`/${apiBase}/queue-hosting/${id}/${mode}`, { reason });
-        toast[mode === "pause" ? "message" : "success"](
-          mode === "pause" ? "Queue paused" : "Queue stopped",
-        );
+        await api.patch(`/admin/queue-hosting/${id}/${mode}`, { reason });
+        // Pause is amber everywhere else in the UI (badges, buttons), so its
+        // toast is a warning rather than the plain uncoloured style.
+        if (mode === "pause") toast.warning("Queue paused");
+        else toast.success("Queue stopped");
         setReasonModal(null);
         await fetchQueues();
         return { mode, id };
@@ -111,7 +108,7 @@ export function useAdminQueueHosting({ onLiveUpdate, apiBase = "admin" } = {}) {
         setReasonSubmitting(false);
       }
     },
-    [reasonModal, fetchQueues, apiBase],
+    [reasonModal, fetchQueues],
   );
 
   return {

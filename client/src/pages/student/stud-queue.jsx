@@ -936,14 +936,7 @@ export default function QueuePage() {
                                   'Queue Full'
                                 ) : (
                                   <>
-                                    <QrCode
-                                      style={{
-                                        width: '1rem',
-                                        height: '1rem',
-                                        marginRight: '0.375rem',
-                                        display: 'inline',
-                                      }}
-                                    />
+                                    <QrCode className="queue-join-btn-icon" />
                                     Scan QR to Join
                                   </>
                                 )}

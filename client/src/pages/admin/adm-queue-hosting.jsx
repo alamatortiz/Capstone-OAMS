@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ChevronLeft, StopCircle, PauseCircle, QrCode, UserX } from "lucide-react";
+import { ChevronLeft, StopCircle, PauseCircle, QrCode, UserX, ShieldCheck } from "lucide-react";
 import "./adm-queue-hosting.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
@@ -389,16 +389,27 @@ export default function AdminQueueHosting() {
             title={reasonModal?.mode === "pause" ? "Pause Queue" : "Stop Queue"}
             message={
               reasonModal?.mode === "pause"
-                ? queues.find((q) => q.id === reasonModal.id)?.currentlyServingStudentNumber
-                  ? "Students in this queue will see this reason while it's paused. A student is currently being served — pausing will return them to waiting instead of leaving their call in progress."
-                  : "Students in this queue will see this reason while it's paused."
+                ? (queues.find((q) => q.id === reasonModal.id)?.currentlyServingStudentNumber
+                    ? "Students in this queue will see this reason while it's paused. A student is currently being served — pausing will return them to waiting instead of leaving their call in progress."
+                    : "Students in this queue will see this reason while it's paused.") +
+                  (queues.find((q) => q.id === reasonModal.id)?.passedCount > 0
+                    ? " Students already passed to faculty aren't affected."
+                    : "")
                 : (() => {
                     const q = queues.find((q) => q.id === reasonModal?.id);
-                    return !q?.currentlyServingStudentNumber && q?.currentCount === 0
-                      ? q?.servedCount > 0
+                    const passedNote =
+                      q?.passedCount > 0
+                        ? ` The ${q.passedCount} student${q.passedCount === 1 ? "" : "s"} already passed to faculty stay with them until served.`
+                        : "";
+                    if (!q?.currentlyServingStudentNumber && q?.currentCount === 0) {
+                      if (q?.passedCount > 0) {
+                        return `No one is left in the office line.${passedNote}`;
+                      }
+                      return q?.servedCount > 0
                         ? "This queue has no one left waiting and already served students — stopping it will mark it complete."
-                        : "This queue hasn't served any students yet — it will be marked closed."
-                      : "All students still waiting or being served will be removed from this queue and will see this reason. This cannot be undone.";
+                        : "This queue hasn't served any students yet — it will be marked closed.";
+                    }
+                    return `All students still waiting or being served in the office line will be removed from this queue and will see this reason. This cannot be undone.${passedNote}`;
                   })()
             }
             icon={reasonModal?.mode === "pause" ? <PauseCircle width={22} height={22} /> : <StopCircle width={22} height={22} />}
@@ -415,51 +426,114 @@ export default function AdminQueueHosting() {
               position:fixed child. */}
           {qrSlot && (
             <div
-              className="aqh-qr-overlay"
+              className="aqh-modal-overlay"
               role="dialog"
               aria-modal="true"
               aria-label="Queue join code"
               onClick={() => setQrSlot(null)}
             >
-              <div className="aqh-qr-sheet" onClick={(e) => e.stopPropagation()}>
-                <div className="aqh-qr-header">
-                  <h2>{qrSlot.name}</h2>
-                  <button type="button" onClick={() => setQrSlot(null)} aria-label="Close join code">×</button>
+              <div className="aqh-modal aqh-modal--qr" onClick={(e) => e.stopPropagation()}>
+                <div className="aqh-modal-header">
+                  <h2 className="aqh-modal-title">Queue Join Code</h2>
+                  <button
+                    className="aqh-modal-close-btn"
+                    onClick={() => setQrSlot(null)}
+                    aria-label="Close join code"
+                  >
+                    <CloseIcon />
+                  </button>
                 </div>
-                <QueueJoinQrDisplay slotId={qrSlot.id} apiBase="admin" />
+                <div className="aqh-modal-body">
+                  <div className="aqh-modal-hero">
+                    <p className="aqh-modal-hero-label">Scan to Join</p>
+                    <p className="aqh-modal-hero-title">{qrSlot.name}</p>
+                    <p className="aqh-modal-hero-purpose">
+                      Show this at the office counter. Each code expires within a
+                      minute, so a forwarded photo or screenshot can't be used to
+                      join from elsewhere.
+                    </p>
+                  </div>
+                  <div className="aqh-qr-code-area">
+                    <QueueJoinQrDisplay slotId={qrSlot.id} />
+                  </div>
+                </div>
+                <div className="aqh-modal-footer">
+                  <button className="aqh-btn-cancel" onClick={() => setQrSlot(null)}>
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           )}
 
           {/* Students blocked by today's no-show limit, and the lift control. */}
           {showBlocked && (
-            <div className="aqh-qr-overlay" role="dialog" aria-modal="true" aria-label="Queue restrictions" onClick={() => setShowBlocked(false)}>
-              <div className="aqh-qr-sheet" onClick={(e) => e.stopPropagation()}>
-                <div className="aqh-qr-header">
-                  <h2>Queue Restrictions</h2>
-                  <button type="button" onClick={() => setShowBlocked(false)} aria-label="Close">×</button>
+            <div
+              className="aqh-modal-overlay"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Queue restrictions"
+              onClick={() => setShowBlocked(false)}
+            >
+              <div className="aqh-modal aqh-modal--danger" onClick={(e) => e.stopPropagation()}>
+                <div className="aqh-modal-header">
+                  <h2 className="aqh-modal-title">Queue Restrictions</h2>
+                  <button
+                    className="aqh-modal-close-btn"
+                    onClick={() => setShowBlocked(false)}
+                    aria-label="Close"
+                  >
+                    <CloseIcon />
+                  </button>
                 </div>
-                <div className="aqh-blocked-body">
-                  {blockedStudents.length === 0 ? (
-                    <p className="aqh-blocked-empty">
-                      No one is restricted right now. A student is paused for the rest of the day
-                      after being marked a no-show three times.
+                <div className="aqh-modal-body">
+                  <div className="aqh-modal-hero">
+                    <p className="aqh-modal-hero-label">No-Show Restrictions</p>
+                    <p className="aqh-modal-hero-title">
+                      {blockedStudents.length === 0
+                        ? "No students restricted today"
+                        : `${blockedStudents.length} student${blockedStudents.length === 1 ? "" : "s"} restricted today`}
                     </p>
+                    <p className="aqh-modal-hero-purpose">
+                      A student marked as a no-show three times in one day can't join
+                      queues until tomorrow. Lift it if they're standing in front of you.
+                    </p>
+                  </div>
+                  {blockedStudents.length === 0 ? (
+                    <div className="aqh-restriction-empty">
+                      <ShieldCheck />
+                      <h3>Everyone Can Queue</h3>
+                      <p>No student has reached today's no-show limit.</p>
+                    </div>
                   ) : (
-                    blockedStudents.map((s) => (
-                      <div key={s.student_id} className="aqh-blocked-row">
-                        <div>
-                          <p className="aqh-blocked-name">{s.student_name}</p>
-                          <p className="aqh-blocked-meta">
-                            {s.student_number} · {s.strikes} no-shows today
-                          </p>
+                    <div className="aqh-restriction-list">
+                      {blockedStudents.map((s) => (
+                        <div key={s.student_id} className="aqh-restriction-row">
+                          <div className="aqh-restriction-info">
+                            <p className="aqh-restriction-name">{s.student_name}</p>
+                            <div className="aqh-restriction-badges">
+                              <span className="aqh-restriction-id">{s.student_number}</span>
+                              <span className="aqh-restriction-strikes">
+                                {s.strikes} no-show{s.strikes === 1 ? "" : "s"} today
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            className="aqh-restriction-lift"
+                            onClick={() => clearBlock(s.student_id)}
+                          >
+                            Lift Restriction
+                          </button>
                         </div>
-                        <button type="button" className="aqh-action-btn" onClick={() => clearBlock(s.student_id)}>
-                          Lift
-                        </button>
-                      </div>
-                    ))
+                      ))}
+                    </div>
                   )}
+                </div>
+                <div className="aqh-modal-footer">
+                  <button className="aqh-btn-cancel" onClick={() => setShowBlocked(false)}>
+                    Close
+                  </button>
                 </div>
               </div>
             </div>
@@ -930,6 +1004,11 @@ export default function AdminQueueHosting() {
                         <span className="aqh-status-badge aqh-status-active">
                           active
                         </span>
+                        {queue.passedCount > 0 && (
+                          <span className="aqh-status-badge aqh-status-with-faculty">
+                            {queue.passedCount} with faculty
+                          </span>
+                        )}
                         {queue.currentlyServingStudentNumber && (
                           <span className={`aqh-status-badge ${queue.currentlyServingArrivedAt ? "aqh-status-serving" : "aqh-status-called"}`}>
                             {queue.currentlyServingArrivedAt ? "being served" : "called"}
@@ -966,9 +1045,13 @@ export default function AdminQueueHosting() {
 
                     <div className="aqh-queue-stats-row aqh-stats-row-4">
                       <div className="aqh-queue-stat">
-                        <p className="aqh-queue-stat-label">Waiting / Max</p>
+                        {/* Occupied seats (waiting + being served + served),
+                            the same figure capacity is enforced on -- a student
+                            passed to faculty or already served still holds a
+                            seat, so this never drops back as people are served. */}
+                        <p className="aqh-queue-stat-label">Occupied / Max</p>
                         <p className="aqh-queue-stat-value">
-                          {queue.currentCount} / {queue.maxCapacity}
+                          {queue.totalInQueue} / {queue.maxCapacity}
                         </p>
                       </div>
                       <div className="aqh-queue-stat">
@@ -998,7 +1081,7 @@ export default function AdminQueueHosting() {
                           <div
                             className="aqh-capacity-bar-fill"
                             style={{
-                              width: `${Math.min(100, (queue.currentCount / queue.maxCapacity) * 100)}%`,
+                              width: `${Math.min(100, (queue.totalInQueue / queue.maxCapacity) * 100)}%`,
                             }}
                           ></div>
                         </div>
@@ -1055,9 +1138,9 @@ export default function AdminQueueHosting() {
 
                     <div className="aqh-queue-stats-row aqh-stats-row-3">
                       <div className="aqh-queue-stat">
-                        <p className="aqh-queue-stat-label">Waiting / Max</p>
+                        <p className="aqh-queue-stat-label">Occupied / Max</p>
                         <p className="aqh-queue-stat-value">
-                          {queue.currentCount} / {queue.maxCapacity}
+                          {queue.totalInQueue} / {queue.maxCapacity}
                         </p>
                       </div>
                       <div className="aqh-queue-stat">
@@ -1103,6 +1186,11 @@ export default function AdminQueueHosting() {
                         <span className="aqh-status-badge aqh-status-still-serving">
                           {queue.status === "full" ? "full" : "hours ended"}
                         </span>
+                        {queue.passedCount > 0 && (
+                          <span className="aqh-status-badge aqh-status-with-faculty">
+                            {queue.passedCount} with faculty
+                          </span>
+                        )}
                         {queue.currentlyServingStudentNumber && (
                           <span className={`aqh-status-badge ${queue.currentlyServingArrivedAt ? "aqh-status-serving" : "aqh-status-called"}`}>
                             {queue.currentlyServingArrivedAt ? "being served" : "called"}
@@ -1130,9 +1218,9 @@ export default function AdminQueueHosting() {
                     </div>
                     <div className="aqh-queue-stats-row aqh-stats-row-4">
                       <div className="aqh-queue-stat">
-                        <p className="aqh-queue-stat-label">Waiting / Max</p>
+                        <p className="aqh-queue-stat-label">Occupied / Max</p>
                         <p className="aqh-queue-stat-value">
-                          {queue.currentCount} / {queue.maxCapacity}
+                          {queue.totalInQueue} / {queue.maxCapacity}
                         </p>
                       </div>
                       <div className="aqh-queue-stat">
@@ -1244,6 +1332,11 @@ export default function AdminQueueHosting() {
                         <span className="aqh-status-badge aqh-status-closed">
                           closed
                         </span>
+                        {queue.passedCount > 0 && (
+                          <span className="aqh-status-badge aqh-status-with-faculty">
+                            {queue.passedCount} with faculty
+                          </span>
+                        )}
                         <div className="aqh-queue-card-actions">
                           <button
                             className="aqh-action-btn aqh-action-btn--repeat"

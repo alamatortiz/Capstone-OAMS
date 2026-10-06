@@ -640,6 +640,15 @@ html, body {
   box-shadow: 0 8px 24px rgba(249,115,22,0.1);
 }
 
+/* Queue — blue, like every queue surface */
+.txn-type-queue::before {
+  background: linear-gradient(135deg, rgba(59,130,246,0.06) 0%, transparent 100%);
+}
+.txn-type-queue:hover {
+  border-color: rgba(59,130,246,0.35);
+  box-shadow: 0 8px 24px rgba(59,130,246,0.1);
+}
+
 /* ── Item icon column ────────────────────────────────────── */
 .txn-item-icon {
   position: relative;
@@ -667,6 +676,10 @@ html, body {
 .txn-icon-appointment {
   background: linear-gradient(135deg, rgba(168,85,247,0.2) 0%, rgba(168,85,247,0.08) 100%);
   color: var(--purple, #a855f7);
+}
+.txn-icon-queue {
+  background: linear-gradient(135deg, rgba(59,130,246,0.2) 0%, rgba(59,130,246,0.08) 100%);
+  color: var(--blue, #3b82f6);
 }
 .txn-icon-document,
 .txn-icon-submission {
@@ -720,6 +733,7 @@ html, body {
 }
 
 .txn-badge-appointment { background: linear-gradient(135deg, rgba(168,85,247,0.2) 0%, rgba(168,85,247,0.08) 100%);  color: var(--purple); }
+.txn-badge-queue       { background: linear-gradient(135deg, rgba(59,130,246,0.2) 0%, rgba(59,130,246,0.08) 100%);  color: var(--blue, #3b82f6); }
 .txn-badge-document    { background: linear-gradient(135deg, rgba(249,115,22,0.2) 0%, rgba(249,115,22,0.08) 100%);  color: #fb923c; }
 .txn-badge-completed   { background: rgba(16,185,129,0.15);  color: var(--success);  border: 0.5px solid rgba(16,185,129,0.3); }
 .txn-badge-approved    { background: rgba(16,185,129,0.15);  color: var(--success);  border: 0.5px solid rgba(16,185,129,0.3); }
@@ -799,6 +813,19 @@ html, body {
   background: rgba(234, 88, 12, 0.08);
   color: #9a3412;
   border-color: rgba(234, 88, 12, 0.2);
+}
+
+/* Queue ticket number (e.g. CCS-ENR-004) -- blue, like the queue badge. */
+.txn-tracking-pill--queue {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+[data-theme="light"] .txn-tracking-pill--queue {
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+  border-color: rgba(37, 99, 235, 0.2);
 }
 
 .txn-item-details {

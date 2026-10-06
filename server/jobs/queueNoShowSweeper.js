@@ -111,6 +111,13 @@ async function sweepNoShows() {
       const conn = await pool.getConnection();
       try {
         await conn.beginTransaction();
+        // Lock the slot BEFORE touching the ticket -- the same slot -> queue
+        // order every route uses. voidQueueEntry updates the ticket and then
+        // settles (which locks the slot); without this, a host pressing
+        // Served/Skip on the same student at the moment their grace period
+        // ran out held the slot and wanted the ticket while we held the
+        // ticket and wanted the slot: a deadlock.
+        await conn.query(`SELECT slot_id FROM queue_slots WHERE slot_id = ? FOR UPDATE`, [slotId]);
         const result = await voidQueueEntry(conn, {
           queueId,
           slotId,

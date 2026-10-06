@@ -20,6 +20,10 @@ const QUEUE_HOSTING_EVENTS = [
   "queue:student-left",
   "queue:notes-updated",
   "queue:service-updated",
+  // The office passing a student to (or back from) a professor changes the
+  // office line's counts.
+  "queue:passed",
+  "queue:returned",
 ];
 
 type ReasonModal = { mode: "pause" | "close"; id: any } | null;

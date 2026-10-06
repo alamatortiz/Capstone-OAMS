@@ -3,17 +3,18 @@ import { QRCodeSVG } from "qrcode.react";
 import api from "../utils/api";
 import "./QueueJoinQrDisplay.css";
 
-// The host-side half of on-site queueing: the code a secretary or faculty
-// member puts on screen for students to scan.
+// The host-side half of on-site queueing: the code the college office puts
+// on screen for students to scan.
 //
 // It re-fetches on an interval because the code is a short-lived credential,
 // not a poster. That rotation is the whole point -- a static code could be
 // photographed once and shared, letting people "join on-site" from home,
 // which is exactly what the panel asked us to stop.
 //
-// `apiBase` lets the same component serve both hosts ("admin" today,
-// "faculty" once delegation lands) without forking.
-export default function QueueJoinQrDisplay({ slotId, apiBase = "admin", onError }) {
+// Safe to show on several screens at once (e.g. the Queue Hosting popup on a
+// kiosk and the queue's Manage screen): minting a code no longer revokes the
+// others -- see server/utils/queueJoinToken.js.
+export default function QueueJoinQrDisplay({ slotId, onError }) {
   const [token, setToken] = useState(null);
   const [expired, setExpired] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -23,7 +24,7 @@ export default function QueueJoinQrDisplay({ slotId, apiBase = "admin", onError 
   const fetchToken = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.post(`/${apiBase}/queue-hosting/${slotId}/qr-token`);
+      const res = await api.post(`/admin/queue-hosting/${slotId}/qr-token`);
       setToken(res.data.token);
       setExpired(false);
       setError("");
@@ -39,7 +40,7 @@ export default function QueueJoinQrDisplay({ slotId, apiBase = "admin", onError 
     } finally {
       setLoading(false);
     }
-  }, [slotId, apiBase, onError]);
+  }, [slotId, onError]);
 
   useEffect(() => {
     fetchToken();

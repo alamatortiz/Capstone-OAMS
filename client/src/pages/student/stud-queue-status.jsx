@@ -12,6 +12,7 @@ import {
   MapPin,
   FileText,
   HelpCircle,
+  UserCheck,
 } from "lucide-react";
 import { getCollegeLogo } from "../../data/collegeLogo";
 import { useQueue } from "../../contexts/QueueContext";
@@ -218,7 +219,36 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
           />
           {queue.arrivedAt
             ? "Service being processed"
-            : "It's your turn — please proceed to the designated location."}
+            : queue.passedTo
+              ? `${queue.passedTo.name} is ready for you — please proceed${queue.location ? ` to ${queue.location}` : ""}.`
+              : "It's your turn — please proceed to the designated location."}
+        </div>
+      )}
+
+      {/* The office passed this student to a professor: they stay on the
+          office's queue (their seat is kept) but are now in that professor's
+          line, so the office pausing its own line doesn't affect them. */}
+      {queue.passedTo && queue.status === "waiting" && (
+        <div
+          style={{
+            background: "rgba(139, 92, 246, 0.1)",
+            border: "1px solid rgba(139, 92, 246, 0.35)",
+            borderRadius: "1rem",
+            padding: "1rem 1.5rem",
+            color: "#8b5cf6",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "0.75rem",
+            fontWeight: 600,
+            fontSize: "0.9375rem",
+            textAlign: "left",
+          }}
+        >
+          <UserCheck style={{ width: "1.5rem", height: "1.5rem", flexShrink: 0 }} />
+          <div>
+            You&apos;re with {queue.passedTo.name}. The college office passed you to them for
+            this service — wait to be called. You kept your place in line.
+          </div>
         </div>
       )}
 
@@ -827,6 +857,26 @@ export default function QueueStatusPage() {
                                 </div>
                                 <span className="qsl-number-badge">{queue.queueNumberBadge}</span>
                               </div>
+                              {queue.passedTo && (
+                                <div
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "0.35rem",
+                                    background: "rgba(139, 92, 246, 0.12)",
+                                    border: "1px solid rgba(139, 92, 246, 0.4)",
+                                    color: "#8b5cf6",
+                                    borderRadius: "999px",
+                                    padding: "0.2rem 0.65rem",
+                                    fontSize: "0.75rem",
+                                    fontWeight: 600,
+                                    margin: "0.5rem 0",
+                                  }}
+                                >
+                                  <UserCheck style={{ width: "0.9rem", height: "0.9rem" }} />
+                                  With {queue.passedTo.name}
+                                </div>
+                              )}
                               {queue.slotStatus === "paused" && (
                                 <div
                                   style={{

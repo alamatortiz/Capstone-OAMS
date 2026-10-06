@@ -102,12 +102,11 @@ const MoonIcon = () => (
   </svg>
 );
 
-// Where a clicked notification should land, by its `type`. Faculty now have
-// their own queue screen (for services the college office delegates to
-// them), so queue notifications go there instead of the dashboard;
-// announcements route to their own screen.
+// Where a clicked notification should land, by its `type`. Queue
+// notifications (a student passed to them, a service assigned) go to the
+// professor's Queue page; announcements route to their own screen.
 const NOTIFICATION_TYPE_PATHS = {
-  queue: "/professor/queue-hosting",
+  queue: "/professor/queue",
   document: "/professor/document-status",
   appointment: "/professor/appointments",
   announcement: "/professor/announcements",
@@ -129,8 +128,8 @@ const navItems = [
   },
   {
     icon: QueueIconNav,
-    label: "My Queue",
-    path: "/professor/queue-hosting",
+    label: "Queue",
+    path: "/professor/queue",
     tourId: "nav-queue",
   },
   {
@@ -174,6 +173,12 @@ const PROFESSOR_TOUR_STEPS = [
       "Review and respond to appointment requests from students who want to consult with you.",
   },
   {
+    selector: '[data-tour="nav-queue"]',
+    title: "Serve Passed Students",
+    description:
+      "When the college office passes you a student for a service you handle, they appear here for you to call and serve.",
+  },
+  {
     selector: '[data-tour="nav-documents"]',
     title: "Request Documents",
     description: "Request documents for yourself, just like a student would.",
@@ -182,7 +187,7 @@ const PROFESSOR_TOUR_STEPS = [
     selector: '[data-tour="nav-transactions"]',
     title: "Track Everything",
     description:
-      "See the full history and status of every appointment and document request tied to you.",
+      "See the full history and status of every appointment, document request and queue student tied to you.",
   },
 ];
 

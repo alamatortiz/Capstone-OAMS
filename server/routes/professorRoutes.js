@@ -111,9 +111,9 @@ router.get(
       const docCount = docPendingOnly + docProcessing;
 
       // 4. Completed, all-time -- appointments completed + the faculty
-      // member's own document requests claimed. Mirrors student's own
-      // completedRow pattern (studentRoutes.js), minus the queue term since
-      // professors don't have queues.
+      // member's own document requests claimed + queue students the office
+      // passed to them that they served. Mirrors student's own completedRow
+      // pattern (studentRoutes.js).
       const [[completedRow]] = await pool.query(
         `SELECT
            (
@@ -123,8 +123,20 @@ router.get(
            (
              SELECT COUNT(*) FROM faculty_document_requests
              WHERE faculty_id = ? AND status = 'claimed'
+           ) +
+           (
+             SELECT COUNT(*) FROM queues
+             WHERE assigned_faculty_id = ? AND status = 'completed'
            ) AS total_completed`,
-        [facultyId, facultyId],
+        [facultyId, facultyId, facultyId],
+      );
+
+      // 4a. Students the office has passed to this professor who are still
+      // waiting for or being served by them -- the Queue tile's badge.
+      const [[queueRow]] = await pool.query(
+        `SELECT COUNT(*) AS waiting FROM queues
+          WHERE assigned_faculty_id = ? AND status IN ('waiting', 'serving')`,
+        [facultyId],
       );
 
       // 4b. Total configured weekly availability slots -- powers the
@@ -217,6 +229,7 @@ router.get(
           },
           completed: completedRow.total_completed || 0,
           scheduleSlots: slotRow.slot_count || 0,
+          queueWaiting: Number(queueRow.waiting || 0),
         },
         todayAppointments: todayAppointments.map((a) => ({
           id: a.appointment_id,
@@ -865,6 +878,45 @@ router.get(
         rows = rows.concat(subs);
       }
 
+      // Queue students the college office passed to this professor. Status
+      // is mapped to the shared transaction vocabulary (waiting -> pending,
+      // serving -> processing) and the status filter applies to that MAPPED
+      // value, so "Pending" / "Processing" mean the same thing on every type.
+      if (filterType === "all" || filterType === "queue") {
+        const mappedStatus = `CASE q.status WHEN 'waiting' THEN 'pending' WHEN 'serving' THEN 'processing' ELSE q.status END`;
+        let sql = `
+          SELECT
+            q.queue_id AS id, 'queue' AS type,
+            CONCAT(st.first_name, ' ', st.last_name) AS studentName,
+            st.student_number AS studentId,
+            COALESCE(q.service_label_snapshot, s.service_name) AS description,
+            CONCAT('Queue - ', COALESCE(q.service_label_snapshot, s.service_name)) AS title,
+            COALESCE(q.notes, COALESCE(q.service_label_snapshot, s.service_name)) AS details,
+            ${mappedStatus} AS status,
+            q.updated_at AS date, q.updated_at AS event_time,
+            NULL AS trackingNumber,
+            CONCAT(d.department_abbreviation, '-', UPPER(LEFT(SUBSTRING_INDEX(s.service_name, ' ', 1), 3)), '-', LPAD(q.queue_number, 3, '0')) AS queueNumberBadge
+          FROM queues q
+          JOIN students st ON q.student_id = st.student_id
+          JOIN services s ON q.service_id = s.service_id
+          JOIN departments d ON s.department_id = d.department_id
+          WHERE q.assigned_faculty_id = ?`;
+        const params = [facultyId];
+        if (filterStatus !== "all") {
+          sql += ` AND ${mappedStatus} = ?`;
+          params.push(filterStatus);
+        }
+        if (search) {
+          sql +=
+            " AND (st.first_name LIKE ? OR st.last_name LIKE ? OR CONCAT(st.first_name, ' ', st.last_name) LIKE ? OR st.student_number LIKE ? OR s.service_name LIKE ? OR q.notes LIKE ?)";
+          for (let i = 0; i < 6; i++) params.push(`%${search}%`);
+        }
+        if (startUTC) { sql += " AND q.updated_at >= ?"; params.push(startUTC); }
+        if (endExclusiveUTC) { sql += " AND q.updated_at < ?"; params.push(endExclusiveUTC); }
+        const [queueRows] = await pool.query(sql, params);
+        rows = rows.concat(queueRows);
+      }
+
       rows.sort((a, b) =>
         new Date(b.event_time) - new Date(a.event_time) ||
         `${b.type}-${b.id}`.localeCompare(`${a.type}-${a.id}`),
@@ -950,11 +1002,16 @@ router.get(
            (SELECT fdr.status AS raw_status, fdr.updated_at AS event_time FROM faculty_document_requests fdr WHERE fdr.faculty_id = ?)
            UNION ALL
            (SELECT sub.status AS raw_status, sub.updated_at AS event_time FROM document_submissions sub WHERE sub.faculty_id = ? AND sub.submitter_type = 'faculty')
+           UNION ALL
+           (SELECT CASE q.status WHEN 'waiting' THEN 'pending' WHEN 'serving' THEN 'processing' ELSE q.status END AS raw_status,
+                   q.updated_at AS event_time
+              FROM queues q WHERE q.assigned_faculty_id = ?)
          ) AS combined`,
         [
           TXN_STATUS_GROUPS.completed,
           TXN_STATUS_GROUPS.ongoing,
           monthStartUTC,
+          facultyId,
           facultyId,
           facultyId,
           facultyId,

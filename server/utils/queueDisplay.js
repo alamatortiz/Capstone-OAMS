@@ -80,9 +80,28 @@ function queueAtOrBeforePredicate(inner, outer) {
   return `(${clauses.join("\n       OR ")})`;
 }
 
+// ── Lanes ──────────────────────────────────────────────────────────────────
+//
+// A queue slot is no longer one line. The college office can pass a ticket to
+// a professor (queues.assigned_faculty_id) without moving it off the office's
+// slot, so capacity and served counts stay slot-wide -- but "who is next" and
+// "what's my position" must be counted within the ticket's own LANE:
+//   office lane    -- same slot, assigned_faculty_id IS NULL
+//   professor lane -- same assigned_faculty_id, across ANY slot (one professor
+//                     can receive students from several office queues at once)
+//
+// "`inner` is in the same lane as `outer`" -- AND it with
+// queueAtOrBeforePredicate for a lane-aware position count.
+function queueLanePredicate(inner, outer) {
+  return `(CASE WHEN ${outer}.assigned_faculty_id IS NULL
+            THEN ${inner}.slot_id = ${outer}.slot_id AND ${inner}.assigned_faculty_id IS NULL
+            ELSE ${inner}.assigned_faculty_id = ${outer}.assigned_faculty_id END)`;
+}
+
 module.exports = {
   getQueueDisplayInfo,
   QUEUE_ORDER_COLUMNS,
   queueOrderBy,
   queueAtOrBeforePredicate,
+  queueLanePredicate,
 };

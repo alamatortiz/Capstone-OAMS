@@ -15,10 +15,12 @@ const {
   manilaDayEndExclusiveUTC,
 } = require("../utils/dateTime");
 const { settleSlotAfterEntryChange } = require("../utils/queueSlotSettlement");
+const { getTxConnection } = require("../utils/txConnection");
 const {
   getQueueDisplayInfo,
   queueOrderBy,
   queueAtOrBeforePredicate,
+  queueLanePredicate,
 } = require("../utils/queueDisplay");
 const { resolveSlotToken } = require("../utils/queueJoinToken");
 const { getStrikeState, getBlockRejection } = require("../utils/queueStrikes");
@@ -82,23 +84,29 @@ router.get(
            q.status,
            q.created_at,
            q.arrived_at,
+           q.assigned_faculty_id,
+           q.assigned_at,
+           CONCAT(fa.first_name, ' ', fa.last_name) AS assigned_faculty_name,
            s.service_name,
            q.service_label_snapshot,
            d.department_name,
            d.department_abbreviation,
            qs.max_capacity,
+           -- Position/waiting are counted within the ticket's own line: the
+           -- office's line, or the professor it was passed to (whose line
+           -- can span several office queues) -- see queueLanePredicate.
            (
              SELECT COUNT(*)
              FROM queues q2
-             WHERE q2.slot_id = q.slot_id
-               AND q2.status = 'waiting'
+             WHERE q2.status = 'waiting'
+               AND ${queueLanePredicate("q2", "q")}
                AND ${queueAtOrBeforePredicate("q2", "q")}
            ) AS position,
            (
              SELECT COUNT(*)
              FROM queues q3
-             WHERE q3.slot_id = q.slot_id
-               AND q3.status = 'waiting'
+             WHERE q3.status = 'waiting'
+               AND ${queueLanePredicate("q3", "q")}
            ) AS total_waiting,
            (
              SELECT COUNT(*)
@@ -117,6 +125,7 @@ router.get(
          JOIN queue_slots qs ON q.slot_id = qs.slot_id
          JOIN services s ON q.service_id = s.service_id
          JOIN departments d ON s.department_id = d.department_id
+         LEFT JOIN faculty fa ON fa.faculty_id = q.assigned_faculty_id
          WHERE q.student_id = ? AND q.status IN ('waiting', 'serving')
          ORDER BY (q.status = 'serving') DESC, position ASC, q.queue_id ASC`,
         [studentId],
@@ -326,6 +335,9 @@ router.get(
               queueOccupancyPercent,
               servicedPercent,
               estimatedWaitTime: closestQueueDisplay.estimatedWait,
+              passedTo: closestQueue.assigned_faculty_id
+                ? { facultyId: closestQueue.assigned_faculty_id, name: closestQueue.assigned_faculty_name }
+                : null,
             }
           : null,
         recentActivity: recentActivity.map((row, i) => ({
@@ -1362,14 +1374,19 @@ router.get(
       const manilaToday = getManilaDateString();
 
       const COUNT_SUBQUERIES = `
+           -- Office line only: a new joiner enters the office's line, so a
+           -- student a professor is handling is neither "now serving" at the
+           -- counter nor ahead of them.
            (
              SELECT q.queue_number FROM queues q
              WHERE q.slot_id = qs.slot_id AND q.status = 'serving'
+               AND q.assigned_faculty_id IS NULL
              ORDER BY q.called_at DESC LIMIT 1
            ) AS currently_serving_number,
            (
              SELECT COUNT(*) FROM queues q2
              WHERE q2.slot_id = qs.slot_id AND q2.status = 'waiting'
+               AND q2.assigned_faculty_id IS NULL
            ) AS waiting_count,
            (
              SELECT COUNT(*) FROM queues q6
@@ -1613,7 +1630,7 @@ router.put(
       // Only while the ticket is live: editing the checklist of a finished
       // or cancelled visit would rewrite what the staff member saw.
       const [[entry]] = await pool.query(
-        `SELECT q.queue_id, q.slot_id
+        `SELECT q.queue_id, q.slot_id, q.assigned_faculty_id
            FROM queues q
           WHERE q.queue_id = ? AND q.student_id = ?
             AND q.status IN ('waiting', 'serving')`,
@@ -1645,6 +1662,10 @@ router.put(
 
       // Lets the host's entry list update live while the student ticks.
       emitToSlot(entry.slot_id, "queue:requirements-updated", { queueId, requirementId, isChecked });
+      // Faculty don't join slot rooms, so reach the professor holding it directly.
+      if (entry.assigned_faculty_id) {
+        emitToUser(entry.assigned_faculty_id, "queue:requirements-updated", { queueId, requirementId, isChecked });
+      }
 
       res.json({ message: "Saved" });
     } catch (error) {
@@ -1676,6 +1697,9 @@ router.get(
            q.created_at AS joined_at,
            q.arrived_at,
            q.completed_at,
+           q.assigned_faculty_id,
+           q.assigned_at,
+           CONCAT(fa.first_name, ' ', fa.last_name) AS assigned_faculty_name,
            qs.start_time,
            qs.end_time,
            qs.max_capacity,
@@ -1688,22 +1712,24 @@ router.get(
            l.location_name AS service_location,
            d.department_name,
            d.department_abbreviation,
-           -- Position: how many 'waiting' entries in this slot sit at or before
+           -- Position: how many 'waiting' entries in MY LINE sit at or before
            -- mine in the canonical order (priority, then arrival) -- NOT by
-           -- queue_number, which is only a display label. See queueDisplay.js.
+           -- queue_number, which is only a display label. My line is the
+           -- office's line on this slot, or the professor I was passed to.
+           -- See queueDisplay.js.
            (
              SELECT COUNT(*)
              FROM queues q2
-             WHERE q2.slot_id = q.slot_id
-               AND q2.status = 'waiting'
+             WHERE q2.status = 'waiting'
+               AND ${queueLanePredicate("q2", "q")}
                AND ${queueAtOrBeforePredicate("q2", "q")}
            ) AS position,
-           -- Total waiting in the same slot
+           -- Total waiting in my line
            (
              SELECT COUNT(*)
              FROM queues q3
-             WHERE q3.slot_id = q.slot_id
-               AND q3.status = 'waiting'
+             WHERE q3.status = 'waiting'
+               AND ${queueLanePredicate("q3", "q")}
            ) AS total_waiting,
            -- Cumulative headcount for this slot: everyone who joined today and
            -- hasn't cancelled (waiting + serving + completed)
@@ -1726,6 +1752,7 @@ router.get(
          JOIN services s ON q.service_id = s.service_id
          JOIN departments d ON s.department_id = d.department_id
          LEFT JOIN locations l ON s.location_id = l.location_id
+         LEFT JOIN faculty fa ON fa.faculty_id = q.assigned_faculty_id
          WHERE q.student_id = ?
            AND q.status IN ('waiting', 'serving')
          ORDER BY q.created_at DESC`,
@@ -1779,8 +1806,16 @@ router.get(
           notes: row.notes ?? null,
           description: row.service_description || null,
           location: row.service_location || null,
-          slotStatus: row.slot_status,
-          slotPauseReason: row.pause_reason ?? null,
+          // A ticket passed to a professor isn't affected by the office
+          // pausing or stopping its own line (the professor keeps serving),
+          // so its EFFECTIVE status is open -- this one mapping keeps every
+          // "queue paused" banner/toast off passed students on web + mobile.
+          slotStatus: row.assigned_faculty_id ? "open" : row.slot_status,
+          slotPauseReason: row.assigned_faculty_id ? null : (row.pause_reason ?? null),
+          passedTo: row.assigned_faculty_id
+            ? { facultyId: row.assigned_faculty_id, name: row.assigned_faculty_name }
+            : null,
+          passedAt: row.assigned_at ?? null,
           position,
           totalWaiting: row.total_waiting || 0,
           maxCapacity,
@@ -2183,12 +2218,14 @@ router.post(
            d.department_abbreviation,
            (
              SELECT COUNT(*) FROM queues q2
-             WHERE q2.slot_id = q.slot_id AND q2.status = 'waiting'
+             WHERE q2.status = 'waiting'
+               AND ${queueLanePredicate("q2", "q")}
                AND ${queueAtOrBeforePredicate("q2", "q")}
            ) AS position,
            (
              SELECT COUNT(*) FROM queues q3
-             WHERE q3.slot_id = q.slot_id AND q3.status = 'waiting'
+             WHERE q3.status = 'waiting'
+               AND ${queueLanePredicate("q3", "q")}
            ) AS total_waiting,
            (
              SELECT COUNT(*) FROM queues q4
@@ -2306,17 +2343,17 @@ router.post(
       return res.status(400).json({ error: "Invalid queueId" });
     }
 
-    const conn = await pool.getConnection();
+    const conn = await getTxConnection();
     try {
       await conn.beginTransaction();
 
       // 1. Look up which slot this entry belongs to, so we know which
       // queue_slots row to lock first.
       //
-      // This read is intentionally unlocked, but slot_id is NO LONGER
-      // immutable: staff can relay a waiting student to another queue
-      // (POST /queue-hosting/:slotId/entries/:queueId/transfer). The
-      // re-check after the row lock below closes that window.
+      // This read is intentionally unlocked. slot_id is effectively
+      // immutable now (passing a student to a professor keeps them on the
+      // same slot; the old slot-to-slot relay was removed), but the
+      // re-check after the row lock below is kept as a cheap safety net.
       const [[entryLookup]] = await conn.query(
         `SELECT slot_id FROM queues WHERE queue_id = ?`,
         [queueId],
@@ -2335,7 +2372,7 @@ router.post(
       );
 
       const [[entry]] = await conn.query(
-        `SELECT queue_id, student_id, slot_id, status
+        `SELECT queue_id, student_id, slot_id, status, assigned_faculty_id
          FROM queues WHERE queue_id = ? FOR UPDATE`,
         [queueId],
       );
@@ -2406,10 +2443,17 @@ router.post(
       );
 
       await conn.commit();
+      // Hand the connection back before the awaited nudge below (a pool
+      // query) -- holding it would need two connections at once, which
+      // exhausts the pool under load. See utils/txConnection.js.
+      conn.release();
 
       const leftPayload = { slotId: entry.slot_id, queueId, studentId };
       emitToSlot(entry.slot_id, "queue:student-left", leftPayload);
       emitToDept(deptRow?.department_id, "queue:student-left", leftPayload);
+      if (entry.assigned_faculty_id) {
+        emitToUser(entry.assigned_faculty_id, "queue:student-left", leftPayload);
+      }
       if (settleResult) {
         const settledPayload = {
           slotId: entry.slot_id,
@@ -2421,7 +2465,11 @@ router.post(
 
       // Someone ahead just left -- nudge whoever's now #2/#3. Best-effort.
       try {
-        await notifyAlmostUp(entry.slot_id);
+        await notifyAlmostUp(
+          entry.assigned_faculty_id
+            ? { facultyId: entry.assigned_faculty_id }
+            : { slotId: entry.slot_id },
+        );
       } catch (nudgeErr) {
         console.error("[leave queue] almost-up nudge failed:", nudgeErr.message);
       }
@@ -4105,15 +4153,18 @@ router.get(
            qs.status,
            qs.no_show_timeout_minutes,
            qs.service_time_minutes,
+           -- Office line only (tickets passed to a professor excluded).
            (
              SELECT COUNT(*)
              FROM queues q
              WHERE q.slot_id = qs.slot_id AND q.status = 'waiting'
+               AND q.assigned_faculty_id IS NULL
            ) AS waiting_count,
            (
              SELECT q2.queue_number
              FROM queues q2
              WHERE q2.slot_id = qs.slot_id AND q2.status = 'serving'
+               AND q2.assigned_faculty_id IS NULL
              ORDER BY q2.called_at DESC
              LIMIT 1
            ) AS currently_serving_number,

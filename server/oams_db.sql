@@ -312,6 +312,16 @@ CREATE TABLE queues (
     student_id      INT          NOT NULL,
     service_id      INT          NOT NULL,
     slot_id         INT          NULL,
+    -- The professor this ticket was passed to by the college office. NULL =
+    -- the office's own line. The ticket deliberately STAYS on the office's
+    -- slot (slot_id unchanged) so capacity stays consumed and a professor-
+    -- served ticket counts as served on the office's queue; only "who is
+    -- serving / who is next / my position" become per-line. A professor's
+    -- line can span several office slots at once. See queueDisplay.js's
+    -- queueLanePredicate and routes/facultyQueueRoutes.js.
+    assigned_faculty_id INT      NULL,
+    assigned_at     TIMESTAMP    NULL,
+    assigned_by     INT          NULL,             -- users.user_id of the admin who passed it
     queue_number    INT          NOT NULL,
     -- queue_number CANNOT be renumbered to express priority or a transfer --
     -- uq_queue_slot_number below turns any shuffle into a deadlock farm. So
@@ -367,6 +377,8 @@ CREATE TABLE queues (
     FOREIGN KEY (service_id) REFERENCES services(service_id),
     FOREIGN KEY (slot_id)    REFERENCES queue_slots(slot_id),
     FOREIGN KEY (transferred_from_slot_id) REFERENCES queue_slots(slot_id) ON DELETE SET NULL,
+    FOREIGN KEY (assigned_faculty_id) REFERENCES faculty(faculty_id) ON DELETE SET NULL,
+    FOREIGN KEY (assigned_by) REFERENCES users(user_id) ON DELETE SET NULL,
     -- Defense-in-depth: queue numbers are generated app-side under a row
     -- lock on the owning slot (POST /queues/join), but nothing previously
     -- stopped a duplicate at the DB layer if that ever got bypassed.
@@ -376,7 +388,9 @@ CREATE TABLE queues (
     -- comparisons all filter+group on this pair).
     INDEX idx_queues_service_created (service_id, created_at),
     -- Backs the canonical waiting-list ordering described on priority_rank.
-    INDEX idx_queue_order (slot_id, status, priority_rank, created_at)
+    INDEX idx_queue_order (slot_id, status, priority_rank, created_at),
+    -- Backs a professor's line (same ordering, keyed by who it was passed to).
+    INDEX idx_queue_faculty_lane (assigned_faculty_id, status, priority_rank, created_at)
 );
 
 -- Audit trail for all queue status transitions

@@ -1,6 +1,7 @@
 const pool = require("../db");
 const { emitToSlot, emitToDept } = require("../sockets");
 const { getManilaDateString, getManilaTimeString } = require("../utils/dateTime");
+const { cancelUnservedEntry, emitUnservedCancelled } = require("../utils/queueHandoff");
 
 const SWEEP_INTERVAL_MS = 30 * 1000;
 
@@ -110,6 +111,122 @@ async function sweepExpiredSlots() {
   }
 }
 
+// A queue's day is over at Manila midnight. Any ticket still waiting or being
+// served on a slot from a previous day -- in the office line or with a
+// professor -- was never going to be reached, and nothing else ever revisits
+// it: without this it sat "in queue" on the student's screen forever. Each is
+// cancelled exactly like stopping a queue does (system_not_entertained + a
+// priority credit, so they go first next time they scan in).
+//
+// Deliberately does NOT settle the slot through settleSlotAfterEntryChange:
+//   - a stale open/paused/full slot becomes 'expired' (its hours are over);
+//   - an 'expired' slot stays 'expired', so the office can still Reopen it
+//     within the 3-day carry-over window -- as a fresh line now, since its
+//     students were cancelled with credit;
+//   - a 'closed' slot (stopped while professors had passed students) stays
+//     'closed'.
+// Runs after sweepExpiredSlots in the same tick, so a slot that missed its
+// end-of-hours sweep is already 'expired' by the time this sees it.
+async function sweepStaleEntries() {
+  try {
+    const manilaToday = getManilaDateString();
+    const [staleSlots] = await pool.query(
+      `SELECT DISTINCT q.slot_id
+         FROM queues q
+         JOIN queue_slots qs ON q.slot_id = qs.slot_id
+        WHERE q.status IN ('waiting', 'serving')
+          AND qs.slot_date < ?
+        ORDER BY q.slot_id`,
+      [manilaToday],
+    );
+    if (staleSlots.length === 0) return;
+
+    let cancelledCount = 0;
+    for (const { slot_id: slotId } of staleSlots) {
+      const conn = await pool.getConnection();
+      let toEmit = [];
+      let slotRow = null;
+      let newSlotStatus = null;
+      try {
+        await conn.beginTransaction();
+
+        [[slotRow]] = await conn.query(
+          `SELECT qs.slot_id, qs.status, qs.department_id, qs.slot_date
+             FROM queue_slots qs WHERE qs.slot_id = ? FOR UPDATE`,
+          [slotId],
+        );
+        // Reopened (slot_date bumped to today) since the outer read.
+        if (!slotRow || getManilaDateString(slotRow.slot_date) >= manilaToday) {
+          await conn.commit();
+          continue;
+        }
+
+        const [entries] = await conn.query(
+          `SELECT q.queue_id, q.student_id, q.status, q.service_id, q.assigned_faculty_id,
+                  COALESCE(q.service_label_snapshot, s.service_name) AS service_name
+             FROM queues q
+             JOIN services s ON q.service_id = s.service_id
+            WHERE q.slot_id = ? AND q.status IN ('waiting', 'serving')
+            FOR UPDATE`,
+          [slotId],
+        );
+
+        const reason = "The queue day ended before you were served";
+        for (const entry of entries) {
+          await cancelUnservedEntry(conn, entry, {
+            reason,
+            changedBy: null,
+            note: "Auto-cancelled: the queue's day ended before this student was reached",
+          });
+        }
+        toEmit = entries;
+
+        if (["open", "paused", "full"].includes(slotRow.status)) {
+          await conn.query(
+            `UPDATE queue_slots SET status = 'expired', close_reason = 'Queue hours ended' WHERE slot_id = ?`,
+            [slotId],
+          );
+          newSlotStatus = "expired";
+        }
+
+        await conn.commit();
+      } catch (entryError) {
+        await conn.rollback();
+        console.error(`[queueExpirySweeper] Failed to clear stale tickets on slot ${slotId}:`, entryError);
+        continue;
+      } finally {
+        conn.release();
+      }
+
+      for (const entry of toEmit) {
+        emitUnservedCancelled({
+          slotId,
+          deptId: slotRow.department_id,
+          queueId: entry.queue_id,
+          studentId: entry.student_id,
+          facultyId: entry.assigned_faculty_id,
+          reason: "The queue day ended before you were served",
+          serviceName: entry.service_name,
+        });
+      }
+      cancelledCount += toEmit.length;
+      if (newSlotStatus) {
+        const payload = { slotId, status: newSlotStatus, reason: "Queue hours ended" };
+        emitToSlot(slotId, "queue:slot-status", payload);
+        emitToDept(slotRow.department_id, "queue:slot-status", payload);
+      }
+    }
+
+    if (cancelledCount > 0) {
+      console.log(
+        `[queueExpirySweeper] Cancelled ${cancelledCount} leftover ticket${cancelledCount === 1 ? "" : "s"} from previous days`,
+      );
+    }
+  } catch (error) {
+    console.error("[queueExpirySweeper] Stale ticket sweep failed:", error);
+  }
+}
+
 // Housekeeping for the two short-lived tables the on-site queueing redesign
 // introduced. Neither affects correctness -- expiry is always evaluated in
 // the query that reads them, so a stale row is already inert -- this just
@@ -142,11 +259,15 @@ function startExpirySweeper() {
   // Deliberately not firing an immediate sweep on boot -- see the identical
   // note in queueNoShowSweeper.js. End-time granularity is minutes-scale, so
   // waiting for the first interval tick costs nothing functionally.
-  const slotTimer = setInterval(sweepExpiredSlots, SWEEP_INTERVAL_MS);
+  // Stale-ticket cleanup runs right after the slot sweep in the same tick.
+  const slotTimer = setInterval(async () => {
+    await sweepExpiredSlots();
+    await sweepStaleEntries();
+  }, SWEEP_INTERVAL_MS);
   // Housekeeping runs far less often than the slot sweep -- nothing depends
   // on its timeliness.
   const cleanupTimer = setInterval(cleanupExpiredArtifacts, 60 * 60 * 1000);
   return { slotTimer, cleanupTimer };
 }
 
-module.exports = { startExpirySweeper, sweepExpiredSlots, cleanupExpiredArtifacts };
+module.exports = { startExpirySweeper, sweepExpiredSlots, sweepStaleEntries, cleanupExpiredArtifacts };
