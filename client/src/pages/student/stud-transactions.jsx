@@ -1,0 +1,620 @@
+import { useState, useEffect, useCallback, useRef } from "react";
+import StudentPageShell from "../../components/StudentPageShell";
+import {
+  QueueIconNav,
+  CalendarIconNav,
+} from "../../components/StudentSidebar";
+import FilterSelect from "../../components/FilterSelect";
+import FilterDateRange from "../../components/FilterDateRange";
+import PageHeader from "../../components/PageHeader";
+import Pagination from "../../components/Pagination";
+import ExportMenu from "../../components/ExportMenu";
+import RefreshButton from "../../components/RefreshButton";
+import { Link } from "react-router-dom";
+import { toast } from "sonner";
+
+import "./stud-transactions.css";
+import ActionsTakenToggle from "../../components/ActionsTakenToggle";
+import api from "../../utils/api";
+import { formatManilaDate, formatManilaTime, getManilaDateString } from "../../utils/dateTime";
+import { exportTransactionsPdf } from "../../utils/exportPdf";
+import { downloadCsv } from "../../utils/csv";
+import { transactionStatusLabel, transactionTypeLabel } from "../../utils/transactionLabels";
+import { ClipboardListIcon, AlertCircleIcon, ChevronDownIcon } from "../../components/TransactionIcons";
+import { useAuth } from "../../context/AuthContext";
+import { ChevronLeft, FileText } from "lucide-react";
+
+// ─── Icons ────────────────────────────────────────────────────────────────
+const SearchIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="11" cy="11" r="8"></circle>
+    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+  </svg>
+);
+
+const ClockIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="10"></circle>
+    <polyline points="12 6 12 12 16 14"></polyline>
+  </svg>
+);
+
+const CheckCircleIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+  </svg>
+);
+
+const CalendarIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+    <line x1="16" y1="2" x2="16" y2="6"></line>
+    <line x1="8" y1="2" x2="8" y2="6"></line>
+    <line x1="3" y1="10" x2="21" y2="10"></line>
+  </svg>
+);
+
+const PAGE_SIZE = 20;
+
+// ─── Component ────────────────────────────────────────────────────────────────
+export default function TransactionsPage() {
+  const { user } = useAuth();
+
+  // ── Transaction data state ────────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [filterType, setFilterType] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [transactions, setTransactions] = useState([]);
+  const [txLoading, setTxLoading] = useState(true);
+  const [txError, setTxError] = useState(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [txStats, setTxStats] = useState({
+    total: 0,
+    completed: 0,
+    ongoing: 0,
+    thisMonth: 0,
+  });
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Debounce the search box so every keystroke doesn't trigger a refetch.
+  // setPage(1) is batched together with setDebouncedSearch here (React 19
+  // batches state updates from timeouts, not just event handlers) so a
+  // filter change never fetches an out-of-range page from a prior search.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchQuery.trim());
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  // ── Derived values ────────────────────────────────────────────────────────
+  const stats = [
+    {
+      label: "Total",
+      value: txStats.total,
+      color: "text-blue-600",
+      bgColor: "tx-bg-blue-50",
+      icon: "list",
+    },
+    {
+      label: "Completed",
+      value: txStats.completed,
+      color: "text-green-600",
+      bgColor: "tx-bg-green-50",
+      icon: "check",
+    },
+    {
+      label: "Ongoing",
+      value: txStats.ongoing,
+      color: "text-orange-600",
+      bgColor: "tx-bg-orange-50",
+      icon: "clock",
+    },
+    {
+      label: "This Month",
+      value: txStats.thisMonth,
+      color: "text-purple-600",
+      bgColor: "tx-bg-purple-50",
+      icon: "calendar",
+    },
+  ];
+
+  // Mirrors `transactions` for the catch block below, without making
+  // fetchTransactions depend on (and change identity with) the state itself.
+  const transactionsRef = useRef(transactions);
+  useEffect(() => { transactionsRef.current = transactions; }, [transactions]);
+
+  // Guards against out-of-order responses: e.g. clicking page 2 then page 3
+  // quickly would otherwise let page 2's slower response land after page
+  // 3's and overwrite it. Each call captures the current token; a response
+  // is only applied if its token is still the latest by the time it resolves.
+  const requestIdRef = useRef(0);
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  // Search/type/status filtering happens server-side (so it considers the
+  // student's whole history, not just whatever page is currently loaded).
+  // `page` is part of this callback's identity, so both a filter change and
+  // a Pagination click go through the same effect below; filter changes
+  // reset `page` back to 1 at their call site (see the FilterSelect
+  // onChange handlers and the search-debounce effect above).
+  const fetchTransactions = useCallback(
+    async () => {
+      const requestId = ++requestIdRef.current;
+      try {
+        const res = await api.get("/student/transactions", {
+          params: {
+            search: debouncedSearch || undefined,
+            type: filterType !== "all" ? filterType : undefined,
+            status: filterStatus !== "all" ? filterStatus : undefined,
+            startDate: startDate || undefined,
+            endDate: endDate || undefined,
+            limit: PAGE_SIZE,
+            page,
+          },
+        });
+        if (requestId !== requestIdRef.current) return;
+        setTransactions(res.data.transactions ?? []);
+        setTotalPages(res.data.totalPages ?? 1);
+        if (res.data.stats) setTxStats(res.data.stats);
+        setTxError(null);
+      } catch (err) {
+        if (requestId !== requestIdRef.current) return;
+        console.error("Failed to fetch transactions:", err);
+        if (transactionsRef.current.length === 0) {
+          setTxError("Could not load your transaction history.");
+        } else {
+          toast.error("Could not refresh your transaction history.");
+        }
+      } finally {
+        if (requestId === requestIdRef.current) setTxLoading(false);
+      }
+    },
+    [debouncedSearch, filterType, filterStatus, startDate, endDate, page],
+  );
+
+  // ── Export (CSV/PDF of EVERYTHING matching the current filters, not just
+  // the current page): pages through the same endpoint at its 100/page max
+  // until totalPages is exhausted. Both formats share this one fetch so a
+  // future column change only has to be made once. ──────────────────────
+  // Appointments now carry a real tracking number (same APT-00001 scheme as
+  // documents' REQ-00001). Appointment-only exports additionally get the
+  // shared, professor-authored comment column (same rule as the
+  // professor/admin pages), since that's still worth recalling for a past
+  // appointment and has nothing to do with the tracking number.
+  const isAppointmentOnlyExport = filterType === "appointment";
+  const header = [
+    "Type", "Title", "Details", "Status", "College", "Tracking #",
+    ...(isAppointmentOnlyExport ? ["Comment"] : []),
+    "Date", "Time",
+  ];
+
+  const fetchExportRows = async () => {
+    let all = [];
+    let fetchPage = 1;
+    let pages;
+    do {
+      const res = await api.get("/student/transactions", {
+        params: {
+          search: debouncedSearch || undefined,
+          type: filterType !== "all" ? filterType : undefined,
+          status: filterStatus !== "all" ? filterStatus : undefined,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+          limit: 100,
+          page: fetchPage,
+        },
+      });
+      all = all.concat(res.data.transactions ?? []);
+      pages = res.data.totalPages ?? 1;
+      fetchPage += 1;
+    } while (fetchPage <= pages);
+    return all.map((t) => {
+      const base = [
+        getTypeLabel(t.type), t.title, t.details, transactionStatusLabel(t.status), t.college,
+        t.trackingNumber ?? "",
+      ];
+      const dateTime = [
+        t.date ? formatManilaDate(t.date, { month: "short", day: "numeric", year: "numeric" }) : "",
+        t.time,
+      ];
+      return isAppointmentOnlyExport
+        ? [...base, t.sharedComment ?? "", ...dateTime]
+        : [...base, ...dateTime];
+    });
+  };
+
+  const dateRangeLabel =
+    startDate || endDate
+      ? `${startDate || "…"} to ${endDate || "…"}`
+      : "All Time";
+
+  const summaryRows = [
+    ["Date Range", dateRangeLabel],
+    ["Total", txStats.total],
+    ["Completed", txStats.completed],
+    ["Ongoing", txStats.ongoing],
+    ["This Month", txStats.thisMonth],
+  ];
+
+  const handleExportCsv = async () => {
+    setIsExporting(true);
+    try {
+      const rows = await fetchExportRows();
+      downloadCsv(
+        [...summaryRows, [], header, ...rows],
+        `transactions-${getManilaDateString()}.csv`,
+      );
+    } catch (err) {
+      console.error("Failed to export transactions:", err);
+      toast.error("Could not export your transaction history.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportPdf = async () => {
+    setIsExporting(true);
+    try {
+      const rows = await fetchExportRows();
+      exportTransactionsPdf({
+        title: "Transaction History",
+        subtitle: `${user?.name ?? "Student"} — ${dateRangeLabel} — Generated ${getManilaDateString()}`,
+        columns: header,
+        rows,
+        filename: `transactions-${getManilaDateString()}.pdf`,
+        summary: summaryRows.map(([label, value]) => ({ label, value })),
+      });
+    } catch (err) {
+      console.error("Failed to export transactions:", err);
+      toast.error("Could not export your transaction history.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Fresh load whenever the page mounts, the search/type/status filters
+  // change, or the user navigates to a different page (fetchTransactions'
+  // identity changes with all of them).
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
+
+  // No live/socket/poll refresh on purpose -- this is a history log; it
+  // refetches on mount and whenever a filter/search/page changes.
+
+  const getTypeIcon = (type) => {
+    switch (type) {
+      case "queue":
+        return <QueueIconNav />;
+      case "appointment":
+        return <CalendarIconNav />;
+      case "document":
+      case "submission":
+        return <FileText />;
+      default:
+        return <AlertCircleIcon />;
+    }
+  };
+
+  const getTypeColor = (type) => {
+    switch (type) {
+      case "queue":
+        return "tx-badge-queue";
+      case "appointment":
+        return "tx-badge-appointment";
+      case "document":
+      case "submission":
+        return "tx-badge-document";
+      default:
+        return "tx-badge-default";
+    }
+  };
+
+  const getTypeLabel = transactionTypeLabel;
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "completed":
+        return "tx-badge-completed";
+      case "ongoing":
+        return "tx-badge-ongoing";
+      case "cancelled":
+        return "tx-badge-cancelled";
+      default:
+        return "tx-badge-default";
+    }
+  };
+
+  const hasActiveFilters =
+    !!debouncedSearch || filterType !== "all" || filterStatus !== "all" || !!startDate || !!endDate;
+  const clearFilters = () => {
+    setSearchQuery("");
+    setDebouncedSearch("");
+    setFilterType("all");
+    setFilterStatus("all");
+    setStartDate("");
+    setEndDate("");
+    setPage(1);
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  return (
+    <StudentPageShell
+      outerClassName="transactions-with-sidebar"
+      mainClassName="transactions-main"
+    >
+        <div className="transactions-container">
+          {/* Header */}
+          <div className="refresh-header-row">
+            <PageHeader
+              breadcrumb={
+                <Link to="/student/dashboard" className="breadcrumb-link">
+                  <ChevronLeft className="breadcrumb-icon" />
+                  Home
+                </Link>
+              }
+              icon={<ClipboardListIcon />}
+              iconClassName="tx-title-icon"
+              title="Transaction History"
+              subtitle="View all your activities and transactions."
+              headerClassName="tx-header"
+              breadcrumbClassName="page-breadcrumb"
+              titleSectionClassName="tx-title-section"
+              titleClassName="tx-title"
+              subtitleClassName="tx-subtitle"
+            />
+            <RefreshButton
+              onClick={fetchTransactions}
+              loading={txLoading}
+              label="Refresh transactions"
+            />
+          </div>
+
+          {/* Stats Grid */}
+          <div className="tx-stats-grid">
+            {stats.map((stat) => (
+              <div key={stat.label} className="tx-stat-card">
+                <div className={`stat-icon-box ${stat.bgColor}`}>
+                  {stat.icon === "list" && <ClipboardListIcon />}
+                  {stat.icon === "check" && <CheckCircleIcon />}
+                  {stat.icon === "clock" && <ClockIcon />}
+                  {stat.icon === "calendar" && <CalendarIcon />}
+                </div>
+                <p className="tx-stat-label">{stat.label}</p>
+                <p className={`tx-stat-value ${stat.color}`}>{stat.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Filters */}
+          <div className="filters-card">
+            <div className="filters-header">
+              <div className="filters-header-text">
+                <h3 className="filters-title">Transaction Filter</h3>
+                <p className="filters-description">
+                  Search and filter your transactions.
+                </p>
+              </div>
+              <ExportMenu
+                triggerClassName="tx-export-btn"
+                label={isExporting ? "Exporting…" : "Export"}
+                disabled={isExporting || transactions.length === 0}
+                onExportCsv={handleExportCsv}
+                onExportPdf={handleExportPdf}
+              />
+            </div>
+            <div className="filters-grid">
+              <div className="filter-group">
+                <label className="filter-label" htmlFor="tx-search">
+                  Search
+                </label>
+                <div className="filter-search-wrapper">
+                  <SearchIcon />
+                  <input
+                    id="tx-search"
+                    type="text"
+                    placeholder="Search transactions..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="filter-search-input"
+                  />
+                </div>
+              </div>
+
+              <FilterSelect
+                id="tx-type-select"
+                label="Type"
+                value={filterType}
+                onChange={(e) => { setFilterType(e.target.value); setPage(1); }}
+                options={[
+                  { value: "all", label: "All Types" },
+                  { value: "queue", label: "Queue" },
+                  { value: "appointment", label: "Appointment" },
+                  { value: "document", label: "Document" },
+                ]}
+                chevronIcon={<ChevronDownIcon className="filter-chevron" />}
+              />
+
+              <FilterSelect
+                id="tx-status-select"
+                label="Status"
+                value={filterStatus}
+                onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
+                options={[
+                  { value: "all", label: "All Statuses" },
+                  { value: "completed", label: "Completed" },
+                  { value: "ongoing", label: "Ongoing" },
+                  { value: "cancelled", label: "Cancelled" },
+                ]}
+                chevronIcon={<ChevronDownIcon className="filter-chevron" />}
+              />
+            </div>
+            <div className="filters-date-section">
+              <FilterDateRange
+                id="tx-filter-date-range"
+                label="Date Range"
+                startValue={startDate}
+                endValue={endDate}
+                onStartChange={(e) => { setStartDate(e.target.value); setPage(1); }}
+                onEndChange={(e) => { setEndDate(e.target.value); setPage(1); }}
+                onClear={() => { setStartDate(""); setEndDate(""); setPage(1); }}
+              />
+            </div>
+          </div>
+
+          {/* Transaction List */}
+          <div className="transactions-list">
+            {txLoading ? (
+              <div className="tx-empty-state">
+                <SearchIcon />
+                <h3>Loading transactions…</h3>
+              </div>
+            ) : txError ? (
+              <div className="tx-empty-state">
+                <AlertCircleIcon />
+                <h3>Could not load transactions</h3>
+                <p>{txError}</p>
+              </div>
+            ) : transactions.length === 0 ? (
+              <div className="tx-empty-state">
+                <ClipboardListIcon />
+                {hasActiveFilters ? (
+                  <>
+                    <h3>No transactions match your filters</h3>
+                    <button type="button" className="tx-clear-btn" onClick={clearFilters}>
+                      Clear filters
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <h3>No Transactions Found</h3>
+                    <p>You have no transaction records yet.</p>
+                  </>
+                )}
+              </div>
+            ) : (
+              transactions.map((transaction) => {
+                // Submission rows reuse document's row-accent styling --
+                // .transaction-type-submission was never given its own CSS,
+                // so submission rows silently got no hover/gradient accent.
+                const rowTypeClass = transaction.type === "submission" ? "document" : transaction.type;
+                return (
+                <div key={transaction.id} className={`transaction-item transaction-type-${rowTypeClass}`}>
+                  <div className="transaction-icon">
+                    <span
+                      className={`icon-wrapper ${getTypeColor(transaction.type)}`}
+                    >
+                      {getTypeIcon(transaction.type)}
+                    </span>
+                  </div>
+
+                  <div className="transaction-content">
+                    <div className="transaction-header">
+                      <h3 className="transaction-title">{transaction.title}</h3>
+                      <div className="transaction-badges">
+                        <span
+                          className={`tx-badge ${getTypeColor(transaction.type)}`}
+                        >
+                          {getTypeLabel(transaction.type)}
+                        </span>
+                        {transaction.trackingNumber && (
+                          <span className="txn-tracking-pill">
+                            {transaction.trackingNumber}
+                          </span>
+                        )}
+                        <span
+                          className={`tx-badge ${getStatusColor(
+                            transaction.status,
+                          )}`}
+                        >
+                          {transactionStatusLabel(transaction.status)}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="transaction-college">{transaction.college}</p>
+                    {transaction.details &&
+                      transaction.details !== "No additional details provided." &&
+                      !(transaction.type === "queue" && transaction.adminReason) && (
+                        <p className="transaction-details">{transaction.details}</p>
+                      )}
+                    {transaction.type === "queue" && transaction.adminReason && (
+                      <p className="transaction-details">
+                        Reason: {transaction.adminReason}
+                      </p>
+                    )}
+                    {transaction.type === "appointment" && transaction.cancelledBy === "student_no_show" && (
+                      <p className="transaction-details">
+                        Reported not served{transaction.cancelReason ? `: ${transaction.cancelReason}` : ""}
+                      </p>
+                    )}
+                    {/* Rejected and cancelled share one bucket in this feed, and older
+                        rows with this value were cancelled -- hence neutral wording. */}
+                    {transaction.type === "appointment" && transaction.cancelledBy === "system_expired" && (
+                      <p className="transaction-details">
+                        Closed automatically — not approved before its scheduled time ended
+                      </p>
+                    )}
+                    {transaction.type === "appointment" && transaction.cancelledBy === "system_not_entertained" && (
+                      <p className="transaction-details">
+                        Automatically cancelled — not marked as served in time{transaction.cancelReason ? `: ${transaction.cancelReason}` : ""}
+                      </p>
+                    )}
+                    {transaction.type === "appointment" && transaction.sharedComment && (
+                      <ActionsTakenToggle
+                        text={transaction.sharedComment}
+                        meta={transaction.commentUpdatedAt
+                          ? `— last updated by ${transaction.commentUpdatedBy === "student" ? "you" : "faculty"} on ${formatManilaDate(transaction.commentUpdatedAt)}`
+                          : null}
+                      />
+                    )}
+                    {transaction.type === "appointment" && (transaction.approvedAtRaw || transaction.completedAtRaw) && (
+                      <div className="transaction-timeline">
+                        {transaction.approvedAtRaw && (
+                          <p className="transaction-timeline-row">
+                            <span className="transaction-timeline-label">Approved:</span>{" "}
+                            {formatManilaDate(transaction.approvedAtRaw, { month: "short", day: "numeric", year: "numeric" })} at {formatManilaTime(transaction.approvedAtRaw)}
+                          </p>
+                        )}
+                        {transaction.completedAtRaw && (
+                          <p className="transaction-timeline-row">
+                            <span className="transaction-timeline-label">Completed:</span>{" "}
+                            {formatManilaDate(transaction.completedAtRaw, { month: "short", day: "numeric", year: "numeric" })} at {formatManilaTime(transaction.completedAtRaw)}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="transaction-meta">
+                    <div className="transaction-date">
+                      <CalendarIcon />
+                      {formatManilaDate(transaction.date, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </div>
+                    <div className="transaction-time">
+                      <ClockIcon />
+                      {transaction.time}
+                    </div>
+                  </div>
+                </div>
+                );
+              })
+            )}
+          </div>
+
+          {!txLoading && !txError && (
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+          )}
+        </div>
+    </StudentPageShell>
+  );
+}

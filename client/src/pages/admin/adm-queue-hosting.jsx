@@ -1,0 +1,1387 @@
+import { useState, useEffect, useCallback } from "react";
+import { useAuth } from "../../context/AuthContext";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { ChevronLeft, StopCircle, PauseCircle, QrCode, UserX, ShieldCheck } from "lucide-react";
+import "./adm-queue-hosting.css";
+import { toast } from "sonner";
+import api from "../../utils/api";
+import { useAdminQueueHosting } from "../../hooks/useAdminQueueHosting";
+import AdminPageShell from "../../components/AdminPageShell";
+import QueueReasonModal from "../../components/QueueReasonModal";
+import QueueJoinQrDisplay from "../../components/QueueJoinQrDisplay";
+import useLockBodyScroll from "../../hooks/useLockBodyScroll";
+import { formatManilaDate, formatManilaTime, getManilaTimeString, addMinutesClampedToDay, formatTimeString } from "../../utils/dateTime";
+import { getCollegeLogo } from "../../data/collegeLogo";
+
+// ── Icons ──────────────────────────────────────────────────────
+// Plus-in-circle — matches adm-queue's .aq-host-link-btn-icon-box glyph so the
+// two screens' "hosting" affordance reads the same.
+const PlusCircleIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="12" y1="8" x2="12" y2="16"></line>
+    <line x1="8" y1="12" x2="16" y2="12"></line>
+  </svg>
+);
+const CloseIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+);
+const PlusIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <line x1="12" y1="5" x2="12" y2="19"></line>
+    <line x1="5" y1="12" x2="19" y2="12"></line>
+  </svg>
+);
+const PlayIcon = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+    <polygon points="6 3 20 12 6 21 6 3"></polygon>
+  </svg>
+);
+const PauseIcon = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+    <rect x="6" y="4" width="4" height="16" rx="1"></rect>
+    <rect x="14" y="4" width="4" height="16" rx="1"></rect>
+  </svg>
+);
+const ClockIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="10"></circle>
+    <polyline points="12 6 12 12 16 14"></polyline>
+  </svg>
+);
+const ChevronDownIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="6 9 12 15 18 9"></polyline>
+  </svg>
+);
+const SearchIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="11" cy="11" r="8"></circle>
+    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+  </svg>
+);
+const CheckIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="20 6 9 17 4 12"></polyline>
+  </svg>
+);
+const RepeatIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="17 1 21 5 17 9"></polyline>
+    <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+    <polyline points="7 23 3 19 7 15"></polyline>
+    <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+  </svg>
+);
+
+export default function AdminQueueHosting() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  // Origin-aware breadcrumb: "Queue Management" when opened from adm-queue's
+  // host link (nav state), "Home" otherwise (dashboard quick action, direct
+  // URL, refresh).
+  const cameFromQueue = location.state?.from === "queue";
+  // Open the monitor view on adm-queue, tagging the origin so its breadcrumb
+  // links back here ("Queue Hosting") instead of the in-page queue list.
+  const openMonitor = (id) =>
+    navigate("/admin/queue", { state: { monitorQueueId: id, from: "hosting" } });
+  const { user: authUser } = useAuth();
+  const user = authUser
+    ? {
+        ...authUser,
+        college: authUser.departmentName ?? "N/A College",
+        departmentAbbrev: authUser.departmentAbbrev ?? "CCS",
+      }
+    : { name: "Admin", role: "admin", college: "", departmentAbbrev: "CCS" };
+
+  // ── Real queue data, its live-update wiring, and pause/resume/close, all
+  // shared with adm-queue.jsx via useAdminQueueHosting so the two pages'
+  // event lists and business logic can't drift out of sync again. ─────────
+  const {
+    queues,
+    loading,
+    error: queueHostingError,
+    fetchQueues,
+    reasonModal,
+    setReasonModal,
+    reasonSubmitting,
+    handlePauseQueue,
+    handleCloseQueue,
+    handleResumeQueue,
+    handleReasonConfirm,
+  } = useAdminQueueHosting();
+
+  const [services, setServices] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchServices = useCallback(async () => {
+    try {
+      const res = await api.get("/admin/queue-hosting/services");
+      setServices(res.data.services ?? []);
+    } catch (error) {
+      console.error("Failed to fetch services:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authUser) fetchServices();
+  }, [authUser, fetchServices]);
+
+  // ── Search & filter state ──────────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+
+  // ── Join-code overlay ─────────────────────────────────────────────────────
+  // { id, name } of the queue whose QR is on screen, or null.
+  const [qrSlot, setQrSlot] = useState(null);
+  useLockBodyScroll(!!qrSlot);
+
+  // ── No-show blocks ────────────────────────────────────────────────────────
+  // Students who hit the daily no-show limit. The override exists so a human
+  // who can see the student decides, so this has to be reachable from the
+  // screen the secretary is already running the queue from.
+  const [blockedStudents, setBlockedStudents] = useState([]);
+  const [showBlocked, setShowBlocked] = useState(false);
+  useLockBodyScroll(showBlocked);
+
+  const fetchBlockedStudents = useCallback(async () => {
+    try {
+      const res = await api.get("/admin/queue-blocked-students");
+      setBlockedStudents(res.data.students ?? []);
+    } catch {
+      // Non-fatal -- hosting still works without the restriction list.
+    }
+  }, []);
+
+  useEffect(() => { fetchBlockedStudents(); }, [fetchBlockedStudents]);
+
+  const clearBlock = useCallback(
+    async (studentId) => {
+      try {
+        await api.post(`/admin/queue-blocked-students/${studentId}/clear`);
+        toast.success("Restriction lifted");
+        await fetchBlockedStudents();
+      } catch (err) {
+        toast.error(err?.response?.data?.error ?? "Could not lift the restriction");
+      }
+    },
+    [fetchBlockedStudents],
+  );
+
+  // ── "Open New Queue Line" modal state ─────────────────────────────────────
+  const [showModal, setShowModal] = useState(false);
+  useLockBodyScroll(showModal);
+  const [serviceId, setServiceId] = useState("");
+  const [hostAllServices, setHostAllServices] = useState(false);
+  const [maxCapacity, setMaxCapacity] = useState("100");
+  const [serviceStart, setServiceStart] = useState("08:00");
+  const [serviceEnd, setServiceEnd] = useState("17:00");
+  const [noShowTimeout, setNoShowTimeout] = useState("15");
+  const [serviceTime, setServiceTime] = useState("15");
+  // True only right after resetForm() auto-computes an end time that got
+  // clamped to 23:59 instead of the full +240min window (see
+  // addMinutesClampedToDay) — cleared as soon as the admin edits either time
+  // field themselves, since past that point it's their explicit choice.
+  const [defaultEndClamped, setDefaultEndClamped] = useState(false);
+
+  // ── Modal handlers ─────────────────────────────────────────────────────────
+  const resetForm = () => {
+    setServiceId("");
+    setHostAllServices(false);
+    setMaxCapacity("100");
+    const now = getManilaTimeString();
+    const [h, m] = now.split(":").map(Number);
+    const rawTargetMinutes = h * 60 + m + 240;
+    setServiceStart(now);
+    setServiceEnd(addMinutesClampedToDay(now, 240));
+    setNoShowTimeout("15");
+    setServiceTime("15");
+    setDefaultEndClamped(rawTargetMinutes > 23 * 60 + 59);
+  };
+  const openModal = () => {
+    resetForm();
+    setShowModal(true);
+  };
+  // Pre-fills the modal from a past queue's config instead of blanking it --
+  // "Host Again" on a Completed/Closed card. Start/End Time are reused as-is:
+  // serviceHours are plain HH:MM clock times, not date-anchored, and POST
+  // always opens the new slot for today regardless of the source queue's
+  // actual date, so no conversion is needed. The existing serviceEnd <=
+  // getManilaTimeString() check on submit already covers the one real edge
+  // case (re-hosting an old "8am-5pm" queue after 5pm today).
+  const openModalWithConfig = (queue) => {
+    setHostAllServices(!!queue.isUniversal);
+    setServiceId(queue.isUniversal ? "" : String(queue.serviceId));
+    setMaxCapacity(String(queue.maxCapacity));
+    setServiceTime(String(queue.avgServiceMinutes ?? 15));
+    setNoShowTimeout(String(queue.noShowTimeoutMinutes ?? 15));
+    setServiceStart(queue.serviceHours.start);
+    setServiceEnd(queue.serviceHours.end);
+    setDefaultEndClamped(false);
+    setShowModal(true);
+  };
+  const closeModal = () => {
+    setShowModal(false);
+    resetForm();
+  };
+
+  const handleOpenQueueSubmit = async () => {
+    if (!hostAllServices && !serviceId) {
+      toast.error("Please select a service to queue, or tick “Host all services”.");
+      return;
+    }
+    const capacityNum = parseInt(maxCapacity, 10);
+    if (!capacityNum || capacityNum <= 0) {
+      toast.error("Please enter a valid maximum queue capacity");
+      return;
+    }
+    if (serviceStart >= serviceEnd) {
+      toast.error("Start time must be before end time");
+      return;
+    }
+    if (serviceEnd <= getManilaTimeString()) {
+      toast.error("End time has already passed — choose a window that ends later than the current time");
+      return;
+    }
+    const noShowTimeoutNum = parseInt(noShowTimeout, 10);
+    if (!noShowTimeoutNum || noShowTimeoutNum <= 0) {
+      toast.error("Please enter a valid no-show timeout in minutes");
+      return;
+    }
+    const serviceTimeNum = parseInt(serviceTime, 10);
+    if (!serviceTimeNum || serviceTimeNum <= 0) {
+      toast.error("Please enter a valid service time in minutes");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await api.post("/admin/queue-hosting", {
+        serviceId: hostAllServices ? null : serviceId,
+        hostAllServices,
+        maxCapacity: capacityNum,
+        startTime: `${serviceStart}:00`,
+        endTime: `${serviceEnd}:00`,
+        noShowTimeoutMinutes: noShowTimeoutNum,
+        serviceTimeMinutes: serviceTimeNum,
+      });
+      toast.success("Queue line opened successfully!");
+      closeModal();
+      await fetchQueues();
+    } catch (error) {
+      toast.error(error?.response?.data?.error ?? "Failed to open queue line");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ── "Reopen Queue" modal state (expired slots only) ───────────────────────
+  // Unlike "Host Again" (openModalWithConfig, above) this resumes the SAME
+  // slot -- see PATCH /queue-hosting/:slotId/reopen -- so existing waiting/
+  // serving students stay attached, instead of being abandoned in favor of a
+  // brand-new empty slot.
+  const [reopenTarget, setReopenTarget] = useState(null); // queue object or null
+  const [reopenEndTime, setReopenEndTime] = useState("");
+  const [reopenCapacity, setReopenCapacity] = useState("");
+  const [reopenSubmitting, setReopenSubmitting] = useState(false);
+  useLockBodyScroll(!!reopenTarget);
+
+  const openReopenModal = (queue) => {
+    setReopenTarget(queue);
+    setReopenEndTime(addMinutesClampedToDay(getManilaTimeString(), 120));
+    setReopenCapacity(String(queue.maxCapacity));
+  };
+  const closeReopenModal = () => {
+    setReopenTarget(null);
+    setReopenEndTime("");
+    setReopenCapacity("");
+  };
+
+  const handleReopenSubmit = async () => {
+    if (!reopenEndTime) {
+      toast.error("Please choose a new end time");
+      return;
+    }
+    if (reopenEndTime <= getManilaTimeString()) {
+      toast.error("The new end time must be later than the current time");
+      return;
+    }
+    const capacityNum = parseInt(reopenCapacity, 10);
+    if (!capacityNum || capacityNum <= 0) {
+      toast.error("Please enter a valid maximum queue capacity");
+      return;
+    }
+    setReopenSubmitting(true);
+    try {
+      await api.patch(`/admin/queue-hosting/${reopenTarget.id}/reopen`, {
+        endTime: `${reopenEndTime}:00`,
+        maxCapacity: capacityNum,
+      });
+      toast.success("Queue reopened successfully!");
+      closeReopenModal();
+      await fetchQueues();
+    } catch (error) {
+      toast.error(error?.response?.data?.error ?? "Failed to reopen queue");
+    } finally {
+      setReopenSubmitting(false);
+    }
+  };
+
+  // ── Derived values ─────────────────────────────────────────────────────────
+  // Unique service types currently hosted, regardless of how many queue lines
+  // of that same type are open/paused/closed today — always computed from the
+  // full queue list so the dropdown options don't shift as filters are applied.
+  const serviceTypeOptions = [...new Set(queues.map((q) => q.queueType))].sort();
+
+  const filteredQueues = queues.filter((q) => {
+    const query = searchQuery.trim().toLowerCase();
+    const matchesSearch =
+      !query ||
+      q.queueType.toLowerCase().includes(query) ||
+      (q.department || "").toLowerCase().includes(query);
+    const matchesStatus = statusFilter === "all" || q.status === statusFilter;
+    const matchesType = typeFilter === "all" || q.queueType === typeFilter;
+    return matchesSearch && matchesStatus && matchesType;
+  });
+
+  const activeQueues = filteredQueues.filter((q) => q.status === "open");
+  const pausedQueues = filteredQueues.filter((q) => q.status === "paused");
+  // 'full' (capacity reached) and 'expired' (hours ended) both mean "closed
+  // to new joins, but still has unserved students" -- grouped together so
+  // they don't silently vanish from this page once they leave open/paused.
+  const stillServingQueues = filteredQueues.filter(
+    (q) => q.status === "full" || q.status === "expired",
+  );
+  const completedQueues = filteredQueues.filter((q) => q.status === "completed");
+  // 'closed' means exclusively "an admin manually stopped this queue".
+  const closedQueues = filteredQueues.filter((q) => q.status === "closed");
+  // The flat card list, ordered by status priority. These five groups are
+  // exhaustive of every possible queue_slots.status value, so gate the list
+  // on this, not filteredQueues.length.
+  const visibleQueues = [
+    ...activeQueues,
+    ...pausedQueues,
+    ...stillServingQueues,
+    ...completedQueues,
+    ...closedQueues,
+  ];
+  // Summary stats reflect today only -- a closed/expired line carried over
+  // from yesterday (kept in the list below so it can still be Hosted Again
+  // or Reopened) shouldn't inflate what's meant to be today's snapshot.
+  const todayActiveCount = activeQueues.filter((q) => q.isToday).length;
+  const todayPausedCount = pausedQueues.filter((q) => q.isToday).length;
+  const todayStillServingCount = stillServingQueues.filter((q) => q.isToday).length;
+  const todayCompletedCount = completedQueues.filter((q) => q.isToday).length;
+  const todayClosedCount = closedQueues.filter((q) => q.isToday).length;
+
+  return (
+    <AdminPageShell
+      outerClassName="aqh-dashboard-with-sidebar"
+      mainClassName="aqh-dashboard-main"
+      overlay={
+        <>
+          <QueueReasonModal
+            show={!!reasonModal}
+            title={reasonModal?.mode === "pause" ? "Pause Queue" : "Stop Queue"}
+            message={
+              reasonModal?.mode === "pause"
+                ? (queues.find((q) => q.id === reasonModal.id)?.currentlyServingStudentNumber
+                    ? "Students in this queue will see this reason while it's paused. A student is currently being served — pausing will return them to waiting instead of leaving their call in progress."
+                    : "Students in this queue will see this reason while it's paused.") +
+                  (queues.find((q) => q.id === reasonModal.id)?.passedCount > 0
+                    ? " Students already passed to faculty aren't affected."
+                    : "")
+                : (() => {
+                    const q = queues.find((q) => q.id === reasonModal?.id);
+                    const passedNote =
+                      q?.passedCount > 0
+                        ? ` The ${q.passedCount} student${q.passedCount === 1 ? "" : "s"} already passed to faculty stay with them until served.`
+                        : "";
+                    if (!q?.currentlyServingStudentNumber && q?.currentCount === 0) {
+                      if (q?.passedCount > 0) {
+                        return `No one is left in the office line.${passedNote}`;
+                      }
+                      return q?.servedCount > 0
+                        ? "This queue has no one left waiting and already served students — stopping it will mark it complete."
+                        : "This queue hasn't served any students yet — it will be marked closed.";
+                    }
+                    return `All students still waiting or being served in the office line will be removed from this queue and will see this reason. This cannot be undone.${passedNote}`;
+                  })()
+            }
+            icon={reasonModal?.mode === "pause" ? <PauseCircle width={22} height={22} /> : <StopCircle width={22} height={22} />}
+            variant={reasonModal?.mode === "pause" ? "warning" : "danger"}
+            accentTheme="blue"
+            confirmText={reasonModal?.mode === "pause" ? "Pause" : "Stop Queue"}
+            submitting={reasonSubmitting}
+            onConfirm={handleReasonConfirm}
+            onCancel={() => setReasonModal(null)}
+          />
+
+          {/* The join code students scan. Lives in the shell's overlay slot
+              because the page content is transformed, which would break a
+              position:fixed child. */}
+          {qrSlot && (
+            <div
+              className="aqh-modal-overlay"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Queue join code"
+              onClick={() => setQrSlot(null)}
+            >
+              <div className="aqh-modal aqh-modal--qr" onClick={(e) => e.stopPropagation()}>
+                <div className="aqh-modal-header">
+                  <h2 className="aqh-modal-title">Queue Join Code</h2>
+                  <button
+                    className="aqh-modal-close-btn"
+                    onClick={() => setQrSlot(null)}
+                    aria-label="Close join code"
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
+                <div className="aqh-modal-body">
+                  <div className="aqh-modal-hero">
+                    <p className="aqh-modal-hero-label">Scan to Join</p>
+                    <p className="aqh-modal-hero-title">{qrSlot.name}</p>
+                    <p className="aqh-modal-hero-purpose">
+                      Show this at the office counter. Each code expires within a
+                      minute, so a forwarded photo or screenshot can't be used to
+                      join from elsewhere.
+                    </p>
+                  </div>
+                  <div className="aqh-qr-code-area">
+                    <QueueJoinQrDisplay slotId={qrSlot.id} />
+                  </div>
+                </div>
+                <div className="aqh-modal-footer">
+                  <button className="aqh-btn-cancel" onClick={() => setQrSlot(null)}>
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Students blocked by today's no-show limit, and the lift control. */}
+          {showBlocked && (
+            <div
+              className="aqh-modal-overlay"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Queue restrictions"
+              onClick={() => setShowBlocked(false)}
+            >
+              <div className="aqh-modal aqh-modal--danger" onClick={(e) => e.stopPropagation()}>
+                <div className="aqh-modal-header">
+                  <h2 className="aqh-modal-title">Queue Restrictions</h2>
+                  <button
+                    className="aqh-modal-close-btn"
+                    onClick={() => setShowBlocked(false)}
+                    aria-label="Close"
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
+                <div className="aqh-modal-body">
+                  <div className="aqh-modal-hero">
+                    <p className="aqh-modal-hero-label">No-Show Restrictions</p>
+                    <p className="aqh-modal-hero-title">
+                      {blockedStudents.length === 0
+                        ? "No students restricted today"
+                        : `${blockedStudents.length} student${blockedStudents.length === 1 ? "" : "s"} restricted today`}
+                    </p>
+                    <p className="aqh-modal-hero-purpose">
+                      A student marked as a no-show three times in one day can't join
+                      queues until tomorrow. Lift it if they're standing in front of you.
+                    </p>
+                  </div>
+                  {blockedStudents.length === 0 ? (
+                    <div className="aqh-restriction-empty">
+                      <ShieldCheck />
+                      <h3>Everyone Can Queue</h3>
+                      <p>No student has reached today's no-show limit.</p>
+                    </div>
+                  ) : (
+                    <div className="aqh-restriction-list">
+                      {blockedStudents.map((s) => (
+                        <div key={s.student_id} className="aqh-restriction-row">
+                          <div className="aqh-restriction-info">
+                            <p className="aqh-restriction-name">{s.student_name}</p>
+                            <div className="aqh-restriction-badges">
+                              <span className="aqh-restriction-id">{s.student_number}</span>
+                              <span className="aqh-restriction-strikes">
+                                {s.strikes} no-show{s.strikes === 1 ? "" : "s"} today
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            className="aqh-restriction-lift"
+                            onClick={() => clearBlock(s.student_id)}
+                          >
+                            Lift Restriction
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="aqh-modal-footer">
+                  <button className="aqh-btn-cancel" onClick={() => setShowBlocked(false)}>
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Open New Queue Line Modal */}
+          {showModal && (
+            <div className="aqh-modal-overlay">
+              <div className="aqh-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="aqh-modal-header">
+                  <h2 className="aqh-modal-title">Open New Queue Line</h2>
+                  <button
+                    className="aqh-modal-close-btn"
+                    onClick={closeModal}
+                    aria-label="Close"
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
+
+                <div className="aqh-modal-body">
+                  <div className="aqh-modal-hero">
+                    <p className="aqh-modal-hero-label">New Queue Line</p>
+                    <p className="aqh-modal-hero-title">
+                      {user.college} ({user.departmentAbbrev})
+                    </p>
+                    <p className="aqh-modal-hero-purpose">
+                      Set the service, capacity, and hours below. Students can
+                      join as soon as the line is open.
+                    </p>
+                  </div>
+
+                  <div className="aqh-form-group">
+                    <label className="aqh-form-label">Service *</label>
+                    <div className="aqh-form-select-wrap">
+                      <select
+                        className="aqh-form-select"
+                        value={serviceId}
+                        onChange={(e) => setServiceId(e.target.value)}
+                        disabled={hostAllServices}
+                      >
+                        <option value="">Select a service</option>
+                        {services.map((s) => (
+                          <option key={s.service_id} value={s.service_id}>
+                            {s.service_name}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="aqh-select-chevron">
+                        <ChevronDownIcon />
+                      </span>
+                    </div>
+                    {services.length === 0 && (
+                      <p className="aqh-modal-subtitle">
+                        No services configured for your department yet.
+                      </p>
+                    )}
+                    <label className="aqh-checkbox-row">
+                      <input
+                        type="checkbox"
+                        checked={hostAllServices}
+                        onChange={(e) => {
+                          setHostAllServices(e.target.checked);
+                          if (e.target.checked) setServiceId("");
+                        }}
+                      />
+                      <span>Host all services — one queue covering every service in your department</span>
+                    </label>
+                  </div>
+
+                  <div className="aqh-form-group">
+                    <label className="aqh-form-label">
+                      Maximum Queue Capacity *
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="aqh-form-input"
+                      placeholder="e.g., 100"
+                      value={maxCapacity}
+                      onChange={(e) => setMaxCapacity(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="aqh-form-group">
+                    <label className="aqh-form-label">
+                      Service Time (minutes) *
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="aqh-form-input"
+                      placeholder="e.g., 15"
+                      value={serviceTime}
+                      onChange={(e) => setServiceTime(e.target.value)}
+                    />
+                    <p className="aqh-modal-subtitle">
+                      Estimated time to serve one student in this queue — used to
+                      calculate students' wait-time estimates.
+                    </p>
+                  </div>
+
+                  <div className="aqh-form-group">
+                    <label className="aqh-form-label">
+                      No-Show Timeout (minutes) *
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="aqh-form-input"
+                      placeholder="e.g., 15"
+                      value={noShowTimeout}
+                      onChange={(e) => setNoShowTimeout(e.target.value)}
+                    />
+                    <p className="aqh-modal-subtitle">
+                      A called student who doesn't show up within this many
+                      minutes is automatically voided so you can call the next one.
+                    </p>
+                  </div>
+
+                  <div className="aqh-form-row">
+                    <div className="aqh-form-group">
+                      <label className="aqh-form-label">Service Start Time *</label>
+                      <div className="aqh-time-input-wrap">
+                        <input
+                          type="time"
+                          className="aqh-form-input"
+                          value={serviceStart}
+                          onChange={(e) => { setServiceStart(e.target.value); setDefaultEndClamped(false); }}
+                        />
+                        <ClockIcon />
+                      </div>
+                    </div>
+                    <div className="aqh-form-group">
+                      <label className="aqh-form-label">Service End Time *</label>
+                      <div className="aqh-time-input-wrap">
+                        <input
+                          type="time"
+                          className="aqh-form-input"
+                          value={serviceEnd}
+                          onChange={(e) => { setServiceEnd(e.target.value); setDefaultEndClamped(false); }}
+                        />
+                        <ClockIcon />
+                      </div>
+                      {defaultEndClamped && (
+                        <p className="aqh-modal-subtitle" style={{ color: "var(--warning, #f59e0b)" }}>
+                          It's late enough today that the usual 4-hour window would run past midnight — the end time was capped at 11:59 PM instead. Adjust it if you meant a shorter window.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="aqh-modal-footer">
+                  <button className="aqh-btn-cancel" onClick={closeModal}>
+                    Cancel
+                  </button>
+                  <button
+                    className="aqh-btn-submit"
+                    onClick={handleOpenQueueSubmit}
+                    disabled={submitting}
+                  >
+                    {submitting ? "Opening..." : "Open Queue Line"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Reopen Queue Modal (expired slots -- same slot_id, not a new one) */}
+          {reopenTarget && (
+            <div className="aqh-modal-overlay">
+              <div className="aqh-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="aqh-modal-header">
+                  <h2 className="aqh-modal-title">Reopen Queue</h2>
+                  <button
+                    className="aqh-modal-close-btn"
+                    onClick={closeReopenModal}
+                    aria-label="Close"
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
+
+                <div className="aqh-modal-body">
+                  <div className="aqh-modal-hero">
+                    <p className="aqh-modal-hero-label">Reopen Queue</p>
+                    <p className="aqh-modal-hero-title">{reopenTarget.queueType}</p>
+                    <p className="aqh-modal-hero-purpose">
+                      Students still waiting in this queue stay exactly where
+                      they are. Set a new end time to reopen it to new joins
+                      too.
+                    </p>
+                  </div>
+
+                  <div className="aqh-form-group">
+                    <label className="aqh-form-label">New End Time *</label>
+                    <div className="aqh-time-input-wrap">
+                      <input
+                        type="time"
+                        className="aqh-form-input"
+                        value={reopenEndTime}
+                        onChange={(e) => setReopenEndTime(e.target.value)}
+                      />
+                      <ClockIcon />
+                    </div>
+                  </div>
+
+                  <div className="aqh-form-group">
+                    <label className="aqh-form-label">
+                      Maximum Queue Capacity *
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="aqh-form-input"
+                      placeholder="e.g., 100"
+                      value={reopenCapacity}
+                      onChange={(e) => setReopenCapacity(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="aqh-modal-footer">
+                  <button className="aqh-btn-cancel" onClick={closeReopenModal}>
+                    Cancel
+                  </button>
+                  <button
+                    className="aqh-btn-submit"
+                    onClick={handleReopenSubmit}
+                    disabled={reopenSubmitting}
+                  >
+                    {reopenSubmitting ? "Reopening..." : "Reopen Queue"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      }
+    >
+        <div className="aqh-page-container">
+          <div className="aqh-header-block">
+            <div className="page-breadcrumb">
+              {cameFromQueue ? (
+                <Link to="/admin/queue" className="page-breadcrumb-link">
+                  <ChevronLeft />
+                  Queue Management
+                </Link>
+              ) : (
+                <Link to="/admin/dashboard" className="page-breadcrumb-link">
+                  <ChevronLeft />
+                  Home
+                </Link>
+              )}
+            </div>
+            {/* Page Header */}
+            <div className="aqh-page-header">
+              <div className="aqh-title-section">
+                <div className="aqh-title-icon">
+                  <PlusCircleIcon />
+                </div>
+                <div>
+                  <h1 className="aqh-page-title">Queue Hosting</h1>
+                  <p className="aqh-page-subtitle">
+                    Host and manage queues within your department.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="aqh-actions-row">
+            <button
+              className="aqh-open-queue-btn"
+              onClick={openModal}
+              disabled={loading}
+            >
+              <PlusIcon />
+              Open Queue Line
+            </button>
+            {/* Header-level secondary beside "Open Queue Line" -- NOT the
+                small .aqh-action-btn card style, which looked undersized
+                next to the primary. Badge only appears when someone is
+                actually restricted, so it stays quiet on a normal day. */}
+            <button
+              className="aqh-restrictions-btn"
+              onClick={() => { fetchBlockedStudents(); setShowBlocked(true); }}
+            >
+              <UserX />
+              Restrictions
+              {blockedStudents.length > 0 && (
+                <span className="aqh-restrictions-count">{blockedStudents.length}</span>
+              )}
+            </button>
+          </div>
+
+          {queueHostingError && (
+            <div className="dash-error-banner" role="alert">
+              {queueHostingError}
+            </div>
+          )}
+
+          {/* Summary Stats */}
+          <div className="aqh-summary-grid">
+            <div className="aqh-summary-card aqh-summary-active">
+              <div className="aqh-summary-icon aqh-icon-active">
+                <PlayIcon />
+              </div>
+              <div className="aqh-summary-content">
+                <p className="aqh-summary-label">Active Queues</p>
+                <p className="aqh-summary-value aqh-value-active">
+                  {loading ? "—" : todayActiveCount}
+                </p>
+              </div>
+            </div>
+            <div className="aqh-summary-card aqh-summary-paused">
+              <div className="aqh-summary-icon aqh-icon-paused">
+                <PauseIcon />
+              </div>
+              <div className="aqh-summary-content">
+                <p className="aqh-summary-label">Paused Queues</p>
+                <p className="aqh-summary-value aqh-value-paused">
+                  {loading ? "—" : todayPausedCount}
+                </p>
+              </div>
+            </div>
+            <div className="aqh-summary-card aqh-summary-still-serving">
+              <div className="aqh-summary-icon aqh-icon-still-serving">
+                <ClockIcon />
+              </div>
+              <div className="aqh-summary-content">
+                <p className="aqh-summary-label">Still Serving</p>
+                <p className="aqh-summary-value aqh-value-still-serving">
+                  {loading ? "—" : todayStillServingCount}
+                </p>
+              </div>
+            </div>
+            <div className="aqh-summary-card aqh-summary-completed">
+              <div className="aqh-summary-icon aqh-icon-completed">
+                <CheckIcon />
+              </div>
+              <div className="aqh-summary-content">
+                <p className="aqh-summary-label">Completed Queues</p>
+                <p className="aqh-summary-value aqh-value-completed">
+                  {loading ? "—" : todayCompletedCount}
+                </p>
+              </div>
+            </div>
+            <div className="aqh-summary-card aqh-summary-closed">
+              <div className="aqh-summary-icon aqh-icon-closed">
+                <CloseIcon />
+              </div>
+              <div className="aqh-summary-content">
+                <p className="aqh-summary-label">Manually Closed</p>
+                <p className="aqh-summary-value aqh-value-closed">
+                  {loading ? "—" : todayClosedCount}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Search & Filters */}
+          <div className="aqh-filters-card">
+            <div className="aqh-filters-header">
+              <h3 className="aqh-filters-title">Queue Filter</h3>
+              <p className="aqh-filters-description">
+                Search and filter your department's queue lines by status and
+                service type.
+              </p>
+            </div>
+            <div className="aqh-filters-grid">
+              <div className="aqh-filter-group aqh-filter-group--search">
+                <label className="aqh-filter-label" htmlFor="aqh-search">Search</label>
+                <div className="aqh-search-wrapper">
+                  <SearchIcon />
+                  <input
+                    id="aqh-search"
+                    type="text"
+                    className="aqh-form-input aqh-search-input"
+                    placeholder="Search by service or department..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="aqh-filter-group">
+                <label className="aqh-filter-label" htmlFor="aqh-status-filter">Status</label>
+                <div className="aqh-form-select-wrap">
+                  <select
+                    id="aqh-status-filter"
+                    className="aqh-form-select"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    aria-label="Filter by status"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="open">Active</option>
+                    <option value="paused">Paused</option>
+                    <option value="full">Full</option>
+                    <option value="expired">Hours Ended</option>
+                    <option value="completed">Completed</option>
+                    <option value="closed">Closed</option>
+                  </select>
+                  <span className="aqh-select-chevron">
+                    <ChevronDownIcon />
+                  </span>
+                </div>
+              </div>
+              <div className="aqh-filter-group">
+                <label className="aqh-filter-label" htmlFor="aqh-type-filter">Service Type</label>
+                <div className="aqh-form-select-wrap">
+                  <select
+                    id="aqh-type-filter"
+                    className="aqh-form-select"
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value)}
+                    aria-label="Filter by service type"
+                  >
+                    <option value="all">All Service Types</option>
+                    {serviceTypeOptions.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                  <span className="aqh-select-chevron">
+                    <ChevronDownIcon />
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {loading && (
+            <div className="aqh-empty-state">
+              <ClockIcon />
+              <p>Loading your department&apos;s queues&hellip;</p>
+            </div>
+          )}
+
+          {/* All queue lines, flat, ordered by status priority */}
+          {!loading && visibleQueues.length > 0 && (
+            <div className="aqh-queue-list">
+                {activeQueues.map((queue) => (
+                  <div
+                    key={queue.id}
+                    className="aqh-queue-card aqh-card-active aqh-queue-card--clickable"
+                    onClick={() => openMonitor(queue.id)}
+                  >
+                    <div className="aqh-queue-card-top">
+                      <div className="aqh-queue-card-title-row">
+                        <img
+                          src={getCollegeLogo(
+                            queue.department || user.departmentAbbrev,
+                          )}
+                          alt={`${queue.department || user.departmentAbbrev} logo`}
+                          className="aqh-queue-card-logo"
+                        />
+                        <div className="aqh-queue-card-title-block">
+                          <h3 className="aqh-queue-card-title">
+                            {queue.queueType}
+                          </h3>
+                          <p className="aqh-queue-card-dept">
+                            {queue.department}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="aqh-queue-card-top-right">
+                        <span className="aqh-status-badge aqh-status-active">
+                          active
+                        </span>
+                        {queue.passedCount > 0 && (
+                          <span className="aqh-status-badge aqh-status-with-faculty">
+                            {queue.passedCount} with faculty
+                          </span>
+                        )}
+                        {queue.currentlyServingStudentNumber && (
+                          <span className={`aqh-status-badge ${queue.currentlyServingArrivedAt ? "aqh-status-serving" : "aqh-status-called"}`}>
+                            {queue.currentlyServingArrivedAt ? "being served" : "called"}
+                          </span>
+                        )}
+                        <div className="aqh-queue-card-actions">
+                          {/* Students can only join by scanning this, so it
+                              needs to be reachable in one tap from the queue
+                              the secretary is already looking at. */}
+                          <button
+                            className="aqh-action-btn aqh-action-qr"
+                            onClick={(e) => { e.stopPropagation(); setQrSlot({ id: queue.id, name: queue.queueType ?? queue.serviceName }); }}
+                          >
+                            <QrCode width={16} height={16} />
+                            <span>Show QR</span>
+                          </button>
+                          <button
+                            className="aqh-action-btn aqh-action-pause"
+                            onClick={(e) => { e.stopPropagation(); handlePauseQueue(queue.id); }}
+                          >
+                            <PauseIcon />
+                            <span>Pause</span>
+                          </button>
+                          <button
+                            className="aqh-action-btn aqh-action-close"
+                            onClick={(e) => { e.stopPropagation(); handleCloseQueue(queue.id); }}
+                          >
+                            <CloseIcon />
+                            <span>Close</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="aqh-queue-stats-row aqh-stats-row-4">
+                      <div className="aqh-queue-stat">
+                        {/* Occupied seats (waiting + being served + served),
+                            the same figure capacity is enforced on -- a student
+                            passed to faculty or already served still holds a
+                            seat, so this never drops back as people are served. */}
+                        <p className="aqh-queue-stat-label">Occupied / Max</p>
+                        <p className="aqh-queue-stat-value">
+                          {queue.totalInQueue} / {queue.maxCapacity}
+                        </p>
+                      </div>
+                      <div className="aqh-queue-stat">
+                        <p className="aqh-queue-stat-label">Service Hours</p>
+                        <p className="aqh-queue-stat-value aqh-stat-value-sm">
+                          {formatTimeString(queue.serviceHours.start)} - {formatTimeString(queue.serviceHours.end)}
+                        </p>
+                      </div>
+                      <div className="aqh-queue-stat">
+                        <p className="aqh-queue-stat-label">Opened At</p>
+                        <p className="aqh-queue-stat-value aqh-stat-value-sm">
+                          <span className="aqh-stat-datetime">
+                            <span>
+                              {formatManilaDate(queue.createdAt, {
+                                year: "numeric",
+                                month: "numeric",
+                                day: "numeric",
+                              })}
+                            </span>
+                            <span>{formatManilaTime(queue.createdAt)}</span>
+                          </span>
+                        </p>
+                      </div>
+                      <div className="aqh-queue-stat">
+                        <p className="aqh-queue-stat-label">Occupied Slots</p>
+                        <div className="aqh-capacity-bar-track">
+                          <div
+                            className="aqh-capacity-bar-fill"
+                            style={{
+                              width: `${Math.min(100, (queue.totalInQueue / queue.maxCapacity) * 100)}%`,
+                            }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {pausedQueues.map((queue) => (
+                  <div
+                    key={queue.id}
+                    className="aqh-queue-card aqh-card-paused aqh-queue-card--clickable"
+                    onClick={() => openMonitor(queue.id)}
+                  >
+                    <div className="aqh-queue-card-top">
+                      <div className="aqh-queue-card-title-row">
+                        <img
+                          src={getCollegeLogo(
+                            queue.department || user.departmentAbbrev,
+                          )}
+                          alt={`${queue.department || user.departmentAbbrev} logo`}
+                          className="aqh-queue-card-logo"
+                        />
+                        <div className="aqh-queue-card-title-block">
+                          <h3 className="aqh-queue-card-title">
+                            {queue.queueType}
+                          </h3>
+                          <p className="aqh-queue-card-dept">
+                            {queue.department}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="aqh-queue-card-top-right">
+                        <span className="aqh-status-badge aqh-status-paused">
+                          paused
+                        </span>
+                        <div className="aqh-queue-card-actions">
+                          <button
+                            className="aqh-action-btn aqh-action-resume"
+                            onClick={(e) => { e.stopPropagation(); handleResumeQueue(queue.id); }}
+                          >
+                            <PlayIcon />
+                            <span>Resume</span>
+                          </button>
+                          <button
+                            className="aqh-action-btn aqh-action-close"
+                            onClick={(e) => { e.stopPropagation(); handleCloseQueue(queue.id); }}
+                          >
+                            <CloseIcon />
+                            <span>Close</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="aqh-queue-stats-row aqh-stats-row-3">
+                      <div className="aqh-queue-stat">
+                        <p className="aqh-queue-stat-label">Occupied / Max</p>
+                        <p className="aqh-queue-stat-value">
+                          {queue.totalInQueue} / {queue.maxCapacity}
+                        </p>
+                      </div>
+                      <div className="aqh-queue-stat">
+                        <p className="aqh-queue-stat-label">Service Hours</p>
+                        <p className="aqh-queue-stat-value aqh-stat-value-sm">
+                          {formatTimeString(queue.serviceHours.start)} - {formatTimeString(queue.serviceHours.end)}
+                        </p>
+                      </div>
+                      <div className="aqh-queue-stat">
+                        <p className="aqh-queue-stat-label">Served Today</p>
+                        <p className="aqh-queue-stat-value aqh-stat-value-sm">
+                          {queue.servedCount}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {stillServingQueues.map((queue) => (
+                  <div
+                    key={queue.id}
+                    className="aqh-queue-card aqh-card-still-serving aqh-queue-card--clickable"
+                    onClick={() => openMonitor(queue.id)}
+                  >
+                    <div className="aqh-queue-card-top">
+                      <div className="aqh-queue-card-title-row">
+                        <img
+                          src={getCollegeLogo(
+                            queue.department || user.departmentAbbrev,
+                          )}
+                          alt={`${queue.department || user.departmentAbbrev} logo`}
+                          className="aqh-queue-card-logo"
+                        />
+                        <div className="aqh-queue-card-title-block">
+                          <h3 className="aqh-queue-card-title">
+                            {queue.queueType}
+                          </h3>
+                          <p className="aqh-queue-card-dept">
+                            {queue.department}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="aqh-queue-card-top-right">
+                        <span className="aqh-status-badge aqh-status-still-serving">
+                          {queue.status === "full" ? "full" : "hours ended"}
+                        </span>
+                        {queue.passedCount > 0 && (
+                          <span className="aqh-status-badge aqh-status-with-faculty">
+                            {queue.passedCount} with faculty
+                          </span>
+                        )}
+                        {queue.currentlyServingStudentNumber && (
+                          <span className={`aqh-status-badge ${queue.currentlyServingArrivedAt ? "aqh-status-serving" : "aqh-status-called"}`}>
+                            {queue.currentlyServingArrivedAt ? "being served" : "called"}
+                          </span>
+                        )}
+                        <div className="aqh-queue-card-actions">
+                          {queue.status === "expired" && (
+                            <button
+                              className="aqh-action-btn aqh-action-btn--repeat"
+                              onClick={(e) => { e.stopPropagation(); openReopenModal(queue); }}
+                            >
+                              <RepeatIcon />
+                              <span>Reopen Queue</span>
+                            </button>
+                          )}
+                          <button
+                            className="aqh-action-btn aqh-action-close"
+                            onClick={(e) => { e.stopPropagation(); handleCloseQueue(queue.id); }}
+                          >
+                            <CloseIcon />
+                            <span>Stop Queue</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="aqh-queue-stats-row aqh-stats-row-4">
+                      <div className="aqh-queue-stat">
+                        <p className="aqh-queue-stat-label">Occupied / Max</p>
+                        <p className="aqh-queue-stat-value">
+                          {queue.totalInQueue} / {queue.maxCapacity}
+                        </p>
+                      </div>
+                      <div className="aqh-queue-stat">
+                        <p className="aqh-queue-stat-label">Service Hours</p>
+                        <p className="aqh-queue-stat-value aqh-stat-value-sm">
+                          {formatTimeString(queue.serviceHours.start)} - {formatTimeString(queue.serviceHours.end)}
+                        </p>
+                      </div>
+                      <div className="aqh-queue-stat">
+                        <p className="aqh-queue-stat-label">Opened At</p>
+                        <p className="aqh-queue-stat-value aqh-stat-value-sm">
+                          <span className="aqh-stat-datetime">
+                            <span>
+                              {formatManilaDate(queue.createdAt, {
+                                year: "numeric",
+                                month: "numeric",
+                                day: "numeric",
+                              })}
+                            </span>
+                            <span>{formatManilaTime(queue.createdAt)}</span>
+                          </span>
+                        </p>
+                      </div>
+                      <div className="aqh-queue-stat">
+                        <p className="aqh-queue-stat-label">Served</p>
+                        <p className="aqh-queue-stat-value aqh-stat-value-sm">
+                          {queue.servedCount}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {completedQueues.map((queue) => (
+                  <div
+                    key={queue.id}
+                    className="aqh-queue-card aqh-card-completed aqh-queue-card--clickable"
+                    onClick={() => openMonitor(queue.id)}
+                  >
+                    <div className="aqh-queue-card-top">
+                      <div className="aqh-queue-card-title-row">
+                        <img
+                          src={getCollegeLogo(
+                            queue.department || user.departmentAbbrev,
+                          )}
+                          alt={`${queue.department || user.departmentAbbrev} logo`}
+                          className="aqh-queue-card-logo"
+                        />
+                        <div className="aqh-queue-card-title-block">
+                          <h3 className="aqh-queue-card-title">
+                            {queue.queueType}
+                          </h3>
+                          <p className="aqh-queue-card-dept">
+                            {queue.department}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="aqh-queue-card-top-right">
+                        <span className="aqh-status-badge aqh-status-completed">
+                          completed
+                        </span>
+                        <div className="aqh-queue-card-actions">
+                          <button
+                            className="aqh-action-btn aqh-action-btn--repeat"
+                            onClick={(e) => { e.stopPropagation(); openModalWithConfig(queue); }}
+                          >
+                            <RepeatIcon />
+                            <span>Host Again</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="aqh-closed-meta">
+                      Opened{" "}
+                      {formatManilaDate(queue.createdAt, {
+                        year: "numeric",
+                        month: "numeric",
+                        day: "numeric",
+                      })}
+                      {" · "}Served: {queue.servedCount} student(s), Capacity: {" "}
+                      {queue.maxCapacity}
+                    </p>
+                  </div>
+                ))}
+                {closedQueues.map((queue) => (
+                  <div
+                    key={queue.id}
+                    className="aqh-queue-card aqh-card-closed aqh-queue-card--clickable"
+                    onClick={() => openMonitor(queue.id)}
+                  >
+                    <div className="aqh-queue-card-top">
+                      <div className="aqh-queue-card-title-row">
+                        <img
+                          src={getCollegeLogo(
+                            queue.department || user.departmentAbbrev,
+                          )}
+                          alt={`${queue.department || user.departmentAbbrev} logo`}
+                          className="aqh-queue-card-logo"
+                        />
+                        <div className="aqh-queue-card-title-block">
+                          <h3 className="aqh-queue-card-title">
+                            {queue.queueType}
+                          </h3>
+                          <p className="aqh-queue-card-dept">
+                            {queue.department}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="aqh-queue-card-top-right">
+                        <span className="aqh-status-badge aqh-status-closed">
+                          closed
+                        </span>
+                        {queue.passedCount > 0 && (
+                          <span className="aqh-status-badge aqh-status-with-faculty">
+                            {queue.passedCount} with faculty
+                          </span>
+                        )}
+                        <div className="aqh-queue-card-actions">
+                          <button
+                            className="aqh-action-btn aqh-action-btn--repeat"
+                            onClick={(e) => { e.stopPropagation(); openModalWithConfig(queue); }}
+                          >
+                            <RepeatIcon />
+                            <span>Host Again</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="aqh-closed-meta">
+                      Opened{" "}
+                      {formatManilaDate(queue.createdAt, {
+                        year: "numeric",
+                        month: "numeric",
+                        day: "numeric",
+                      })}
+                      {" · "}Served {queue.servedCount} student(s), capacity{" "}
+                      {queue.maxCapacity}
+                    </p>
+                  </div>
+                ))}
+            </div>
+          )}
+
+          {!loading && queues.length === 0 && (
+            <div className="aqh-empty-state">
+              <ClockIcon />
+              <h3>No Queue Lines Yet</h3>
+              <p>
+                No recent queue lines for {user.departmentAbbrev}. Open one
+                to start serving students.
+              </p>
+            </div>
+          )}
+
+          {!loading && queues.length > 0 && visibleQueues.length === 0 && (
+            <div className="aqh-empty-state">
+              <ClockIcon />
+              <h3>No Matches</h3>
+              <p>No queue lines match your search or filters.</p>
+            </div>
+          )}
+        </div>
+    </AdminPageShell>
+  );
+}

@@ -1,0 +1,1879 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import Toast from 'react-native-toast-message';
+import type { ComponentProps } from 'react';
+import {
+  Alert,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
+import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
+import NotificationBell from '@/components/NotificationBell';
+import RefreshButton from '@/components/RefreshButton';
+import QueueReasonModal from '@/components/QueueReasonModal';
+import ProfessorAvailabilityToggle from '@/components/ProfessorAvailabilityToggle';
+import { useProfessorAvailability } from '@/hooks/useProfessorAvailability';
+import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
+import { DocStatus, getHubStatusMeta, normalizeDocStatus } from '@/utils/documentStatus';
+import { toLocalYMD, fromLocalYMD, formatManilaDate, formatManilaTime } from '@/utils/date';
+import DatePickerSheet from '@/components/DatePickerSheet';
+import * as DocumentPicker from 'expo-document-picker';
+
+// Mirrors the server's limits (server/middleware/upload.js) -- purely
+// advisory here for the running-total UI, the server stays authoritative.
+const MAX_FILES = 5;
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 50 * 1024 * 1024;
+const ATTACHMENT_TYPES = [
+  'application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain', 'text/csv', 'application/zip',
+];
+
+const pncLogo = require('@/assets/Pnc-Logo.png');
+const oamsLogo = require('@/assets/oams_logo.png');
+const darkModeIcon = require('@/assets/darkmode_icon.png');
+const sunIcon = require('@/assets/sun_icon.png');
+
+type IoniconName = ComponentProps<typeof Ionicons>['name'];
+
+function OamsLogo({
+  style,
+  outline,
+}: {
+  style: { height: number; width: number };
+  outline: boolean;
+}) {
+  if (!outline) {
+    return <Image source={oamsLogo} style={style} resizeMode="contain" />;
+  }
+  const layerStyle = {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    width: style.width,
+    height: style.height,
+  };
+  return (
+    <View style={[style, { position: 'relative', overflow: 'hidden' }]}>
+      {[
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ].map(([dx, dy]) => (
+        <Image
+          key={`${dx}-${dy}`}
+          source={oamsLogo}
+          resizeMode="contain"
+          style={[
+            layerStyle,
+            { tintColor: '#ffffff', transform: [{ translateX: dx }, { translateY: dy }] },
+          ]}
+        />
+      ))}
+      <Image source={oamsLogo} resizeMode="contain" style={layerStyle} />
+    </View>
+  );
+}
+
+// ─── Field shapes documented here mirror what Field shapes mirror what
+// GET /professor/documents and GET /professor/documents/service-types really
+// return (service_name, college, purpose, created_at, status, tracking_number,
+// notes, estimated_completion, needed_by) — this screen ports the actual wired
+// prof-documents.jsx/.css 1:1: Request Document dialog (type/purpose/needed-by/
+// notes), Active/Completed tabs, and the Cancel Request confirm flow. ───
+interface DocumentAttachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
+interface DocumentRequest {
+  id: string;
+  kind?: 'request' | 'submission';
+  type: string;
+  college: string;
+  purpose: string;
+  copies?: number;
+  requestDate: string;
+  updatedAt?: string;
+  status: DocStatus;
+  trackingNumber: string;
+  notes?: string;
+  estimatedCompletion?: string;
+  neededBy?: string;
+  facultyFiles?: DocumentAttachment[];
+  adminFiles?: DocumentAttachment[];
+}
+
+interface DocumentRequirement {
+  name: string;
+  description?: string;
+  isMandatory: boolean;
+}
+
+interface DocumentTypeOption {
+  id: number;
+  name: string;
+  processingTime: string;
+  requirements: DocumentRequirement[];
+}
+
+interface NavItem {
+  key: string;
+  label: string;
+  icon: IoniconName;
+}
+
+const navItems: NavItem[] = [
+  { key: 'dashboard', label: 'Dashboard', icon: 'home-outline' },
+  { key: 'announcements', label: 'Announcements', icon: 'megaphone-outline' },
+  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
+  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
+  { key: 'transactions', label: 'Transactions', icon: 'time-outline' },
+];
+
+const TABS = ['active', 'claimed', 'rejected', 'cancelled'] as const;
+type TabKey = (typeof TABS)[number];
+const TAB_META: Record<TabKey, { label: string; icon: IoniconName }> = {
+  active: { label: 'Active Requests', icon: 'alert-circle-outline' },
+  claimed: { label: 'Claimed', icon: 'checkmark-circle-outline' },
+  rejected: { label: 'Rejected', icon: 'close-circle-outline' },
+  cancelled: { label: 'Cancelled', icon: 'close-circle-outline' },
+};
+
+// The documents API returns full ISO timestamp strings (…T05:30:00.000Z);
+// the old `new Date(`${dateStr}T00:00:00`)` produced an Invalid Date and fell
+// back to rendering the raw string. Delegate to the shared Manila formatter.
+function formatDate(dateStr?: string) {
+  return formatManilaDate(dateStr);
+}
+
+const emptyFormData: { typeId: number | ''; purpose: string; copies: string; neededBy: string } = {
+  typeId: '',
+  purpose: '',
+  copies: '1',
+  neededBy: '',
+};
+
+export default function ProfessorDocumentsScreen() {
+  const { isDarkMode, toggleTheme } = useTheme();
+  const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const {
+    isAvailable,
+    unavailableReasonModalOpen,
+    unavailableReasonText,
+    unavailableReasonSubmitting,
+    setUnavailableReasonText,
+    toggleAvailability,
+    confirmMarkUnavailable,
+    cancelUnavailableModal,
+  } = useProfessorAvailability();
+  const [requests, setRequests] = useState<DocumentRequest[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(true);
+  const [documentTypes, setDocumentTypes] = useState<DocumentTypeOption[]>([]);
+  const [, setTypesLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabKey>('active');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [formData, setFormData] = useState(emptyFormData);
+  const [typePickerOpen, setTypePickerOpen] = useState(false);
+  const [showNeededByPicker, setShowNeededByPicker] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<DocumentRequest | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [claimTarget, setClaimTarget] = useState<DocumentRequest | null>(null);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  // ── "Send a Document" state ────────────────────────────────────────────
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [sendSubmitting, setSendSubmitting] = useState(false);
+  const [sendFormData, setSendFormData] = useState({ title: '', purpose: '', neededBy: '' });
+  const [sendFiles, setSendFiles] = useState<DocumentPicker.DocumentPickerAsset[]>([]);
+  const [showSendNeededByPicker, setShowSendNeededByPicker] = useState(false);
+
+  const router = useRouter();
+  const { user, logout, token } = useAuth();
+  const tomorrowDate = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d;
+  })();
+
+  const openSendDialog = () => {
+    setSendFormData({ title: '', purpose: '', neededBy: '' });
+    setSendFiles([]);
+    setSendDialogOpen(true);
+  };
+
+  const pickSendFiles = async () => {
+    const result = await DocumentPicker.getDocumentAsync({ type: ATTACHMENT_TYPES, multiple: true });
+    if (result.canceled || !result.assets?.length) return;
+
+    let count = sendFiles.length;
+    let bytes = sendFiles.reduce((sum, f) => sum + (f.size ?? 0), 0);
+    let tooLarge = 0;
+    let overBudget = 0;
+    const accepted: DocumentPicker.DocumentPickerAsset[] = [];
+    for (const asset of result.assets) {
+      if (asset.size != null && asset.size > MAX_FILE_BYTES) {
+        tooLarge += 1;
+        continue;
+      }
+      if (count + 1 > MAX_FILES || (asset.size != null && bytes + asset.size > MAX_TOTAL_BYTES)) {
+        overBudget += 1;
+        continue;
+      }
+      accepted.push(asset);
+      count += 1;
+      bytes += asset.size ?? 0;
+    }
+    if (accepted.length > 0) setSendFiles((prev) => [...prev, ...accepted]);
+    if (tooLarge > 0) {
+      Alert.alert('File too large', `${tooLarge} file(s) skipped — each file must be 10MB or smaller.`);
+    }
+    if (overBudget > 0) {
+      Alert.alert('Attachment limit reached', `${overBudget} file(s) skipped — you can attach up to ${MAX_FILES} files.`);
+    }
+  };
+  const removeSendFile = (uri: string) => setSendFiles((prev) => prev.filter((f) => f.uri !== uri));
+
+  const theme = isDarkMode ? darkPalette : lightPalette;
+  const styles = createStyles(theme);
+
+  const comingSoon = () =>
+    Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
+
+  useEffect(() => {
+    const fetchTypes = async () => {
+      setTypesLoading(true);
+      try {
+        const { data } = await api.get('/professor/documents/service-types');
+        setDocumentTypes(
+          (data ?? []).map((s: any) => ({
+            id: s.service_id,
+            name: s.service_name,
+            processingTime: s.processing_time ?? 'TBD',
+            requirements: s.requirements ?? [],
+          })),
+        );
+      } catch (err) {
+        console.error('Fetch document types error:', err);
+      } finally {
+        setTypesLoading(false);
+      }
+    };
+    fetchTypes();
+  }, []);
+
+  // Mirrors `requests` for the catch block below, without making
+  // fetchRequests depend on (and change identity with) the state itself.
+  const requestsRef = useRef(requests);
+  useEffect(() => { requestsRef.current = requests; }, [requests]);
+
+  // Guards against out-of-order responses: mount, the status-change socket
+  // event, and the 45s fallback poll below can all independently trigger
+  // this fetch, so a slower-but-earlier response landing after a newer one
+  // could otherwise overwrite fresh state with stale data.
+  const requestIdRef = useRef(0);
+
+  const fetchRequests = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    try {
+      const { data } = await api.get('/professor/documents');
+      if (requestId !== requestIdRef.current) return;
+      setRequests(
+        (data ?? []).map((r: any) => ({
+          id: String(r.request_id),
+          kind: r.kind,
+          type: r.service_name,
+          college: r.college,
+          purpose: r.purpose,
+          copies: r.copies,
+          requestDate: r.created_at,
+          updatedAt: r.updated_at || undefined,
+          status: r.status,
+          trackingNumber: r.tracking_number,
+          notes: r.notes || undefined,
+          estimatedCompletion: r.estimated_completion || undefined,
+          neededBy: r.needed_by || undefined,
+          facultyFiles: r.faculty_files || undefined,
+          adminFiles: r.admin_files || undefined,
+        })),
+      );
+    } catch (err) {
+      if (requestId !== requestIdRef.current) return;
+      console.error('Fetch document requests error:', err);
+      if (requestsRef.current.length === 0) {
+        Alert.alert('Error', 'Could not load your document requests.');
+      } else {
+        Toast.show({ type: 'error', text1: 'Could not refresh your document requests.' });
+      }
+    } finally {
+      if (requestId === requestIdRef.current) setRequestsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchRequests();
+  }, [fetchRequests]);
+
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+    const refetch = () => fetchRequests();
+    socket.on('document:status-updated', refetch);
+    return () => {
+      socket.off('document:status-updated', refetch);
+    };
+  }, [user, token, fetchRequests]);
+
+  // ── Fallback poll (safety net only — sockets drive live updates) ──────────
+  useEffect(() => {
+    if (!user || !token) return undefined;
+    const interval = setInterval(() => {
+      fetchRequests();
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [user, token, fetchRequests]);
+
+  const goToDashboard = () => router.push('/pages/professor/professor_dashboard');
+
+  const handleNavPress = (key: string) => {
+    setMenuOpen(false);
+    if (key === 'documents') return;
+    if (key === 'dashboard') {
+      goToDashboard();
+      return;
+    }
+    if (key === 'announcements') {
+      router.push('/pages/professor/professor_announcement');
+      return;
+    }
+    if (key === 'appointments') {
+      router.push('/pages/professor/professor_appointment');
+      return;
+    }
+    if (key === 'transactions') {
+      router.push('/pages/professor/professor_transactions');
+      return;
+    }
+    comingSoon();
+  };
+
+  const handleLogout = () => {
+    setMenuOpen(false);
+    setLogoutModalVisible(true);
+  };
+
+  const confirmLogout = () => {
+    setLogoutModalVisible(false);
+    logout();
+    router.replace('/login');
+  };
+
+  const openRequestDialog = () => {
+    setFormData(emptyFormData);
+    setDialogOpen(true);
+  };
+
+  const selectedType = documentTypes.find((t) => t.id === formData.typeId);
+  const canSubmit = !!formData.typeId && formData.purpose.trim().length > 0;
+
+  const handleSubmitRequest = async () => {
+    if (!canSubmit || !selectedType) return;
+    setSubmitting(true);
+    try {
+      await api.post('/professor/documents', {
+        service_id: selectedType.id,
+        request_type: selectedType.name,
+        purpose: formData.purpose.trim(),
+        copies: formData.copies,
+        needed_by: formData.neededBy || null,
+      });
+      await fetchRequests();
+      setDialogOpen(false);
+      setFormData(emptyFormData);
+    } catch (err: any) {
+      console.error('Submit document request error:', err);
+      Alert.alert('Error', err?.response?.data?.message ?? 'Failed to submit document request.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSubmitSendDocument = async () => {
+    if (sendSubmitting) return;
+    if (!sendFormData.title.trim() || !sendFormData.purpose.trim()) {
+      Alert.alert('Missing information', 'Please fill in all required fields.');
+      return;
+    }
+    setSendSubmitting(true);
+    try {
+      const body = new FormData();
+      body.append('title', sendFormData.title);
+      body.append('purpose', sendFormData.purpose);
+      body.append('neededBy', sendFormData.neededBy);
+      sendFiles.forEach((asset) => {
+        body.append('attachments', {
+          uri: asset.uri,
+          name: asset.name,
+          type: asset.mimeType ?? 'application/octet-stream',
+        } as any);
+      });
+      await api.post('/professor/document-submissions', body, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      await fetchRequests();
+      setSendDialogOpen(false);
+      setSendFormData({ title: '', purpose: '', neededBy: '' });
+      setSendFiles([]);
+    } catch (err: any) {
+      console.error('Send document error:', err);
+      Alert.alert('Error', err?.response?.data?.message ?? 'Failed to send document.');
+    } finally {
+      setSendSubmitting(false);
+    }
+  };
+
+  const confirmCancelRequest = async () => {
+    if (!cancelTarget) return;
+    setCancellingId(cancelTarget.id);
+    try {
+      await api.delete(`/professor/documents/${cancelTarget.id}`);
+      setRequests((prev) =>
+        prev.map((r) => (r.id === cancelTarget.id ? { ...r, status: 'cancelled' } : r)),
+      );
+      setCancelTarget(null);
+    } catch (err: any) {
+      console.error('Cancel document request error:', err);
+      Alert.alert('Error', err?.response?.data?.message ?? 'Failed to cancel document request.');
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  const confirmClaimRequest = async () => {
+    if (!claimTarget) return;
+    setClaimingId(claimTarget.id);
+    try {
+      await api.patch(`/professor/documents/${claimTarget.id}/claim`);
+      setClaimTarget(null);
+      await fetchRequests();
+      Toast.show({ type: 'success', text1: 'Document marked as claimed.' });
+    } catch (err: any) {
+      console.error('Claim document request error:', err);
+      Alert.alert('Error', err?.response?.data?.error ?? 'Failed to mark the document as claimed.');
+    } finally {
+      setClaimingId(null);
+    }
+  };
+
+  const activeRequests = requests.filter(
+    (r) => r.status !== 'claimed' && r.status !== 'rejected' && r.status !== 'cancelled',
+  );
+  const claimedRequests = requests.filter((r) => r.status === 'claimed');
+  const rejectedRequests = requests.filter((r) => r.status === 'rejected');
+  const cancelledRequests = requests.filter((r) => r.status === 'cancelled');
+  const tabCounts: Record<TabKey, number> = {
+    active: activeRequests.length,
+    claimed: claimedRequests.length,
+    rejected: rejectedRequests.length,
+    cancelled: cancelledRequests.length,
+  };
+
+  return (
+    <View style={styles.root}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+
+        <View style={styles.header}>
+          <View style={styles.headerBrand}>
+            <Image source={pncLogo} style={styles.headerPncLogo} resizeMode="contain" />
+            <OamsLogo style={styles.headerOamsLogo} outline={isDarkMode} />
+          </View>
+          <View style={styles.headerActions}>
+            <Pressable style={styles.iconBtn} onPress={toggleTheme} hitSlop={8}>
+              <Image
+                source={isDarkMode ? sunIcon : darkModeIcon}
+                style={styles.iconBtnImg}
+                resizeMode="contain"
+              />
+            </Pressable>
+            <RefreshButton onPress={() => fetchRequests()} loading={requestsLoading} style={styles.iconBtn} color={theme.text} label="Refresh documents" />
+            <NotificationBell
+              endpointBase="professor"
+              theme={theme}
+              typePaths={PROFESSOR_NOTIFICATION_PATHS}
+              viewAllPath={PROFESSOR_NOTIFICATIONS_VIEW_ALL}
+            />
+            <Pressable style={styles.iconBtn} onPress={() => setMenuOpen(true)} hitSlop={8}>
+              <Ionicons name="menu-outline" size={20} color={theme.text} />
+            </Pressable>
+          </View>
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
+            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <Text style={styles.breadcrumbText}>Home</Text>
+          </Pressable>
+
+          <View style={styles.titleRow}>
+            <LinearGradient colors={['#f97316', '#ea580c']} style={styles.titleIcon}>
+              <Ionicons name="document-text-outline" size={22} color="#ffffff" />
+            </LinearGradient>
+            <View style={styles.titleTextWrap}>
+              <Text style={styles.pageTitle}>Document Requests and Submissions</Text>
+              <Text style={styles.pageSubtitle}>Request and submit documents as well as track their status.</Text>
+            </View>
+          </View>
+
+          <View style={styles.actionButtonsCol}>
+            <Pressable style={styles.requestBtn} onPress={openRequestDialog}>
+              <LinearGradient colors={['#f97316', '#ea580c']} style={StyleSheet.absoluteFill} />
+              <Ionicons name="add-outline" size={16} color="#ffffff" />
+              <Text style={styles.requestBtnText}>Request Document</Text>
+            </Pressable>
+            <Pressable style={styles.requestBtn} onPress={openSendDialog}>
+              <LinearGradient colors={['#f97316', '#ea580c']} style={StyleSheet.absoluteFill} />
+              <Ionicons name="add-outline" size={16} color="#ffffff" />
+              <Text style={styles.requestBtnText}>Send Document</Text>
+            </Pressable>
+          </View>
+
+          {/* Tabs */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.tabsList}
+            contentContainerStyle={{ gap: 6 }}
+          >
+            {TABS.map((tab) => {
+              const active = activeTab === tab;
+              const count = tabCounts[tab];
+              return (
+                <Pressable
+                  key={tab}
+                  style={[styles.tabTrigger, active && styles.tabTriggerActive]}
+                  onPress={() => setActiveTab(tab)}
+                >
+                  <Ionicons
+                    name={TAB_META[tab].icon}
+                    size={14}
+                    color={active ? '#f97316' : theme.subtext}
+                  />
+                  <Text style={[styles.tabTriggerText, active && styles.tabTriggerTextActive]}>
+                    {TAB_META[tab].label}
+                  </Text>
+                  <View style={[styles.tabCount, active && styles.tabCountActive]}>
+                    <Text style={[styles.tabCountText, active && styles.tabCountTextActive]}>{count}</Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {/* Active Tab */}
+          {activeTab === 'active' && (
+            requestsLoading ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="document-text-outline" size={32} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>Loading requests...</Text>
+              </View>
+            ) : activeRequests.length > 0 ? (
+              <View style={styles.docList}>
+                {activeRequests.map((req) => {
+                  const meta = getHubStatusMeta(req.status, isDarkMode);
+                  return (
+                    <Pressable
+                      key={req.id}
+                      style={styles.docCard}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/pages/professor/professor_documents_status',
+                          params: { docId: req.id, from: 'document-request' },
+                        })
+                      }
+                    >
+                      <View style={styles.docCardHeaderRow}>
+                        <View style={styles.docIconWrap}>
+                          <Ionicons name="document-text-outline" size={17} color="#f97316" />
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={styles.docTypeText}>{req.type}</Text>
+                          <Text style={styles.docCollegeText}>{req.college}</Text>
+                          <View style={[styles.statusBadge, styles.docHeaderBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
+                            <Ionicons name={meta.icon} size={12} color={meta.color} />
+                            <Text style={[styles.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
+                          </View>
+                          <Text style={styles.docTrackingText}>
+                            Tracking: <Text style={styles.docTrackingValue}>{req.trackingNumber}</Text>
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.docInfoGrid}>
+                        <View style={styles.docInfoField}>
+                          <Text style={styles.docInfoLabel}>Request Date</Text>
+                          <Text style={styles.docInfoDateValue}>{formatDate(req.requestDate)}</Text>
+                        </View>
+                        {req.neededBy && (
+                          <View style={styles.docInfoField}>
+                            <Text style={styles.docInfoLabel}>Needed By</Text>
+                            <Text style={styles.docInfoDateValue}>{formatDate(req.neededBy)}</Text>
+                          </View>
+                        )}
+                        {req.copies != null && (
+                          <View style={styles.docInfoField}>
+                            <Text style={styles.docInfoLabel}>Number of Copies</Text>
+                            <Text style={styles.docInfoDateValue}>{req.copies}</Text>
+                          </View>
+                        )}
+                        <View style={[styles.docInfoField, styles.docInfoFieldFull]}>
+                          <Text style={styles.docInfoLabel}>Purpose</Text>
+                          <Text style={styles.docInfoValue}>{req.purpose}</Text>
+                        </View>
+                      </View>
+
+                      {req.notes && (
+                        <View style={styles.updateBox}>
+                          <Text style={styles.updateTitle}>Update</Text>
+                          <Text style={styles.updateText}>{req.notes}</Text>
+                        </View>
+                      )}
+
+                      {normalizeDocStatus(req.status) === 'ready' && (
+                        <View style={styles.docActionsRow}>
+                          <Pressable
+                            style={[styles.claimBtnFull, styles.docActionsRowItem]}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              router.push({
+                                pathname: '/pages/professor/professor_documents_status',
+                                params: { docId: req.id, from: 'document-request' },
+                              });
+                            }}
+                          >
+                            <Ionicons name="download-outline" size={16} color="#22c55e" />
+                            <Text style={styles.claimBtnFullText}>View Pickup Details</Text>
+                          </Pressable>
+                          <Pressable
+                            style={[styles.claimBtnFull, styles.docActionsRowItem]}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              setClaimTarget(req);
+                            }}
+                            disabled={claimingId === req.id}
+                          >
+                            <Ionicons name="checkmark-circle-outline" size={16} color="#22c55e" />
+                            <Text style={styles.claimBtnFullText}>
+                              {claimingId === req.id ? 'Marking…' : 'Mark Document as Claimed'}
+                            </Text>
+                          </Pressable>
+                        </View>
+                      )}
+
+                      {(req.status === 'pending' || req.status === 'processing') && (
+                        <Pressable
+                          style={styles.cancelBtnFull}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            setCancelTarget(req);
+                          }}
+                        >
+                          <Ionicons name="close-circle-outline" size={16} color="#ef4444" />
+                          <Text style={styles.cancelBtnFullText}>Cancel Request</Text>
+                        </Pressable>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="document-text-outline" size={32} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>No active requests</Text>
+                <Text style={styles.emptyText}>Start by requesting a document</Text>
+              </View>
+            )
+          )}
+
+          {/* Claimed Tab */}
+          {activeTab === 'claimed' && (
+            requestsLoading ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="document-text-outline" size={32} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>Loading requests...</Text>
+              </View>
+            ) : claimedRequests.length > 0 ? (
+              <View style={styles.docList}>
+                {claimedRequests.map((req) => {
+                  const meta = getHubStatusMeta(req.status, isDarkMode);
+                  return (
+                    <Pressable
+                      key={req.id}
+                      style={[styles.docCard, styles.docCardCompleted]}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/pages/professor/professor_documents_status',
+                          params: { docId: req.id, from: 'document-request' },
+                        })
+                      }
+                    >
+                      <View style={styles.docCardHeaderRow}>
+                        <View style={styles.docIconWrap}>
+                          <Ionicons name="document-text-outline" size={17} color="#f97316" />
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={styles.docTypeText}>{req.type}</Text>
+                          <Text style={styles.docCollegeText}>{req.college}</Text>
+                          <View style={[styles.statusBadge, styles.docHeaderBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
+                            <Text style={[styles.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
+                          </View>
+                          <Text style={styles.docTrackingText}>{req.trackingNumber}</Text>
+                          <View style={styles.docCardMeta}>
+                            <View style={styles.docCardMetaRow}>
+                              <Ionicons name="calendar-outline" size={13} color={theme.tertiary} />
+                              <Text style={styles.docCardMetaText}>
+                                {formatManilaDate(req.updatedAt || req.requestDate, { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </Text>
+                            </View>
+                            <View style={styles.docCardMetaRow}>
+                              <Ionicons name="time-outline" size={13} color={theme.tertiary} />
+                              <Text style={styles.docCardMetaText}>{formatManilaTime(req.updatedAt || req.requestDate)}</Text>
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="checkmark-circle-outline" size={32} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>No Completed Requests</Text>
+                <Text style={styles.emptyText}>You have no records of claimed documents.</Text>
+              </View>
+            )
+          )}
+
+          {/* Rejected Tab */}
+          {activeTab === 'rejected' && (
+            requestsLoading ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="document-text-outline" size={32} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>Loading requests...</Text>
+              </View>
+            ) : rejectedRequests.length > 0 ? (
+              <View style={styles.docList}>
+                {rejectedRequests.map((req) => {
+                  const meta = getHubStatusMeta(req.status, isDarkMode);
+                  return (
+                    <Pressable
+                      key={req.id}
+                      style={[styles.docCard, styles.docCardCompleted]}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/pages/professor/professor_documents_status',
+                          params: { docId: req.id, from: 'document-request' },
+                        })
+                      }
+                    >
+                      <View style={styles.docCardHeaderRow}>
+                        <View style={styles.docIconWrap}>
+                          <Ionicons name="document-text-outline" size={17} color="#f97316" />
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={styles.docTypeText}>{req.type}</Text>
+                          <Text style={styles.docCollegeText}>{req.college}</Text>
+                          <View style={[styles.statusBadge, styles.docHeaderBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
+                            <Text style={[styles.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
+                          </View>
+                          <Text style={styles.docTrackingText}>{req.trackingNumber}</Text>
+                          <View style={styles.docCardMeta}>
+                            <View style={styles.docCardMetaRow}>
+                              <Ionicons name="calendar-outline" size={13} color={theme.tertiary} />
+                              <Text style={styles.docCardMetaText}>
+                                {formatManilaDate(req.updatedAt || req.requestDate, { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </Text>
+                            </View>
+                            <View style={styles.docCardMetaRow}>
+                              <Ionicons name="time-outline" size={13} color={theme.tertiary} />
+                              <Text style={styles.docCardMetaText}>{formatManilaTime(req.updatedAt || req.requestDate)}</Text>
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="close-circle-outline" size={32} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>No Rejected Requests</Text>
+                <Text style={styles.emptyText}>You have no records of rejected document requests.</Text>
+              </View>
+            )
+          )}
+
+          {/* Cancelled Tab */}
+          {activeTab === 'cancelled' && (
+            requestsLoading ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="document-text-outline" size={32} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>Loading requests...</Text>
+              </View>
+            ) : cancelledRequests.length > 0 ? (
+              <View style={styles.docList}>
+                {cancelledRequests.map((req) => {
+                  const meta = getHubStatusMeta(req.status, isDarkMode);
+                  return (
+                    <Pressable
+                      key={req.id}
+                      style={[styles.docCard, styles.docCardCompleted]}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/pages/professor/professor_documents_status',
+                          params: { docId: req.id, from: 'document-request' },
+                        })
+                      }
+                    >
+                      <View style={styles.docCardHeaderRow}>
+                        <View style={styles.docIconWrap}>
+                          <Ionicons name="document-text-outline" size={17} color="#f97316" />
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={styles.docTypeText}>{req.type}</Text>
+                          <Text style={styles.docCollegeText}>{req.college}</Text>
+                          <View style={[styles.statusBadge, styles.docHeaderBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
+                            <Text style={[styles.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
+                          </View>
+                          <Text style={styles.docTrackingText}>{req.trackingNumber}</Text>
+                          <View style={styles.docCardMeta}>
+                            <View style={styles.docCardMetaRow}>
+                              <Ionicons name="calendar-outline" size={13} color={theme.tertiary} />
+                              <Text style={styles.docCardMetaText}>
+                                {formatManilaDate(req.updatedAt || req.requestDate, { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </Text>
+                            </View>
+                            <View style={styles.docCardMetaRow}>
+                              <Ionicons name="time-outline" size={13} color={theme.tertiary} />
+                              <Text style={styles.docCardMetaText}>{formatManilaTime(req.updatedAt || req.requestDate)}</Text>
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="close-circle-outline" size={32} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>No Cancelled Requests</Text>
+                <Text style={styles.emptyText}>You have no records of cancelled document requests.</Text>
+              </View>
+            )
+          )}
+        </ScrollView>
+      </SafeAreaView>
+
+      {/* Request Document Dialog */}
+      <Modal visible={dialogOpen} animationType="fade" transparent onRequestClose={() => setDialogOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.requestDialogCard}>
+            <View style={styles.requestDialogHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.requestDialogTitle}>Request a Document</Text>
+              </View>
+              <Pressable onPress={() => setDialogOpen(false)} hitSlop={8}>
+                <Ionicons name="close" size={20} color={theme.subtext} />
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.requestDialogScroll}>
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Document Type</Text>
+                <Pressable style={styles.selectTrigger} onPress={() => setTypePickerOpen(true)}>
+                  <Text style={selectedType ? styles.selectTriggerText : styles.selectPlaceholder}>
+                    {selectedType ? selectedType.name : 'Select document type'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color={theme.subtext} />
+                </Pressable>
+              </View>
+
+              {selectedType && (
+                <View style={styles.hintBox}>
+                  <Text style={styles.hintText}>
+                    <Text style={styles.hintBold}>Processing Time: </Text>
+                    {selectedType.processingTime}
+                  </Text>
+                  {selectedType.requirements.length > 0 && (
+                    <View style={styles.hintRequirements}>
+                      <Text style={[styles.hintText, styles.hintBold]}>Requirements:</Text>
+                      {selectedType.requirements.map((req) => (
+                        <View key={req.name} style={styles.hintRequirementRow}>
+                          <View style={styles.hintRequirementNameRow}>
+                            <Text style={styles.hintText}>{req.name}</Text>
+                            <View style={req.isMandatory ? styles.reqTagRequired : styles.reqTagOptional}>
+                              <Text style={req.isMandatory ? styles.reqTagRequiredText : styles.reqTagOptionalText}>
+                                {req.isMandatory ? 'Required' : 'Optional'}
+                              </Text>
+                            </View>
+                          </View>
+                          {req.description && <Text style={styles.hintRequirementDesc}>{req.description}</Text>}
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Number of Copies</Text>
+                <TextInput
+                  style={styles.textArea}
+                  keyboardType="number-pad"
+                  value={formData.copies}
+                  onChangeText={(v) => setFormData((prev) => ({ ...prev, copies: v }))}
+                  placeholderTextColor={theme.tertiary}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Date Needed (Optional)</Text>
+                <Pressable style={styles.selectTrigger} onPress={() => setShowNeededByPicker(true)}>
+                  <Text style={formData.neededBy ? styles.selectTriggerText : styles.selectPlaceholder}>
+                    {formData.neededBy || 'Select a date'}
+                  </Text>
+                  <Ionicons name="calendar-outline" size={16} color={theme.subtext} />
+                </Pressable>
+                {showNeededByPicker && (
+                  <DatePickerSheet
+                    value={formData.neededBy ? fromLocalYMD(formData.neededBy) : tomorrowDate}
+                    minimumDate={tomorrowDate}
+                    onChange={(event, selectedDate) => {
+                      setShowNeededByPicker(false);
+                      if (event.type === 'set' && selectedDate) {
+                        setFormData((prev) => ({ ...prev, neededBy: toLocalYMD(selectedDate) }));
+                      }
+                    }}
+                  />
+                )}
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Purpose</Text>
+                <TextInput
+                  style={styles.textArea}
+                  placeholder="Specify the purpose of your request"
+                  placeholderTextColor={theme.tertiary}
+                  value={formData.purpose}
+                  onChangeText={(v) => setFormData((prev) => ({ ...prev, purpose: v }))}
+                  multiline
+                  numberOfLines={3}
+                  maxLength={255}
+                />
+              </View>
+
+            </ScrollView>
+            <View style={styles.dialogActionsRow}>
+              <Pressable style={styles.cancelBtn} onPress={() => setDialogOpen(false)}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.submitBtn, (!canSubmit || submitting) && styles.submitBtnDisabled]}
+                onPress={handleSubmitRequest}
+                disabled={!canSubmit || submitting}
+              >
+                <Text style={styles.confirmBtnText}>{submitting ? 'Submitting…' : 'Submit Request'}</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Document Type picker, rendered inside this same Modal (not a
+              separate nested Modal) -- two simultaneously-visible native
+              Modals cause touch-routing/z-order bugs under Fabric, which was
+              swallowing taps on this picker's Close button. */}
+          {typePickerOpen && (
+            <View style={[StyleSheet.absoluteFill, styles.modalOverlay]}>
+              <View style={styles.pickerModalCard}>
+                <Text style={styles.pickerModalTitle}>Document Type</Text>
+                <ScrollView style={{ maxHeight: 320 }}>
+                  {documentTypes.map((t) => {
+                    const selected = formData.typeId === t.id;
+                    return (
+                      <Pressable
+                        key={t.id}
+                        style={[styles.pickerOption, selected && styles.pickerOptionActive]}
+                        onPress={() => {
+                          setFormData((prev) => ({ ...prev, typeId: t.id }));
+                          setTypePickerOpen(false);
+                        }}
+                      >
+                        <Text style={[styles.pickerOptionText, selected && styles.pickerOptionTextActive]}>{t.name}</Text>
+                        {selected && <Ionicons name="checkmark" size={16} color="#f97316" />}
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+                <Pressable style={styles.pickerModalClose} onPress={() => setTypePickerOpen(false)}>
+                  <Text style={styles.pickerModalCloseText}>Close</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+        </View>
+      </Modal>
+
+      {/* Send a Document Dialog */}
+      <Modal visible={sendDialogOpen} animationType="fade" transparent onRequestClose={() => setSendDialogOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.requestDialogCard}>
+            <View style={styles.requestDialogHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.requestDialogTitle}>Send a Document</Text>
+              </View>
+              <Pressable onPress={() => setSendDialogOpen(false)} hitSlop={8}>
+                <Ionicons name="close" size={20} color={theme.subtext} />
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.requestDialogScroll}>
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Title</Text>
+                <TextInput
+                  style={styles.textArea}
+                  placeholder="Indicate the reason behind your file submission"
+                  placeholderTextColor={theme.tertiary}
+                  value={sendFormData.title}
+                  onChangeText={(v) => setSendFormData((prev) => ({ ...prev, title: v }))}
+                  maxLength={255}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Date Needed (Optional)</Text>
+                <Pressable style={styles.selectTrigger} onPress={() => setShowSendNeededByPicker(true)}>
+                  <Text style={sendFormData.neededBy ? styles.selectTriggerText : styles.selectPlaceholder}>
+                    {sendFormData.neededBy || 'Select a date'}
+                  </Text>
+                  <Ionicons name="calendar-outline" size={16} color={theme.subtext} />
+                </Pressable>
+                {showSendNeededByPicker && (
+                  <DatePickerSheet
+                    value={sendFormData.neededBy ? fromLocalYMD(sendFormData.neededBy) : tomorrowDate}
+                    minimumDate={tomorrowDate}
+                    onChange={(event, selectedDate) => {
+                      setShowSendNeededByPicker(false);
+                      if (event.type === 'set' && selectedDate) {
+                        setSendFormData((prev) => ({ ...prev, neededBy: toLocalYMD(selectedDate) }));
+                      }
+                    }}
+                  />
+                )}
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Purpose</Text>
+                <TextInput
+                  style={styles.textArea}
+                  placeholder="Specify the purpose of sending this document"
+                  placeholderTextColor={theme.tertiary}
+                  value={sendFormData.purpose}
+                  onChangeText={(v) => setSendFormData((prev) => ({ ...prev, purpose: v }))}
+                  multiline
+                  numberOfLines={3}
+                  maxLength={255}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>
+                  Attachments <Text style={styles.attachBudgetText}>({sendFiles.length}/{MAX_FILES} files)</Text>
+                </Text>
+                {sendFiles.length > 0 && (
+                  <View style={styles.attachList}>
+                    {sendFiles.map((f) => (
+                      <View key={f.uri} style={styles.attachChip}>
+                        <Text style={styles.attachChipText} numberOfLines={1}>{f.name}</Text>
+                        <Pressable onPress={() => removeSendFile(f.uri)} hitSlop={8}>
+                          <Ionicons name="close" size={14} color={theme.tertiary} />
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                <Pressable
+                  style={styles.selectTrigger}
+                  onPress={pickSendFiles}
+                  disabled={sendFiles.length >= MAX_FILES}
+                >
+                  <Text style={styles.selectTriggerText}>
+                    {sendFiles.length >= MAX_FILES ? 'Attachment limit reached' : 'Add files'}
+                  </Text>
+                  <Ionicons name="document-text-outline" size={16} color={theme.subtext} />
+                </Pressable>
+                <Text style={styles.attachHintText}>Each file up to 10MB.</Text>
+              </View>
+
+            </ScrollView>
+            <View style={styles.dialogActionsRow}>
+              <Pressable style={styles.cancelBtn} onPress={() => setSendDialogOpen(false)} disabled={sendSubmitting}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.submitBtn, (!sendFormData.title.trim() || !sendFormData.purpose.trim() || sendSubmitting) && styles.submitBtnDisabled]}
+                onPress={handleSubmitSendDocument}
+                disabled={!sendFormData.title.trim() || !sendFormData.purpose.trim() || sendSubmitting}
+              >
+                <Text style={styles.confirmBtnText}>{sendSubmitting ? 'Sending…' : 'Send Document'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Cancel Confirm Modal */}
+      <Modal visible={!!cancelTarget} animationType="fade" transparent onRequestClose={() => setCancelTarget(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.confirmModalCard}>
+            <View style={[styles.confirmIconCircle, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
+              <Ionicons name="document-text-outline" size={26} color="#ef4444" />
+            </View>
+            <Text style={styles.confirmTitle}>Cancel Request?</Text>
+            <Text style={styles.confirmDescription}>
+              You are about to cancel your request for{' '}
+              <Text style={{ fontWeight: '700', color: theme.text }}>{cancelTarget?.type}</Text>. It will
+              move to your Cancelled requests — you&apos;re welcome to submit a new one if you change your mind.
+            </Text>
+            <View style={styles.confirmActionsRow}>
+              <Pressable style={styles.cancelBtn} onPress={() => setCancelTarget(null)}>
+                <Text style={styles.cancelBtnText}>Keep Request</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.confirmActionBtn, { backgroundColor: '#ef4444' }]}
+                onPress={confirmCancelRequest}
+                disabled={!!cancellingId}
+              >
+                <Text style={styles.confirmBtnText}>{cancellingId ? 'Cancelling…' : 'Cancel Request'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Mark as Claimed Confirm Modal */}
+      <Modal visible={!!claimTarget} animationType="fade" transparent onRequestClose={() => setClaimTarget(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.confirmModalCard}>
+            <View style={[styles.confirmIconCircle, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
+              <Ionicons name="checkmark-circle-outline" size={26} color="#22c55e" />
+            </View>
+            <Text style={styles.confirmTitle}>Mark Document as Claimed?</Text>
+            <Text style={styles.confirmDescription}>
+              Mark{' '}
+              <Text style={{ fontWeight: '700', color: theme.text }}>{claimTarget?.type}</Text> as claimed?
+              Only do this once you&apos;ve received your document.
+            </Text>
+            <View style={styles.confirmActionsRow}>
+              <Pressable style={styles.cancelBtn} onPress={() => setClaimTarget(null)}>
+                <Text style={styles.cancelBtnText}>Not Yet</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.confirmActionBtn, { backgroundColor: '#22c55e' }]}
+                onPress={confirmClaimRequest}
+                disabled={!!claimingId}
+              >
+                <Text style={styles.confirmBtnText}>{claimingId ? 'Marking…' : 'Mark as Claimed'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <NavDrawer
+        visible={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onNavPress={handleNavPress}
+        onLogout={handleLogout}
+        theme={theme}
+        styles={styles}
+        userName={user?.name ?? 'Faculty'}
+        userDept={user?.departmentName ?? ''}
+        isAvailable={isAvailable}
+        onToggleAvailability={(v) => toggleAvailability(v, () => setMenuOpen(false))}
+      />
+
+      <QueueReasonModal
+        visible={unavailableReasonModalOpen}
+        title="Mark Yourself Unavailable"
+        message="Let students and admins know why you're unavailable right now. This reason will be shown wherever your schedule is visible."
+        confirmText={unavailableReasonSubmitting ? 'Submitting...' : 'Confirm'}
+        confirmColor="#ef4444"
+        reason={unavailableReasonText}
+        onChangeReason={setUnavailableReasonText}
+        onCancel={cancelUnavailableModal}
+        onConfirm={() => confirmMarkUnavailable(unavailableReasonText)}
+        theme={theme}
+        styles={styles}
+        submitting={unavailableReasonSubmitting}
+      />
+
+      <LogoutModal
+        visible={logoutModalVisible}
+        onCancel={() => setLogoutModalVisible(false)}
+        onConfirm={confirmLogout}
+        styles={styles}
+      />
+    </View>
+  );
+}
+
+// ─────────────────────────── Shared sub-components ───────────────────────────
+
+function NavDrawer({
+  visible,
+  onClose,
+  onNavPress,
+  onLogout,
+  theme,
+  styles,
+  userName,
+  userDept,
+  isAvailable,
+  onToggleAvailability,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onNavPress: (key: string) => void;
+  onLogout: () => void;
+  theme: ThemePalette;
+  styles: ReturnType<typeof createStyles>;
+  userName: string;
+  userDept: string;
+  isAvailable: boolean;
+  onToggleAvailability: (value: boolean) => void;
+}) {
+  return (
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+      <View style={styles.drawerOverlay}>
+        <SafeAreaView style={styles.drawerPanel} edges={['top', 'bottom']}>
+          <View style={styles.drawerProfile}>
+            <View style={styles.drawerProfileHeader}>
+              <View style={styles.drawerAvatar}>
+                <Ionicons name="person-outline" size={15} color={theme.primary} />
+              </View>
+              <Text style={styles.drawerName}>{userName}</Text>
+            </View>
+            <View style={styles.drawerRoleBadge}>
+              <Text style={styles.drawerRoleBadgeText}>Professor</Text>
+            </View>
+            <Text style={styles.drawerCollege}>{userDept}</Text>
+          </View>
+
+          <ProfessorAvailabilityToggle isAvailable={isAvailable} onToggle={onToggleAvailability} styles={styles} />
+
+          <View style={styles.drawerNav}>
+            {navItems.map((item) => {
+              // This is the sidebar's canonical "Documents" destination —
+              // the tracking/status screen (professor_documents_status.tsx) is
+              // reached via the dashboard's stat tile instead and stays unhighlighted.
+              const active = item.key === 'documents';
+              return (
+                <Pressable
+                  key={item.key}
+                  style={[styles.drawerNavItem, active && styles.drawerNavItemActive]}
+                  onPress={() => onNavPress(item.key)}
+                >
+                  <Ionicons name={item.icon} size={18} color={active ? '#ffffff' : theme.subtext} />
+                  <Text style={[styles.drawerNavLabel, active && styles.drawerNavLabelActive]}>{item.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Pressable style={styles.drawerLogout} onPress={onLogout}>
+            <Ionicons name="log-out-outline" size={18} color="#ef4444" />
+            <Text style={styles.drawerLogoutText}>Logout</Text>
+          </Pressable>
+        </SafeAreaView>
+        <Pressable style={styles.drawerBackdrop} onPress={onClose} />
+      </View>
+    </Modal>
+  );
+}
+
+function LogoutModal({
+  visible,
+  onCancel,
+  onConfirm,
+  styles,
+}: {
+  visible: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onCancel}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.confirmModalCard}>
+          <View style={[styles.confirmIconCircle, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
+            <Ionicons name="log-out-outline" size={26} color="#ef4444" />
+          </View>
+          <Text style={styles.confirmTitle}>Confirm Logout</Text>
+          <Text style={styles.confirmDescription}>
+            Are you sure you want to log out? Any unsaved changes will be lost.
+          </Text>
+          <View style={styles.confirmActionsRow}>
+            <Pressable style={styles.cancelBtn} onPress={onCancel}>
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </Pressable>
+            <Pressable style={styles.logoutConfirmBtn} onPress={onConfirm}>
+              <Ionicons name="log-out-outline" size={16} color="#ffffff" />
+              <Text style={styles.confirmBtnText}>Log Out</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─────────────────────────── Theme ───────────────────────────
+
+type ThemePalette = {
+  background: string;
+  card: string;
+  border: string;
+  headerBg: string;
+  headerBorder: string;
+  text: string;
+  subtext: string;
+  tertiary: string;
+  primary: string;
+  iconBtnBg: string;
+  iconBtnBorder: string;
+  inputBg: string;
+};
+
+const darkPalette: ThemePalette = {
+  background: '#0a0f0a',
+  card: '#111612',
+  border: '#1e3a23',
+  headerBg: 'rgba(17, 22, 18, 0.95)',
+  headerBorder: 'rgba(34, 197, 94, 0.15)',
+  text: '#f0fdf4',
+  subtext: '#94a3b8',
+  tertiary: '#94a3b8',
+  primary: '#16a34a',
+  iconBtnBg: 'rgba(34, 197, 94, 0.1)',
+  iconBtnBorder: 'rgba(34, 197, 94, 0.2)',
+  inputBg: '#0f1a11',
+};
+
+const lightPalette: ThemePalette = {
+  background: '#f8fafc',
+  card: '#ffffff',
+  border: '#e2e8f0',
+  headerBg: 'rgba(255, 255, 255, 0.95)',
+  headerBorder: 'rgba(34, 197, 94, 0.15)',
+  text: '#1e293b',
+  subtext: '#64748b',
+  tertiary: '#64748b',
+  primary: '#166534',
+  iconBtnBg: 'rgba(34, 197, 94, 0.08)',
+  iconBtnBorder: 'rgba(34, 197, 94, 0.15)',
+  inputBg: '#f8fafc',
+};
+
+function createStyles(theme: ThemePalette) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: theme.background },
+    safeArea: { flex: 1 },
+
+    // Header
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: theme.headerBg,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.headerBorder,
+    },
+    headerBrand: { flexDirection: 'row', alignItems: 'center', gap: 0 },
+    headerPncLogo: { width: 40, height: 40 },
+    headerOamsLogo: { height: 34, width: 96 },
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    iconBtn: {
+      padding: 8,
+      borderRadius: 10,
+      backgroundColor: theme.iconBtnBg,
+      borderWidth: 1,
+      borderColor: theme.iconBtnBorder,
+    },
+    iconBtnImg: { width: 18, height: 18 },
+
+    scrollContent: { padding: 16, gap: 16, paddingBottom: 40 },
+
+    // Breadcrumb
+    breadcrumb: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
+    breadcrumbText: { fontSize: 14, fontWeight: '600', color: theme.subtext },
+
+    // Title
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+    titleIcon: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    titleTextWrap: { flex: 1 },
+    pageTitle: { fontSize: 20, fontWeight: '800', color: theme.text, letterSpacing: -0.3 },
+    pageSubtitle: { fontSize: 12, color: theme.subtext, marginTop: 3 },
+
+    // Request / Send buttons
+    actionButtonsCol: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'center' },
+    requestBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      alignSelf: 'flex-start',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      overflow: 'hidden',
+    },
+    requestBtnText: { fontSize: 13.5, fontWeight: '700', color: '#ffffff' },
+
+    // Tabs
+    tabsList: { flexDirection: 'row', gap: 6, borderBottomWidth: 2, borderBottomColor: theme.border },
+    tabTrigger: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 12, paddingBottom: 12 },
+    tabTriggerActive: { borderBottomWidth: 2, borderBottomColor: '#f97316', marginBottom: -2 },
+    tabTriggerText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: theme.subtext,
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+    tabTriggerTextActive: { color: '#f97316' },
+    tabCount: {
+      minWidth: 20,
+      height: 20,
+      paddingHorizontal: 5,
+      borderRadius: 999,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(249, 115, 22, 0.15)',
+    },
+    tabCountActive: { backgroundColor: 'rgba(249, 115, 22, 0.25)' },
+    tabCountText: { fontSize: 10, fontWeight: '700', color: '#f97316' },
+    tabCountTextActive: { color: '#f97316' },
+
+    // Empty state
+    emptyState: {
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 16,
+      paddingVertical: 40,
+      paddingHorizontal: 20,
+      alignItems: 'center',
+      gap: 8,
+    },
+    emptyTitle: { fontSize: 15, fontWeight: '700', color: theme.text },
+    emptyText: { fontSize: 13, color: theme.tertiary, textAlign: 'center' },
+
+    // Document cards
+    docList: { gap: 10 },
+    docCard: {
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: 'rgba(249, 115, 22, 0.25)',
+      borderRadius: 16,
+      padding: 11,
+      gap: 10,
+    },
+    docCardCompleted: { opacity: 0.85 },
+    docCardHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
+    docIconWrap: {
+      width: 32,
+      height: 32,
+      borderRadius: 12,
+      backgroundColor: 'rgba(249, 115, 22, 0.1)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    docTypeText: { fontSize: 13.5, fontWeight: '700', color: '#f97316' },
+    docCollegeText: { fontSize: 11, color: theme.tertiary, marginTop: 2 },
+    docTrackingText: { fontSize: 11, color: theme.tertiary, marginTop: 2 },
+    docTrackingValue: { fontWeight: '700', color: '#22c55e' },
+    statusBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingVertical: 3,
+      paddingHorizontal: 8,
+      borderRadius: 10,
+      borderWidth: 1,
+      flexShrink: 0,
+    },
+    statusBadgeText: { fontSize: 9.5, fontWeight: '700' },
+    docHeaderBadge: { alignSelf: 'flex-start', marginTop: 4 },
+    docCardMeta: { alignItems: 'flex-start', gap: 4, marginTop: 6 },
+    docCardMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    docCardMetaText: { fontSize: 11, color: theme.tertiary },
+    docActionsRow: { flexDirection: 'row', gap: 8 },
+    docActionsRowItem: { flex: 1, minWidth: 0 },
+    claimBtnFull: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 11,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(34, 197, 94, 0.35)',
+      backgroundColor: 'rgba(34, 197, 94, 0.05)',
+      paddingHorizontal: 10,
+    },
+    claimBtnFullText: { fontSize: 12.5, fontWeight: '700', color: '#22c55e', flexShrink: 1, textAlign: 'center' },
+
+    docInfoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    docInfoField: { width: '46%', gap: 2 },
+    docInfoFieldFull: { width: '100%' },
+    docInfoLabel: { fontSize: 10, fontWeight: '600', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
+    docInfoValue: { fontSize: 12, fontWeight: '600', color: theme.text, lineHeight: 16 },
+    docInfoDateValue: { fontSize: 12, fontWeight: '600', color: '#f97316', lineHeight: 16 },
+
+    updateBox: {
+      backgroundColor: 'rgba(16, 185, 129, 0.1)',
+      borderWidth: 1,
+      borderColor: 'rgba(16, 185, 129, 0.25)',
+      borderRadius: 12,
+      padding: 8,
+      gap: 4,
+    },
+    updateTitle: { fontSize: 11, fontWeight: '700', color: '#10b981' },
+    updateText: { fontSize: 11, color: theme.subtext, lineHeight: 15 },
+
+    cancelBtnFull: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 11,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(239, 68, 68, 0.35)',
+      paddingHorizontal: 10,
+    },
+    cancelBtnFullText: { fontSize: 12.5, fontWeight: '700', color: '#ef4444', flexShrink: 1, textAlign: 'center' },
+
+    // Request dialog
+    modalOverlay: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      padding: 24,
+    },
+    requestDialogCard: {
+      width: '100%',
+      maxWidth: 420,
+      maxHeight: '85%',
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 20,
+      padding: 22,
+    },
+    requestDialogHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 18 },
+    // Left-aligned, unlike confirmTitle (centered -- built for the
+    // icon-above-title confirm dialogs elsewhere in this file). This header
+    // sits in a flexDirection:'row' with nothing else centered next to it,
+    // so a centered title looks visually misaligned.
+    requestDialogTitle: { fontSize: 18, fontWeight: '800', color: theme.text },
+    // flexShrink: 1 -- deliberately NOT the flex:1 shorthand, which sets
+    // flexBasis:0% and collapses this ScrollView to zero height (a column
+    // container with only maxHeight, no explicit height, sizes itself to its
+    // non-flex children only -- the flex:1 child contributes nothing to that
+    // measurement, so there's never any "extra" space left for it to grow
+    // into). flexShrink:1 instead sizes this ScrollView to its own content
+    // normally, only compressing -- and becoming internally scrollable for
+    // the overflow -- once content would push the card past its maxHeight cap.
+    requestDialogScroll: { flexShrink: 1 },
+
+    formGroup: { gap: 8, marginBottom: 16 },
+    formLabel: { fontSize: 13.5, fontWeight: '700', color: theme.text },
+    selectTrigger: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      backgroundColor: theme.inputBg,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+    },
+    selectTriggerText: { fontSize: 13.5, color: theme.text, flex: 1 },
+    selectPlaceholder: { fontSize: 13.5, color: theme.tertiary, flex: 1 },
+    textArea: {
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      backgroundColor: theme.inputBg,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      color: theme.text,
+      fontSize: 13.5,
+      minHeight: 70,
+      textAlignVertical: 'top',
+    },
+
+    hintBox: {
+      backgroundColor: 'rgba(249, 115, 22, 0.06)',
+      borderWidth: 1,
+      borderColor: 'rgba(249, 115, 22, 0.2)',
+      borderRadius: 12,
+      padding: 12,
+      gap: 4,
+      marginBottom: 16,
+    },
+    hintText: { fontSize: 12.5, color: theme.subtext, lineHeight: 18 },
+    hintBold: { fontWeight: '700', color: theme.text },
+    hintRequirements: { gap: 6, marginTop: 2 },
+    hintRequirementRow: { gap: 2 },
+    hintRequirementNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    hintRequirementDesc: { fontSize: 11.5, color: theme.tertiary, opacity: 0.85 },
+    reqTagRequired: {
+      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+      backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.35)',
+    },
+    reqTagRequiredText: { fontSize: 10, fontWeight: '700', color: '#ef4444' },
+    reqTagOptional: {
+      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+      backgroundColor: 'rgba(107, 114, 128, 0.15)', borderWidth: 1, borderColor: 'rgba(107, 114, 128, 0.35)',
+    },
+    reqTagOptionalText: { fontSize: 10, fontWeight: '700', color: '#9ca3af' },
+
+    // Pinned footer, outside the scrollable form body -- so Cancel/Submit
+    // stay reachable without scrolling to the very end of the form.
+    dialogActionsRow: {
+      flexDirection: 'row', gap: 10, justifyContent: 'flex-end',
+      marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: theme.border,
+    },
+    submitBtn: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 11,
+      paddingHorizontal: 20,
+      borderRadius: 12,
+      backgroundColor: '#f97316',
+    },
+    submitBtnDisabled: { opacity: 0.5 },
+
+    // Attachments (Send a Document)
+    attachBudgetText: { fontSize: 11, fontWeight: '400', color: theme.tertiary, textTransform: 'none' },
+    attachHintText: { fontSize: 11, color: theme.tertiary, marginTop: 4 },
+    attachList: { gap: 6, marginBottom: 8 },
+    attachChip: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+      paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10,
+      borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
+    },
+    attachChipText: { flex: 1, fontSize: 12, color: theme.text },
+
+    // Generic picker modal
+    pickerModalCard: {
+      width: '85%',
+      maxWidth: 320,
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 16,
+      padding: 12,
+    },
+    pickerModalTitle: { fontSize: 14, fontWeight: '800', color: theme.text, padding: 8, paddingBottom: 4 },
+    pickerOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      borderRadius: 10,
+    },
+    pickerOptionActive: { backgroundColor: 'rgba(249, 115, 22, 0.1)' },
+    pickerOptionText: { fontSize: 13.5, fontWeight: '600', color: theme.text },
+    pickerOptionTextActive: { color: '#f97316' },
+    pickerModalClose: {
+      paddingVertical: 12,
+      alignItems: 'center',
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      marginTop: 4,
+    },
+    pickerModalCloseText: { fontSize: 13, fontWeight: '700', color: theme.subtext },
+
+    // Shared confirm modal chrome
+    confirmModalCard: {
+      width: '100%',
+      maxWidth: 340,
+      alignItems: 'center',
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 20,
+      padding: 24,
+    },
+    confirmIconCircle: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+    confirmTitle: { fontSize: 18, fontWeight: '800', color: theme.text, marginBottom: 8, textAlign: 'center' },
+    confirmDescription: { fontSize: 13, color: theme.subtext, textAlign: 'center', lineHeight: 19, marginBottom: 20 },
+    confirmActionsRow: { flexDirection: 'row', gap: 12, width: '100%' },
+    cancelBtn: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+    },
+    cancelBtnText: { fontSize: 14, fontWeight: '700', color: theme.text },
+    confirmBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+    confirmActionBtn: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderRadius: 12,
+    },
+    // Availability-reason modal (QueueReasonModal) -- confirmBtn is its own
+    // name, distinct from confirmActionBtn above (this file's generic
+    // confirm dialog), since QueueReasonModal is a shared component with its
+    // own fixed prop-name contract.
+    confirmBtn: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderRadius: 12,
+    },
+    reasonInput: {
+      width: '100%',
+      minHeight: 64,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      padding: 12,
+      fontSize: 13,
+      color: theme.text,
+      backgroundColor: theme.background,
+      textAlignVertical: 'top',
+      marginBottom: 16,
+    },
+    formSubmitBtnDisabled: { opacity: 0.6 },
+    logoutConfirmBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 12,
+      borderRadius: 12,
+      backgroundColor: '#ef4444',
+    },
+
+    // Nav drawer
+    drawerOverlay: { flex: 1, flexDirection: 'row' },
+    drawerPanel: {
+      width: 270,
+      backgroundColor: theme.card,
+      borderRightWidth: 1,
+      borderRightColor: theme.border,
+      padding: 20,
+      justifyContent: 'space-between',
+    },
+    drawerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+    drawerProfile: {
+      width: '100%',
+      alignItems: 'flex-start',
+      gap: 8,
+      backgroundColor: 'rgba(22, 163, 74, 0.12)',
+      borderWidth: 1,
+      borderColor: 'rgba(22, 163, 74, 0.25)',
+      borderRadius: 14,
+      padding: 14,
+    },
+    drawerProfileHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    drawerAvatar: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: 'rgba(22, 163, 74, 0.18)',
+      borderWidth: 1,
+      borderColor: 'rgba(22, 163, 74, 0.3)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    drawerName: { fontSize: 15, fontWeight: '700', color: theme.text },
+    drawerRoleBadge: { backgroundColor: 'rgba(22, 163, 74, 0.18)', borderRadius: 999, paddingVertical: 3, paddingHorizontal: 10 },
+    drawerRoleBadgeText: { fontSize: 11, fontWeight: '700', color: theme.primary },
+    drawerCollege: { fontSize: 12, fontWeight: '500', color: theme.subtext },
+    availabilityRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 14,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+    },
+    availabilityLabel: { fontSize: 14, fontWeight: '700', color: theme.text },
+    drawerNav: { flex: 1, marginTop: 28, gap: 4 },
+    drawerNavItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 12, borderRadius: 10 },
+    drawerNavItemActive: { backgroundColor: theme.primary },
+    drawerNavLabel: { fontSize: 14, fontWeight: '600', color: theme.subtext },
+    drawerNavLabelActive: { color: '#ffffff' },
+    drawerLogout: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: 'rgba(239, 68, 68, 0.3)',
+      backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    },
+    drawerLogoutText: { fontSize: 14, fontWeight: '700', color: '#ef4444' },
+  });
+}

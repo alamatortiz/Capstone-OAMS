@@ -1,0 +1,357 @@
+.qcm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: qcm-fade-in 0.15s ease;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+@keyframes qcm-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.qcm-modal {
+  background: var(--card-bg, #111612);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 16px;
+  padding: 2rem 2rem 1.5rem;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  animation: qcm-slide-up 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Only this middle section scrolls -- the header above and the Cancel/Join
+   actions below stay put, so the buttons never overlap the content the way
+   a sticky-footer-inside-a-scrolling-modal would. */
+.qcm-scroll-content {
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Universal Service Queue join: the picker + its requirements/steps preview
+   need the room of the stud-documents request dialog. Compound selector so it
+   wins over the base max-width regardless of stylesheet order. */
+.qcm-modal.qcm-modal--wide {
+  max-width: 38rem;
+}
+
+@keyframes qcm-slide-up {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.qcm-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+  color: #3b82f6;
+}
+
+.qcm-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary, #f0fdf4);
+  margin: 0 0 0.5rem;
+}
+
+.qcm-message {
+  font-size: 0.875rem;
+  color: var(--muted-foreground, #94a3b8);
+  margin: 0 0 1.5rem;
+  line-height: 1.5;
+  text-align: justify;
+}
+
+.qcm-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 4.5rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: var(--input-background, rgba(255, 255, 255, 0.03));
+  color: var(--text-primary, #f0fdf4);
+  font-size: 0.875rem;
+  font-family: inherit;
+}
+
+.qcm-textarea:focus {
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.6);
+}
+
+.qcm-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Universal Service Queue: service picker + picked-service hint (blue) ── */
+.qcm-field {
+  text-align: left;
+  margin-bottom: 0.25rem;
+}
+
+.qcm-label {
+  display: block;
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+  color: var(--text-primary, #f0fdf4);
+}
+
+.qcm-select-wrap {
+  position: relative;
+}
+
+.qcm-select-wrap svg {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  color: #3b82f6;
+  pointer-events: none;
+}
+
+.qcm-select {
+  width: 100%;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0.625rem 2.25rem 0.625rem 0.875rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: var(--input-background, rgba(255, 255, 255, 0.03));
+  color: var(--text-primary, #f0fdf4);
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.qcm-select:hover {
+  border-color: rgba(59, 130, 246, 0.45);
+}
+
+.qcm-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.qcm-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.qcm-service-hint {
+  text-align: left;
+  background: rgba(59, 130, 246, 0.06);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  margin: 0.25rem 0 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.qcm-service-desc {
+  font-size: 0.8rem;
+  color: var(--muted-foreground, #94a3b8);
+  margin: 0;
+  line-height: 1.5;
+  text-align: justify;
+}
+
+.qcm-hint-section > strong {
+  font-size: 0.78rem;
+  color: var(--text-primary, #f0fdf4);
+}
+
+.qcm-req-list {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.qcm-req-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.qcm-req-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary, #f0fdf4);
+}
+
+.qcm-req-tag {
+  flex-shrink: 0;
+  padding: 0.15rem 0.55rem;
+  border-radius: 0.375rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.qcm-req-tag--req {
+  background: rgba(59, 130, 246, 0.14);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.qcm-req-tag--opt {
+  background: rgba(100, 116, 139, 0.12);
+  color: var(--muted-foreground, #94a3b8);
+  border: 1px solid rgba(100, 116, 139, 0.25);
+}
+
+.qcm-req-desc {
+  font-size: 0.72rem;
+  color: var(--muted-foreground, #94a3b8);
+  margin: 0.15rem 0 0;
+  line-height: 1.4;
+  text-align: justify;
+}
+
+.qcm-step-list {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.qcm-step-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+}
+
+.qcm-step-num {
+  flex-shrink: 0;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #60a5fa;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qcm-step-title {
+  font-size: 0.8rem;
+  color: var(--text-primary, #f0fdf4);
+}
+
+.qcm-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  flex-shrink: 0;
+}
+
+.qcm-cancel {
+  flex: 1;
+  padding: 0.625rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: transparent;
+  color: var(--text-primary, #f0fdf4);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.qcm-cancel:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.qcm-cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.qcm-confirm {
+  flex: 1;
+  padding: 0.625rem 1rem;
+  border-radius: 8px;
+  border: none;
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  transition: filter 0.15s;
+}
+
+.qcm-confirm:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.qcm-confirm:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* ── Responsive (mirrors ActionConfirmModal) ── */
+.qcm-modal {
+  max-height: calc(100dvh - 2rem);
+}
+
+@media (max-width: 480px) {
+  .qcm-overlay { padding: 0.75rem; }
+  .qcm-modal {
+    padding: 1.5rem 1.25rem 1.25rem;
+    max-height: calc(100dvh - 1.5rem);
+  }
+  .qcm-icon { width: 46px; height: 46px; }
+}
+
+@media (max-width: 380px) {
+  .qcm-modal { padding: 1.25rem 1rem 1rem; }
+}
+
+@media (max-width: 380px) {
+  .qcm-actions { flex-direction: column-reverse; gap: 0.5rem; }
+  .qcm-cancel,
+  .qcm-confirm { width: 100%; }
+}

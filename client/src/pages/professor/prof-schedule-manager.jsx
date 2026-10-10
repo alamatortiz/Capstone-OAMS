@@ -1,0 +1,960 @@
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
+import { Link, useLocation } from "react-router-dom";
+import { ChevronLeft, CalendarClock, ChevronDown, StickyNote } from "lucide-react";
+import ProfessorSidebar from "../../components/ProfessorSidebar";
+import PageHeader from "../../components/PageHeader";
+import RefreshButton from "../../components/RefreshButton";
+import ActionConfirmModal from "../../components/ActionConfirmModal";
+import "./prof-dashboard.css";
+import "./prof-schedule-manager.css";
+import api from "../../utils/api";
+import { toast } from "sonner";
+
+const PlusIcon = () => (
+  <svg style={{ width: "1rem", height: "1rem" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+);
+const TrashIcon = () => (
+  <svg style={{ width: "1rem", height: "1rem" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4h6v2" />
+  </svg>
+);
+const PencilIcon = () => (
+  <svg style={{ width: "1rem", height: "1rem" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+  </svg>
+);
+const ClockIcon = () => (
+  <svg style={{ width: "1rem", height: "1rem" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+  </svg>
+);
+const CloseIcon = () => (
+  <svg style={{ width: "1.125rem", height: "1.125rem" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
+
+// ── Constants ──────────────────────────────────────────────────────────────────
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+// Quick-add shortcuts for the "Appointment Types" tag field. Each is just an
+// ordinary tag string -- the professor can still type anything custom.
+const PRESET_APPT_TYPES = [
+  "Consultation",
+  "Advising",
+  "Thesis/Capstone",
+  "Make-up Class",
+  "Grade Consultation",
+];
+
+// Renders a slot note as plain text, but turns a bare URL (e.g. a pasted
+// Google Meet link) into a clickable link -- the field itself is just free
+// text, no markdown/rich-text support.
+const URL_RE = /^(https?:\/\/\S+)$/i;
+function SlotNoteLine({ note, className, compact = false }) {
+  if (!note) return null;
+  const isLink = URL_RE.test(note.trim());
+  return (
+    <div className={`sa-note-block${compact ? " sa-note-block--compact" : ""}`}>
+      <div className="sa-note-header">
+        <StickyNote className="sa-note-icon" />
+        <span>Notes</span>
+      </div>
+      <p className={className}>
+        {isLink ? (
+          <a href={note.trim()} target="_blank" rel="noopener noreferrer">
+            {note.trim()}
+          </a>
+        ) : (
+          note
+        )}
+      </p>
+    </div>
+  );
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function fmt12(t) {
+  if (!t) return "";
+  const [h, m] = t.split(":");
+  const hour = parseInt(h, 10);
+  return `${hour % 12 || 12}:${m} ${hour >= 12 ? "PM" : "AM"}`;
+}
+
+// ── End-time picker (common durations: 5/10/15/30 min, then every 30 min) ──────
+// 5, 10, 15, 30, 60, 90, 120, ... -- generous upper bound (24h) so the ladder
+// always reaches END_CAP_MIN regardless of how early the chosen start time
+// is; getEndTimeOptions trims anything past it.
+const DURATION_MINUTES = (() => {
+  const list = [5, 10, 15, 30];
+  for (let d = 60; d <= 24 * 60; d += 30) list.push(d);
+  return list;
+})();
+const END_CAP_MIN = 20 * 60; // 8:00 PM -- the office's latest suggested consultation end time
+
+function toMinutes(t) {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+function toHHMM(min) {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+function formatDuration(min) {
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60), rem = min % 60;
+  return rem === 0 ? `${h} hr` : `${h} hr ${rem} min`;
+}
+// Generates the ladder of end-time options for a given start time, capped at
+// the absolute 8:00 PM cutoff (not a duration relative to start) -- so a
+// start time late in the day naturally offers a shorter ladder. The cap
+// itself is always included as the final option even when it doesn't land
+// exactly on one of the standard durations from this particular start time,
+// so "...and so on til 8:00 PM" is always reachable without falling back to
+// Custom time.
+// currentEnd (when editing an existing slot) is injected as its own option
+// if it doesn't already match one on the ladder, so a legacy/custom slot
+// length is never silently dropped from the list.
+function getEndTimeOptions(startTime, currentEnd) {
+  if (!startTime) return [];
+  const startMin = toMinutes(startTime);
+  const opts = DURATION_MINUTES
+    .map((dur) => startMin + dur)
+    .filter((end) => end <= END_CAP_MIN)
+    .map((end) => ({ value: toHHMM(end), duration: end - startMin }));
+  if (startMin < END_CAP_MIN && !opts.some((o) => o.value === toHHMM(END_CAP_MIN))) {
+    opts.push({ value: toHHMM(END_CAP_MIN), duration: END_CAP_MIN - startMin });
+  }
+  if (currentEnd && !opts.some((o) => o.value === currentEnd)) {
+    const dur = toMinutes(currentEnd) - startMin;
+    if (dur > 0) opts.push({ value: currentEnd, duration: dur });
+  }
+  return opts.sort((a, b) => a.duration - b.duration);
+}
+
+// Custom dropdown for End Time, in place of a plain native <select> --
+// a native select's popup list is rendered by the OS and its height can't be
+// constrained by CSS, so with ~28 generated durations it opened as one huge
+// overwhelming list. This shows only ~5 rows at a time (Google-Calendar-
+// style) with the rest reachable by scrolling inside the panel. Portaled to
+// <body> with position:fixed (mirrors NotificationBell.jsx's dropdown) since
+// the Add/Edit Slot modal (.sa-modal) has overflow-y:auto and would
+// otherwise clip the panel wherever it extends past the modal's own bounds.
+function EndTimePicker({ options, value, disabled, placeholder, onSelect, onCustomSelect }) {
+  const [open, setOpen] = useState(false);
+  const [panelStyle, setPanelStyle] = useState(null);
+  const triggerRef = useRef(null);
+  const panelRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleClickOutside = (e) => {
+      const insideTrigger = triggerRef.current?.contains(e.target);
+      const insidePanel = panelRef.current?.contains(e.target);
+      if (!insideTrigger && !insidePanel) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) {
+      setPanelStyle(null);
+      return;
+    }
+    const rect = triggerRef.current.getBoundingClientRect();
+    setPanelStyle({
+      position: "fixed",
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: rect.width,
+    });
+  }, [open]);
+
+  const selected = options.find((o) => o.value === value);
+  const label = selected ? `${fmt12(selected.value)} (${formatDuration(selected.duration)})` : placeholder;
+
+  return (
+    <div ref={triggerRef} className="sa-endtime-picker">
+      <button
+        type="button"
+        className="sa-input sa-select sa-endtime-trigger"
+        disabled={disabled}
+        onClick={() => setOpen((prev) => !prev)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span>{label}</span>
+        <ChevronDown className="sa-endtime-chevron" />
+      </button>
+
+      {open &&
+        createPortal(
+          <div
+            className="sa-endtime-panel"
+            ref={panelRef}
+            style={panelStyle ?? { position: "fixed", visibility: "hidden" }}
+            role="listbox"
+          >
+            {options.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                role="option"
+                aria-selected={o.value === value}
+                className={`sa-endtime-option${o.value === value ? " is-selected" : ""}`}
+                onClick={() => {
+                  onSelect(o.value);
+                  setOpen(false);
+                }}
+              >
+                {fmt12(o.value)} <span className="sa-endtime-duration">({formatDuration(o.duration)})</span>
+              </button>
+            ))}
+            <button
+              type="button"
+              className="sa-endtime-option sa-endtime-option--custom"
+              onClick={() => {
+                onCustomSelect();
+                setOpen(false);
+              }}
+            >
+              Custom time…
+            </button>
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────────
+export default function ProfessorScheduleManager() {
+  const location = useLocation();
+  const cameFrom = location.state?.from ?? "/professor/dashboard";
+  const cameFromLabel = location.state?.fromLabel ?? "Home";
+
+  // ── Data ────────────────────────────────────────────────────────────────────
+  // All slots indexed by day name, e.g. "Monday" -> [slot, slot, ...]
+  const [slotsByDay, setSlotsByDay] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [locations, setLocations] = useState([]);
+
+  // ── Selected day / Add-Edit slot form ───────────────────────────────────────
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [showAddSlot, setShowAddSlot] = useState(false);
+  const [editingId, setEditingId] = useState(null);     // availability_id being edited, or null when adding
+  const [addDays, setAddDays] = useState([]);           // string[] (single-item when editing)
+  const [addStart, setAddStart] = useState("");
+  const [addEnd, setAddEnd] = useState("");
+  const [endCustom, setEndCustom] = useState(false); // End Time picked via "Custom time…" (free time input)
+  const [addLocation, setAddLocation] = useState("");
+  const [showOtherLocation, setShowOtherLocation] = useState(false);
+  const [addSlotNote, setAddSlotNote] = useState(""); // optional, e.g. a Google Meet link
+  const [addMaxStudents, setAddMaxStudents] = useState("");
+  const [editingCurrentMaxBooked, setEditingCurrentMaxBooked] = useState(0); // students already booked (future dates) for the slot being edited
+  const [addApptTypes, setAddApptTypes] = useState([]);   // string[]
+  const [addApptInput, setAddApptInput] = useState("");   // current tag input value
+  const [addSaving, setAddSaving] = useState(false);
+
+  // ── Delete-slot confirmation ─────────────────────────────────────────────────
+  const [deleteTarget, setDeleteTarget] = useState(null); // { id, day, slot } or null
+  const [deleteSaving, setDeleteSaving] = useState(false);
+
+  // ── Save-slot confirmation ───────────────────────────────────────────────────
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+
+  // ── Fetch weekly availability ───────────────────────────────────────────────
+  const fetchAll = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get("/professor/availability");
+      const map = {};
+      res.data.forEach((slot) => {
+        if (!map[slot.day_of_week]) map[slot.day_of_week] = [];
+        map[slot.day_of_week].push(slot);
+      });
+      setSlotsByDay(map);
+    } catch {
+      toast.error("Failed to load schedule data.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchAll(); }, []);
+
+  useEffect(() => {
+    api.get("/professor/locations")
+      .then(({ data }) => setLocations(data.locations || []))
+      .catch(() => toast.error("Failed to load locations."));
+  }, []);
+
+  const handleDayClick = (day) => {
+    setSelectedDay(day === selectedDay ? null : day);
+  };
+
+  // ── Open "Add Slot" modal ───────────────────────────────────────────────────
+  const openAddSlot = (day) => {
+    setEditingId(null);
+    setAddDays(day ? [day] : []);
+    setAddStart("");
+    setAddEnd("");
+    setEndCustom(false);
+    setAddLocation("");
+    setShowOtherLocation(false);
+    setAddSlotNote("");
+    setAddMaxStudents("");
+    setAddApptTypes([]);
+    setAddApptInput("");
+    setEditingCurrentMaxBooked(0);
+    setShowAddSlot(true);
+  };
+
+  // ── Open "Edit Slot" modal, pre-filled with the existing slot's values ──────
+  const openEditSlot = (slot, day) => {
+    setEditingId(slot.availability_id);
+    setAddDays([day]);
+    setAddStart(slot.start_time.slice(0, 5));
+    setAddEnd(slot.end_time.slice(0, 5));
+    setEndCustom(false);
+    setAddLocation(slot.location ?? "");
+    setShowOtherLocation(!!slot.location && !locations.some((loc) => loc.name === slot.location));
+    setAddSlotNote(slot.slot_note ?? "");
+    setAddMaxStudents(slot.max_students != null ? String(slot.max_students) : "");
+    setAddApptTypes((slot.appointmentTypes ?? []).map((t) => t.name));
+    setAddApptInput("");
+    setEditingCurrentMaxBooked(slot.currentMaxBooked ?? 0);
+    setShowAddSlot(true);
+  };
+
+  const toggleAddDay = (day) => {
+    setAddDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
+  };
+
+  // Preserves the current End Time if it's still valid for the new Start Time
+  // (e.g. nudging Start by a minute while editing shouldn't wipe an untouched
+  // End Time), and clears it only when the new Start actually invalidates it.
+  const handleStartChange = (e) => {
+    const newStart = e.target.value;
+    setAddStart(newStart);
+    setAddEnd((prevEnd) => (prevEnd && prevEnd > newStart ? prevEnd : ""));
+  };
+
+  // `explicit` is a preset string when clicked from PRESET_APPT_TYPES; when
+  // wired to onBlur/onKeyDown it's a React event, so `typeof !== "string"`
+  // falls back to the free-text input (unchanged behaviour there).
+  const commitApptTag = (explicit) => {
+    const fromPreset = typeof explicit === "string";
+    const val = (fromPreset ? explicit : addApptInput).trim();
+    if (!val || addApptTypes.includes(val) || addApptTypes.length >= 10) return;
+    setAddApptTypes((prev) => [...prev, val]);
+    if (!fromPreset) setAddApptInput("");
+  };
+
+  const removeApptTag = (tag) => setAddApptTypes((prev) => prev.filter((t) => t !== tag));
+
+  // ── Overlap check ────────────────────────────────────────────────────────
+  // Two windows on the same day conflict if they intersect at all, not just
+  // if they're an exact duplicate. A professor can't keep two overlapping
+  // consultation blocks open at once (see explanation above this feature).
+  const findOverlap = (day, start, end) =>
+    (slotsByDay[day] ?? []).find((s) => {
+      if (editingId && s.availability_id === editingId) return false;
+      const sStart = s.start_time.slice(0, 5);
+      const sEnd = s.end_time.slice(0, 5);
+      return start < sEnd && sStart < end;
+    });
+
+  // ── Save (add or edit) slot ─────────────────────────────────────────────────
+  // Validation only -- on success, opens the confirmation modal instead of
+  // saving directly. The actual save happens in handleConfirmSave.
+  const handleValidateAndOpenConfirm = () => {
+    if (addDays.length === 0) {
+      toast.error("Please select at least one day.");
+      return;
+    }
+    if (!addStart) {
+      toast.error("Please select a start time.");
+      return;
+    }
+    if (!addEnd) {
+      toast.error("Please select an end time.");
+      return;
+    }
+    if (!addLocation.trim()) {
+      toast.error("Please enter a location.");
+      return;
+    }
+    if (addEnd <= addStart) { toast.error("End time must be after start time."); return; }
+
+    if (!addMaxStudents.trim()) {
+      toast.error("Max students is required.");
+      return;
+    }
+    const maxStu = parseInt(addMaxStudents, 10);
+    if (isNaN(maxStu) || maxStu < 1) {
+      toast.error("Max students must be a positive number.");
+      return;
+    }
+    if (editingId && maxStu < editingCurrentMaxBooked) {
+      toast.error(`Cannot set max students below ${editingCurrentMaxBooked} — that many students are already booked on a future date.`);
+      return;
+    }
+
+    const conflictDays = addDays.filter((day) => findOverlap(day, addStart, addEnd));
+    if (conflictDays.length > 0) {
+      toast.error(`This time overlaps an existing slot on ${conflictDays.join(", ")}`);
+      return;
+    }
+
+    setShowSaveConfirm(true);
+  };
+
+  const handleConfirmSave = async () => {
+    const maxStu = parseInt(addMaxStudents, 10);
+    setAddSaving(true);
+    try {
+      if (showOtherLocation && !locations.some((loc) => loc.name === addLocation.trim())) {
+        try {
+          const { data } = await api.post("/professor/locations", { name: addLocation.trim() });
+          setLocations((prev) => [...prev, data]);
+        } catch {
+          // Non-fatal: the slot can still be saved with the typed location text.
+        }
+      }
+
+      if (editingId) {
+        await api.patch(`/professor/availability/${editingId}`, {
+          day_of_week: addDays[0],
+          start_time: addStart,
+          end_time: addEnd,
+          location: addLocation.trim(),
+          slotNote: addSlotNote.trim(),
+          max_students: maxStu,
+          appointmentTypes: addApptTypes,
+        });
+        toast.success("Time slot updated.");
+        setShowAddSlot(false);
+        setShowSaveConfirm(false);
+        setSelectedDay(addDays[0]);
+      } else {
+        const results = await Promise.allSettled(
+          addDays.map((day) =>
+            api.post("/professor/availability", {
+              day_of_week: day,
+              start_time: addStart,
+              end_time: addEnd,
+              location: addLocation.trim(),
+              slotNote: addSlotNote.trim(),
+              max_students: maxStu,
+              appointmentTypes: addApptTypes,
+            })
+          )
+        );
+        const failed = results.filter((r) => r.status === "rejected");
+        if (failed.length === 0) {
+          toast.success(addDays.length > 1 ? "Time slots added." : "Time slot added.");
+          setShowAddSlot(false);
+          setShowSaveConfirm(false);
+          if (!selectedDay) setSelectedDay(addDays[0]);
+        } else if (failed.length < addDays.length) {
+          toast.error(`${failed.length} of ${addDays.length} day(s) failed to save.`);
+          setShowAddSlot(false);
+          setShowSaveConfirm(false);
+        } else {
+          const msg = failed[0].reason?.response?.data?.message ?? "Failed to add time slot.";
+          toast.error(msg);
+        }
+      }
+      await fetchAll();
+    } catch (err) {
+      const msg = err?.response?.data?.message ?? "Failed to save time slot.";
+      toast.error(msg);
+    } finally {
+      setAddSaving(false);
+      // Unlock the modal after any failed/partial save so the user can fix and retry.
+      setShowSaveConfirm(false);
+    }
+  };
+
+  // ── Delete slot ─────────────────────────────────────────────────────────────
+  const requestDeleteSlot = (slot, day) => setDeleteTarget({ id: slot.availability_id, day, slot });
+
+  const handleDeleteSlot = async () => {
+    if (!deleteTarget) return;
+    const { id, day } = deleteTarget;
+    setDeleteSaving(true);
+    try {
+      await api.delete(`/professor/availability/${id}`);
+      toast.success("Time slot removed.");
+      await fetchAll();
+      // If this was the last slot for the selected day, deselect it
+      const remaining = (slotsByDay[day] ?? []).filter((s) => s.availability_id !== id);
+      if (remaining.length === 0 && selectedDay === day) setSelectedDay(null);
+      setDeleteTarget(null);
+    } catch { toast.error("Failed to remove time slot."); }
+    finally { setDeleteSaving(false); }
+  };
+
+  // ── Weekly schedule summary (days with slots, in week order) ────────────────
+  const scheduledDays = DAYS.filter((d) => (slotsByDay[d] ?? []).length > 0);
+
+  const selectedSlots = selectedDay ? (slotsByDay[selectedDay] ?? []) : [];
+
+  const endOptions = getEndTimeOptions(addStart, endCustom ? "" : addEnd);
+  // Locks the Add/Edit modal's fields while the save-confirmation overlay is
+  // showing, so a keyboard user can't Tab past the confirmation into fields
+  // hidden behind it and change them while a stale summary is displayed.
+  const modalLocked = addSaving || showSaveConfirm;
+
+  return (
+    <div className="dashboard-with-sidebar">
+      <ProfessorSidebar />
+
+      {/* Main Content */}
+      <main className="dashboard-main">
+        <div className="sa-page">
+
+          {/* Page Header */}
+          <div className="refresh-header-row">
+            <PageHeader
+              breadcrumb={
+                <Link to={cameFrom} className="breadcrumb-link">
+                  <ChevronLeft className="breadcrumb-icon" />
+                  {cameFromLabel}
+                </Link>
+              }
+              icon={<CalendarClock />}
+              iconClassName="sa-title-icon"
+              title="Schedule Manager"
+              subtitle="Set your weekly availability schedule for appointments."
+              headerClassName="sa-header"
+              breadcrumbClassName="page-breadcrumb"
+              titleSectionClassName="sa-title-section"
+              titleClassName="sa-title"
+              subtitleClassName="sa-subtitle"
+            />
+            <RefreshButton
+              onClick={fetchAll}
+              loading={loading}
+              label="Refresh schedule"
+            />
+          </div>
+
+          <button className="sa-action-btn sa-action-btn--primary" onClick={() => openAddSlot(selectedDay)}>
+            <PlusIcon /> Add Time Slot
+          </button>
+
+          {/* Two-column layout: Weekly overview + Detail panel */}
+          <div className="sa-main-layout">
+            {/* Left: Weekly day list */}
+            <div className="sa-calendar-card">
+              <div className="sa-panel-header">
+                <div>
+                  <h2 className="sa-section-heading">Weekly Overview</h2>
+                  <p className="sa-section-desc">Select a day to view or manage its slots. Days with slots are highlighted.</p>
+                </div>
+              </div>
+              <div className="sa-panel-body">
+                <div className="sa-day-list">
+                  {loading ? (
+                    <p className="sa-section-desc">Loading…</p>
+                  ) : (
+                    DAYS.map((day) => {
+                      const count = (slotsByDay[day] ?? []).length;
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          className={`sa-day-btn${count > 0 ? " sa-day-btn--has-slots" : ""}${selectedDay === day ? " sa-day-btn--active" : ""}`}
+                          onClick={() => handleDayClick(day)}
+                        >
+                          <span className="sa-day-btn-name">{day}</span>
+                          <span className="sa-day-btn-count">{count} slot{count !== 1 ? "s" : ""}</span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Detail panel */}
+            <div className="sa-detail-panel">
+              {selectedDay ? (
+                <>
+                  <div className="sa-panel-header">
+                    <div>
+                      <h2 className="sa-section-heading">{selectedDay}</h2>
+                    </div>
+                  </div>
+                  <div className="sa-panel-body">
+                    {selectedSlots.length === 0 ? (
+                      <div className="sa-detail-empty">
+                        <p>No time slots set for {selectedDay}.</p>
+                        <button className="sa-action-btn sa-action-btn--primary" onClick={() => openAddSlot(selectedDay)}>
+                          <PlusIcon /> Add Time Slot
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="sa-slot-list">
+                        {selectedSlots.map((s) => (
+                          <div key={s.availability_id} className="sa-slot-card">
+                            <div className="sa-slot-card-header">
+                              <div className="sa-slot-card-info">
+                                <h3 className={`sa-slot-card-title${s.location ? "" : " sa-slot-card-title--muted"}`}>
+                                  {s.location || "Location not set"}
+                                </h3>
+                                <div className="sa-slot-card-row">
+                                  <ClockIcon />
+                                  <span className="sa-slot-time">{fmt12(s.start_time)} – {fmt12(s.end_time)}</span>
+                                </div>
+                                <span className="sa-slot-count">{`Students Slots: ${s.max_students ?? "—"}`}</span>
+                                <SlotNoteLine note={s.slot_note} className="sa-slot-note" />
+                              </div>
+                              <div className="sa-slot-actions">
+                                <button className="sa-edit-btn" onClick={() => openEditSlot(s, selectedDay)} title="Edit slot" aria-label="Edit slot">
+                                  <PencilIcon />
+                                </button>
+                                <button className="sa-delete-btn" onClick={() => requestDeleteSlot(s, selectedDay)} title="Remove slot" aria-label="Remove slot">
+                                  <TrashIcon />
+                                </button>
+                              </div>
+                            </div>
+                            {s.appointmentTypes?.length > 0 && (
+                              <div className="sa-slot-types-block">
+                                <span className="sa-slot-types-heading">Appointment Types</span>
+                                <ul className="sa-slot-types-list">
+                                  {s.appointmentTypes.map((t) => (
+                                    <li key={t.id}>{t.name}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="sa-panel-body">
+                  <div className="sa-detail-placeholder">
+                    <CalendarClock />
+                    <p>Select a day in the weekly overview to view or add time slots.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Weekly Schedule Summary */}
+          <div className="sa-weekly-section">
+            <div className="sa-panel-header">
+              <div>
+                <h2 className="sa-section-heading">Weekly Schedule Summary</h2>
+                <p className="sa-section-desc">Your recurring availability across the week.</p>
+              </div>
+            </div>
+            <div className="sa-panel-body">
+              {scheduledDays.length === 0 ? (
+                <div className="sa-detail-placeholder">
+                  <CalendarClock />
+                  <p>No weekly availability set. Click a day above or use "Add Time Slot" to get started.</p>
+                </div>
+              ) : (
+                <div className="sa-upcoming-list">
+                  {scheduledDays.map((day) => {
+                    const slots = slotsByDay[day] ?? [];
+                    return (
+                      <div
+                        key={day}
+                        className={`sa-upcoming-item ${selectedDay === day ? "sa-upcoming-item--selected" : ""}`}
+                        onClick={() => setSelectedDay(day)}
+                      >
+                        <div className="sa-upcoming-date-col">
+                          <span className="sa-upcoming-date-label">{day}</span>
+                          <span className="sa-upcoming-count">{slots.length} slot{slots.length !== 1 ? "s" : ""}</span>
+                        </div>
+                        <div className="sa-upcoming-slots-col">
+                          {slots.map((s) => (
+                            <div key={s.availability_id} className="sa-mini-slot-card">
+                              <span className={`sa-mini-slot-title${s.location ? "" : " sa-mini-slot-title--muted"}`}>
+                                {s.location || "Location not set"}
+                              </span>
+                              <div className="sa-mini-slot-row">
+                                <ClockIcon />
+                                <span>{fmt12(s.start_time)} – {fmt12(s.end_time)}</span>
+                              </div>
+                              <span className="sa-mini-slot-count">
+                                {`Students slots: ${s.max_students ?? "—"}`}
+                              </span>
+                              <SlotNoteLine note={s.slot_note} className="sa-mini-slot-note" compact />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+        </div>
+      </main>
+
+      {/* ── Add Time Slot Modal ── */}
+      {showAddSlot && (
+        <div className="sa-modal-overlay">
+          <div className="sa-modal">
+            <div className="sa-modal-header">
+              <div>
+                <h3>{editingId ? "Edit Time Slot" : "Add Time Slot"}</h3>
+              </div>
+              <button
+                type="button"
+                className="sa-modal-close"
+                onClick={() => { setShowAddSlot(false); setEditingId(null); }}
+                aria-label="Close"
+                disabled={modalLocked}
+              >
+                <CloseIcon />
+              </button>
+            </div>
+            <div className="sa-modal-body">
+              <div className="sa-form-group">
+                <label>{editingId ? "Day of Week *" : "Day(s) of Week *"}</label>
+                {editingId ? (
+                  <select
+                    className="sa-input sa-select"
+                    value={addDays[0] ?? ""}
+                    onChange={(e) => setAddDays([e.target.value])}
+                    disabled={modalLocked}
+                  >
+                    {DAYS.map((day) => (
+                      <option key={day} value={day}>{day}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="sa-day-checkbox-group">
+                    {DAYS.map((day) => (
+                      <label key={day} className={`sa-day-checkbox${addDays.includes(day) ? " checked" : ""}`}>
+                        <input
+                          type="checkbox"
+                          checked={addDays.includes(day)}
+                          onChange={() => toggleAddDay(day)}
+                          disabled={modalLocked}
+                        />
+                        {day.slice(0, 3)}
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <p className="sa-field-hint">This time slot will repeat weekly on the selected day{editingId ? "" : "(s)"}.</p>
+              </div>
+              <div className="sa-form-row">
+                <div className="sa-form-group">
+                  <label>Start Time *</label>
+                  <input className="sa-input" type="time" value={addStart} onChange={handleStartChange} disabled={modalLocked} />
+                </div>
+                <div className="sa-form-group">
+                  <label>End Time *</label>
+                  <EndTimePicker
+                    options={endOptions}
+                    value={endCustom ? "" : addEnd}
+                    disabled={!addStart || modalLocked}
+                    placeholder={
+                      !addStart ? "Select a start time first"
+                        : endCustom ? "Custom time…"
+                        : endOptions.length === 0 ? "No end times available"
+                        : "Select end time"
+                    }
+                    onSelect={(val) => { setEndCustom(false); setAddEnd(val); }}
+                    onCustomSelect={() => { setEndCustom(true); setAddEnd(""); }}
+                  />
+                  {endCustom && (
+                    <input
+                      className="sa-input"
+                      type="time"
+                      value={addEnd}
+                      min={addStart}
+                      onChange={(e) => setAddEnd(e.target.value)}
+                      disabled={modalLocked}
+                    />
+                  )}
+                  {addStart && !endCustom && endOptions.length === 0 && (
+                    <p className="sa-field-hint sa-field-hint--warning">
+                      No end times available — pick a start time before 8:00 PM.
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="sa-form-group">
+                <label>Location *</label>
+                <select
+                  className="sa-input"
+                  value={showOtherLocation ? "__other__" : addLocation}
+                  disabled={modalLocked}
+                  onChange={(e) => {
+                    if (e.target.value === "__other__") {
+                      setShowOtherLocation(true);
+                      setAddLocation("");
+                    } else {
+                      setShowOtherLocation(false);
+                      setAddLocation(e.target.value);
+                    }
+                  }}
+                >
+                  <option value="">Select a location</option>
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.name}>
+                      {loc.name}{loc.isGlobal ? " (Shared)" : ""}
+                    </option>
+                  ))}
+                  <option value="__other__">Other (type your own)…</option>
+                </select>
+                {showOtherLocation && (
+                  <input
+                    className="sa-input"
+                    style={{ marginTop: "8px" }}
+                    type="text"
+                    placeholder="Type the location name"
+                    value={addLocation}
+                    onChange={(e) => setAddLocation(e.target.value)}
+                    disabled={modalLocked}
+                  />
+                )}
+              </div>
+              <div className="sa-form-group">
+                <label>Note <span style={{ fontWeight: 400, color: "var(--text-tertiary)", fontSize: "0.78rem" }}>(optional)</span></label>
+                <input
+                  className="sa-input"
+                  type="text"
+                  placeholder="e.g. a Google Meet link, room change, or reminder for students"
+                  value={addSlotNote}
+                  maxLength={500}
+                  onChange={(e) => setAddSlotNote(e.target.value)}
+                  disabled={modalLocked}
+                />
+                <p className="sa-field-hint">Shown to students on this slot. Doesn't send a notification.</p>
+              </div>
+              <div className="sa-form-group">
+                <label>Max Students *</label>
+                <input
+                  className="sa-input"
+                  type="number"
+                  min="1"
+                  placeholder="e.g. 5"
+                  value={addMaxStudents}
+                  onChange={(e) => setAddMaxStudents(e.target.value)}
+                  disabled={modalLocked}
+                />
+                {editingId && editingCurrentMaxBooked > 0 && (
+                  <p className="sa-field-hint sa-field-hint--warning">
+                    {editingCurrentMaxBooked} student{editingCurrentMaxBooked === 1 ? "" : "s"} already booked on a future date — max can't go below this.
+                  </p>
+                )}
+              </div>
+              <div className="sa-form-group">
+                <label>Appointment Types <span style={{ fontWeight: 400, color: "var(--text-tertiary)", fontSize: "0.78rem" }}>(optional · press Enter to add)</span></label>
+                <div className="sa-preset-row">
+                  {PRESET_APPT_TYPES.map((preset) => {
+                    const added = addApptTypes.includes(preset);
+                    return (
+                      <button
+                        key={preset}
+                        type="button"
+                        className={`sa-preset-chip${added ? " is-added" : ""}`}
+                        onClick={() => commitApptTag(preset)}
+                        disabled={added || addApptTypes.length >= 10 || modalLocked}
+                      >
+                        {added ? "✓ " : "+ "}{preset}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className={`sa-tag-input-box${addApptTypes.length > 0 ? " has-tags" : ""}`}>
+                  {addApptTypes.map((tag) => (
+                    <span key={tag} className="sa-tag-chip">
+                      {tag}
+                      <button type="button" className="sa-tag-remove" onClick={() => removeApptTag(tag)} aria-label={`Remove ${tag}`}>×</button>
+                    </span>
+                  ))}
+                  <input
+                    className="sa-tag-input"
+                    type="text"
+                    placeholder={addApptTypes.length === 0 ? "Enter appointment type (e.g. Thesis Consultation)" : "Enter another appointment type"}
+                    value={addApptInput}
+                    onChange={(e) => setAddApptInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === ",") { e.preventDefault(); commitApptTag(); }
+                      if (e.key === "Backspace" && !addApptInput && addApptTypes.length > 0) {
+                        setAddApptTypes((prev) => prev.slice(0, -1));
+                      }
+                    }}
+                    onBlur={commitApptTag}
+                    disabled={modalLocked}
+                  />
+                </div>
+                <p className="sa-field-hint">Students will choose from these types when booking. Leave empty for no restriction.</p>
+              </div>
+            </div>
+            <div className="sa-modal-footer">
+              <button className="sa-btn sa-btn--outline" onClick={() => { setShowAddSlot(false); setEditingId(null); }} disabled={modalLocked}>Cancel</button>
+              <button className="sa-btn sa-btn--primary" onClick={handleValidateAndOpenConfirm} disabled={modalLocked}>
+                {addSaving ? "Saving…" : editingId ? "Save Changes" : "Add Slot"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Save Time Slot Confirmation ── */}
+      <ActionConfirmModal
+        show={showSaveConfirm}
+        onCancel={() => setShowSaveConfirm(false)}
+        onConfirm={handleConfirmSave}
+        variant="primary"
+        centered
+        title={editingId ? "Save these changes?" : "Add this time slot?"}
+        message={
+          <>
+            <strong>{addDays.join(", ")}</strong>, {fmt12(addStart)} – {fmt12(addEnd)}<br />
+            {addLocation.trim()} · Max {addMaxStudents} student{addMaxStudents === "1" ? "" : "s"}
+          </>
+        }
+        icon={editingId ? <PencilIcon /> : <PlusIcon />}
+        confirmText={addSaving ? "Saving…" : editingId ? "Save Changes" : "Add Slot"}
+        confirmDisabled={addSaving}
+      />
+
+      {/* ── Delete Time Slot Confirmation ── */}
+      <ActionConfirmModal
+        show={!!deleteTarget}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteSlot}
+        title="Remove Time Slot?"
+        message={
+          deleteTarget && (
+            <>
+              Remove the <strong>{fmt12(deleteTarget.slot.start_time)} – {fmt12(deleteTarget.slot.end_time)}</strong> slot on{" "}
+              <strong>{deleteTarget.day}</strong>? This action cannot be undone.
+            </>
+          )
+        }
+        icon={<TrashIcon />}
+        confirmText={deleteSaving ? "Removing…" : "Remove"}
+        confirmDisabled={deleteSaving}
+      />
+
+    </div>
+  );
+}

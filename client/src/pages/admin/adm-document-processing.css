@@ -1,0 +1,1074 @@
+/* Full token block (not just semantic tokens) so this page renders correctly
+   regardless of which other admin page loaded first in the session. */
+:root,
+[data-theme="dark"] {
+  --primary-color: #22c55e;
+  --primary-dark: #16a34a;
+  --primary-light: #86efac;
+
+  --background: #0a0f0a;
+  --card: #111612;
+  --sidebar: #0f1510;
+
+  --foreground: #f0fdf4;
+  --card-foreground: #f0fdf4;
+
+  --secondary: #1a3a1f;
+  --muted: #1a3a1f;
+  --muted-foreground: #94a3b8;
+
+  --border: #1e3a23;
+  --input: #1a3a1f;
+  --input-background: #0f1e12;
+
+  --accent: #16532a;
+  --accent-foreground: #dcfce7;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  --dark-bg: var(--background);
+  --card-bg: var(--card);
+  --card-border: var(--border);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--foreground);
+  --text-tertiary: var(--muted-foreground);
+
+  --sidebar-width: 14rem;
+
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: var(--destructive);
+  --blue: #3b82f6;
+  --cyan: #06b6d4;
+  --purple: #a855f7;
+  --violet: #7c3aed;
+  --pink: #ec4899;
+  --orange: #f97316;
+
+  --icon-sun-color: #fbbf24;
+  --icon-moon-color: #64748b;
+}
+
+[data-theme="light"] {
+  --primary-color: #15803d;
+  --primary-dark: #166534;
+  --primary-light: #22c55e;
+
+  --background: #f8fafc;
+  --card: #ffffff;
+  --sidebar: #f1f5f9;
+
+  --foreground: #1e293b;
+  --card-foreground: #1e293b;
+
+  --secondary: #e2e8f0;
+  --muted: #e2e8f0;
+  --muted-foreground: #64748b;
+
+  --border: #e2e8f0;
+  --input: #f1f5f9;
+  --input-background: #f8fafc;
+
+  --accent: #d1fae5;
+  --accent-foreground: #065f46;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+
+  --dark-bg: var(--background);
+  --card-bg: var(--card);
+  --card-border: var(--border);
+  --text-primary: var(--foreground);
+  --text-secondary: #334155;
+  --text-tertiary: var(--muted-foreground);
+
+  --sidebar-width: 14rem;
+
+  --success: #059669;
+  --warning: #d97706;
+  --danger: var(--destructive);
+  --blue: #2563eb;
+  --cyan: #0891b2;
+  --purple: #9333ea;
+  --violet: #6d28d9;
+  --pink: #db2777;
+  --orange: #ea580c;
+
+  --icon-sun-color: #fbbf24;
+  --icon-moon-color: #1e293b;
+}
+
+html, body {
+    font-family: 'Inter', sans-serif;
+}
+
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+.adp-layout {
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--dark-bg);
+  transition: background-color 0.3s ease;
+}
+
+/* ── Main ────────────────────────────────────────────────────────────────── */
+.adp-main {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  overflow-y: auto;
+  transition: margin-left 0.3s ease;
+}
+.adp-content {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+@media (max-width: 1024px) {
+  .adp-main { margin-left: 0; margin-top: 4rem; }
+  .adp-content { padding: 1rem; }
+}
+@media (max-width: 768px) {
+  .adp-content { padding: 0.75rem; gap: 1rem; }
+}
+
+/* ── Breadcrumb (self-contained so its rendered height/gap can't be
+   clobbered by whichever other admin page's CSS happened to load last) ──── */
+.adp-content .page-breadcrumb {
+  display: flex;
+  align-items: center;
+}
+.adp-content .page-breadcrumb-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  padding: 0.5rem 0.875rem 0.5rem 0;
+  border-radius: 0.5rem;
+  color: var(--text-tertiary);
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.adp-content .page-breadcrumb-link:hover {
+  color: var(--primary-color);
+  background: rgba(34, 197, 94, 0.1);
+}
+.adp-content .page-breadcrumb-link svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke: currentColor;
+  flex-shrink: 0;
+}
+
+/* ── Page Header ─────────────────────────────────────────────────────────── */
+.adp-page-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+}
+.adp-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.adp-title-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+  color: #fff;
+}
+.adp-title-icon svg {
+  width: 1.75rem;
+  height: 1.75rem;
+  stroke: #fff;
+  color: #fff;
+}
+.adp-icon-lg { width: 1.75rem; height: 1.75rem; }
+.adp-page-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.25rem 0;
+  transition: color 0.3s ease;
+  text-align: left;
+}
+.adp-page-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  transition: color 0.3s ease;
+  text-align: left;
+}
+
+/* ── Category Tabs ───────────────────────────────────────────────────────── */
+.adp-tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 2px solid var(--card-border);
+  flex-wrap: wrap;
+  font-family: 'Inter', sans-serif;
+}
+.adp-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  position: relative;
+  transition: color 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-family: 'Inter', sans-serif;
+}
+.adp-tab:hover:not(.adp-tab-active) { color: #f97316; }
+.adp-tab-active {
+  color: #f97316;
+  font-weight: 600;
+  cursor: default;
+  pointer-events: none;
+}
+.adp-tab-active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #f97316;
+}
+[data-theme="light"] .adp-tab:hover:not(.adp-tab-active) { color: #ea580c; }
+[data-theme="light"] .adp-tab-active { color: #ea580c; }
+[data-theme="light"] .adp-tab-active::after { background: #ea580c; }
+
+.adp-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+  transition: background 0.2s;
+}
+.adp-tab-active .adp-tab-count { background: rgba(249, 115, 22, 0.25); }
+[data-theme="light"] .adp-tab-count { background: rgba(234, 88, 12, 0.1); color: #ea580c; }
+[data-theme="light"] .adp-tab-active .adp-tab-count { background: rgba(234, 88, 12, 0.2); }
+
+/* ── Source Toggle ───────────────────────────────────────────────────────── */
+.adp-source-toggle {
+  display: inline-flex;
+  gap: 0.35rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.875rem;
+  padding: 0.35rem;
+  width: fit-content;
+}
+.adp-source-btn {
+  padding: 0.65rem 1.6rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.6rem;
+  color: var(--text-tertiary);
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.adp-source-btn:hover:not(.adp-source-btn-active) { color: var(--text-primary); }
+.adp-source-btn-active {
+  background: #f97316;
+  color: #fff;
+  cursor: default;
+}
+[data-theme="light"] .adp-source-btn-active { background: #ea580c; }
+
+/* ── Filter card ─────────────────────────────────────────────────────────
+   Bare filter- and filters-card class names (matching prof-transactions.css's
+   own filters-card structure, reused here rather than reinvented), scoped
+   under .adp-main so they don't collide with adm-transactions.css/
+   prof-transactions.css/stud-transactions.css, which scope the exact same
+   bare class names under their own page containers for the same reason. */
+.adp-main .filters-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(249, 115, 22, 0.15);
+  border-radius: 1rem;
+  padding: 1rem 1.5rem 1.5rem;
+  transition: all 0.3s ease;
+}
+[data-theme="light"] .adp-main .filters-card { border-color: rgba(234, 88, 12, 0.15); }
+
+.adp-main .filters-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.adp-main .filters-header-text {
+  display: flex;
+  flex-direction: column;
+  grid-column: 2;
+  text-align: center;
+}
+.adp-main .filters-title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  font-family: "Inter", sans-serif;
+  color: var(--text-primary);
+  margin: 0;
+  text-align: center;
+  transition: color 0.3s ease;
+}
+.adp-main .filters-description {
+  font-size: 0.9375rem;
+  color: var(--text-tertiary);
+  margin: 0.4rem 0 0 0;
+  text-align: center;
+  transition: color 0.3s ease;
+}
+
+.adp-main .filters-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+@media (min-width: 768px) {
+  .adp-main .filters-grid { gap: 1.5rem; }
+}
+@media (max-width: 768px) {
+  .adp-main .filters-grid { grid-template-columns: 1fr; }
+}
+
+.adp-main .filter-group--search {
+  grid-column: 1 / -1;
+}
+
+.adp-main .filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.adp-main .filter-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: left;
+  transition: color 0.3s ease;
+}
+.adp-main .filter-select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.adp-main .filter-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.adp-main .filter-search-wrapper svg {
+  position: absolute;
+  left: 0.875rem;
+  width: 1rem;
+  height: 1rem;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  stroke: currentColor;
+  z-index: 1;
+}
+.adp-main .filter-search-input {
+  width: 100%;
+  padding: 0.75rem 1.25rem 0.75rem 2.5rem;
+  background: var(--input-background, var(--card-bg));
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+.adp-main .filter-search-input::placeholder { color: var(--text-tertiary); }
+.adp-main .filter-search-input:hover { border-color: rgba(249, 115, 22, 0.3); }
+.adp-main .filter-search-input:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+}
+
+.adp-main .filter-select {
+  width: 100%;
+  padding: 0.75rem 1.25rem;
+  padding-right: 2.75rem;
+  background: var(--input-background, var(--card-bg));
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+.adp-main .filter-select:hover { border-color: rgba(249, 115, 22, 0.3); }
+.adp-main .filter-select:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+}
+.adp-main .filter-select option {
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.adp-main .filter-chevron {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+.adp-main .filter-chevron svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
+  stroke-width: 2;
+  stroke: currentColor;
+}
+.adp-main .filter-select:focus + .filter-chevron {
+  color: #f97316;
+}
+
+/* ── Documents List ──────────────────────────────────────────────────────── */
+.adp-documents-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.adp-doc-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(249, 115, 22, 0.25);
+  border-radius: 1rem;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+.adp-doc-card:hover {
+  box-shadow: 0 12px 28px rgba(249, 115, 22, 0.15);
+  border-color: rgba(249, 115, 22, 0.4);
+}
+.adp-doc-card-inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+  padding: 1.05rem;
+}
+.adp-doc-file-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.75rem;
+  background: rgba(249, 115, 22, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #f97316;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+[data-theme="light"] .adp-doc-file-icon {
+  background: rgba(249, 115, 22, 0.08);
+}
+.adp-doc-file-icon svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  stroke: currentColor;
+}
+.adp-doc-info {
+  flex: 1;
+  min-width: 0;
+}
+.adp-doc-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+.adp-doc-college {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0.25rem 0 0 0;
+  transition: color 0.3s ease;
+  text-align: left;
+}
+.adp-doc-requester-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.625rem;
+}
+.adp-doc-requester-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: color 0.3s ease;
+}
+.adp-id-badge {
+  padding: 0.3rem 0.625rem;
+  border-radius: 0.375rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  font-family: "Inter", sans-serif;
+}
+[data-theme="light"] .adp-id-badge { color: #ea580c; }
+.adp-doc-purpose {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0.625rem 0 0 0;
+  line-height: 1.4;
+  transition: color 0.3s ease;
+  text-align: left;
+}
+.adp-doc-tags-row {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+.adp-tracking-badge {
+  padding: 0.3rem 0.625rem;
+  border-radius: 0.375rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  font-family: "Inter", sans-serif;
+}
+[data-theme="light"] .adp-tracking-badge { color: #ea580c; }
+.adp-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.625rem;
+  border-radius: 0.375rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.adp-status-badge svg {
+  width: 0.75rem;
+  height: 0.75rem;
+  stroke: currentColor;
+  flex-shrink: 0;
+}
+.adp-badge-pending    { background: rgba(245, 158, 11, 0.15); color: var(--warning); border: 0.5px solid rgba(245, 158, 11, 0.3); }
+.adp-badge-processing { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 0.5px solid rgba(59, 130, 246, 0.3); }
+.adp-badge-ready       { background: rgba(34, 197, 94, 0.18); color: var(--primary-color); border: 0.5px solid rgba(34, 197, 94, 0.35); }
+.adp-badge-claimed     { background: rgba(34, 197, 94, 0.18); color: var(--primary-color); border: 0.5px solid rgba(34, 197, 94, 0.35); }
+.adp-badge-rejected    { background: rgba(239, 68, 68, 0.15);  color: var(--danger); border: 0.5px solid rgba(239, 68, 68, 0.3); }
+.adp-badge-cancelled   { background: rgba(239, 68, 68, 0.15); color: var(--danger); border: 0.5px solid rgba(239, 68, 68, 0.3); }
+
+[data-theme="light"] .adp-badge-pending    { background: rgba(217, 119, 6, 0.1); color: #92400e; border-color: rgba(217, 119, 6, 0.3); }
+[data-theme="light"] .adp-badge-processing { background: rgba(37, 99, 235, 0.1); color: #1d4ed8; border-color: rgba(37, 99, 235, 0.25); }
+[data-theme="light"] .adp-badge-ready       { background: rgba(5, 150, 105, 0.1); color: #065f46; border-color: rgba(5, 150, 105, 0.25); }
+[data-theme="light"] .adp-badge-claimed     { background: rgba(5, 150, 105, 0.1); color: #065f46; border-color: rgba(5, 150, 105, 0.25); }
+[data-theme="light"] .adp-badge-rejected    { background: rgba(220, 38, 38, 0.08); color: #991b1b; border-color: rgba(220, 38, 38, 0.2); }
+[data-theme="light"] .adp-badge-cancelled   { background: rgba(220, 38, 38, 0.08); color: #991b1b; border-color: rgba(220, 38, 38, 0.2); }
+
+.adp-doc-date {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+.adp-doc-date svg {
+  width: 0.75rem;
+  height: 0.75rem;
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+.adp-doc-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.625rem;
+  flex-shrink: 0;
+}
+.adp-doc-action-badges {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.adp-view-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  border: none;
+  border-radius: 0.75rem;
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
+}
+.adp-view-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(249, 115, 22, 0.35);
+}
+.adp-view-btn svg {
+  width: 1rem;
+  height: 1rem;
+  stroke: currentColor;
+  flex-shrink: 0;
+}
+
+/* Empty state */
+.adp-empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: var(--card-bg);
+  border: 1px solid rgba(249, 115, 22, 0.25);
+  border-radius: 1rem;
+}
+.adp-empty-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  margin: 0 auto 1rem;
+  color: var(--text-tertiary);
+}
+.adp-empty-icon svg {
+  width: 100%;
+  height: 100%;
+  stroke: currentColor;
+}
+.adp-empty-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+}
+.adp-empty-desc {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+/* ── Details Modal ───────────────────────────────────────────────────────── */
+.adp-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.adp-modal {
+  width: 100%;
+  max-width: 42rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1.25rem;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+  max-height: 90vh;
+  max-height: 90dvh;
+  display: flex;
+  flex-direction: column;
+}
+.adp-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 1.5rem 1.5rem 1.25rem;
+  border-bottom: 1px solid var(--card-border);
+  transition: border-color 0.3s ease;
+  flex-shrink: 0;
+  text-align: left;
+}
+
+/* Ensure modal text aligns left */
+.adp-modal {
+  text-align: left;
+}
+
+.adp-modal-title,
+.adp-modal-label,
+.adp-modal-value,
+.adp-modal-notes-wrap,
+.adp-modal-actions {
+  text-align: left;
+}
+.adp-modal-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+.adp-modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+.adp-modal-close-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+.adp-modal-close-btn svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  stroke: currentColor;
+}
+.adp-modal-body {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  overflow-y: auto;
+}
+.adp-modal-hero {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  border-radius: 1rem;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 10px 30px rgba(249, 115, 22, 0.2);
+}
+.adp-modal-hero-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 0 0.375rem 0;
+}
+.adp-modal-hero-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.3;
+}
+.adp-modal-hero-purpose {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.92);
+  margin: 0.75rem 0 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  line-height: 1.5;
+}
+.adp-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+@media (max-width: 480px) {
+  .adp-modal-grid { grid-template-columns: 1fr; }
+}
+.adp-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.adp-modal-label {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: color 0.3s ease;
+}
+.adp-modal-value {
+  font-size: 0.925rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+.adp-modal-notes-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.adp-modal-textarea {
+  width: 100%;
+  padding: 0.75rem;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+  transition: all 0.2s ease;
+  line-height: 1.5;
+}
+.adp-modal-textarea:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+}
+.adp-modal-textarea::placeholder { color: var(--text-tertiary); }
+
+/* ── Attachments (Submissions source) ────────────────────────────────────── */
+.adp-attach-input {
+  width: 100%;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.65rem;
+  padding: 0.5rem 0.75rem;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.8rem;
+}
+
+/* Native "Choose Files" button -- pin it to a light chip with near-black text
+   so it stays readable regardless of the OS color-scheme (index.css sets
+   `color-scheme: light dark`, which otherwise makes the button follow the OS
+   into dark mode = white text on a dark chip against the dark input wrapper). */
+.adp-attach-input::file-selector-button,
+.adp-attach-input::-webkit-file-upload-button {
+  margin-right: 0.6rem;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--card-border);
+  border-radius: 0.4rem;
+  background: #e5e7eb;
+  color: #111827;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.adp-attach-input::file-selector-button:hover,
+.adp-attach-input::-webkit-file-upload-button:hover {
+  background: #d1d5db;
+}
+.adp-attach-hint {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  margin: 0.35rem 0 0;
+}
+.adp-attach-budget {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.adp-attach-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.4rem 0 0.6rem;
+}
+.adp-attach-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--card-border);
+  border-radius: 0.6rem;
+  background: var(--input-background);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.adp-attach-chip:hover {
+  background: rgba(249, 115, 22, 0.08);
+  border-color: #f97316;
+  color: #f97316;
+}
+.adp-attach-chip--queued {
+  justify-content: space-between;
+  cursor: default;
+}
+.adp-attach-chip--queued:hover {
+  background: var(--input-background);
+  border-color: var(--card-border);
+  color: var(--text-secondary);
+}
+.adp-attach-filename {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.adp-attach-chip svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+.adp-attach-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0.4rem;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.adp-attach-remove:hover {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+}
+.adp-attach-remove svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.adp-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--card-border);
+  transition: border-color 0.3s ease;
+}
+.adp-modal-btn {
+  flex: 1;
+  min-width: 120px;
+  padding: 0.625rem 1.25rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+}
+.adp-modal-btn--primary {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: white;
+  border-color: transparent;
+}
+.adp-modal-btn--primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(249, 115, 22, 0.35);
+}
+.adp-modal-btn--success {
+  background: #059669;
+  color: white;
+  border-color: transparent;
+}
+.adp-modal-btn--success:hover {
+  background: #047857;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(5, 150, 105, 0.35);
+}
+.adp-modal-btn--danger {
+  background: transparent;
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+.adp-modal-btn--danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.6);
+}
+.adp-modal-btn--outline {
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: var(--card-border);
+}
+.adp-modal-btn--outline:hover {
+  background: rgba(249, 115, 22, 0.05);
+  border-color: rgba(249, 115, 22, 0.3);
+  color: #f97316;
+}
+[data-theme="light"] .adp-modal-btn--outline:hover { color: #ea580c; }
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .adp-doc-card-inner {
+    flex-wrap: wrap;
+    gap: 0.9rem;
+  }
+  .adp-doc-action {
+    width: 100%;
+    align-items: flex-end;
+  }
+  .adp-view-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+@media (max-width: 480px) {
+  .adp-modal-actions { flex-direction: column; }
+  .adp-modal-btn { flex: unset; width: 100%; }
+}

@@ -1,0 +1,318 @@
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
+const pool = require("../db");
+const { sendServerError } = require("../utils/errorResponse");
+const { emitToDept } = require("../sockets");
+
+// Per the capstone paper's User Login Activity Diagram: "a three-tries limit
+// before a temporary lockout of the account." The paper doesn't specify an
+// exact lockout duration (just "temporary"), so 15 minutes is used as a
+// reasonable default -- adjust if the paper is later revised with a number.
+const MAX_FAILED_ATTEMPTS = 3;
+const LOCKOUT_MINUTES = 15;
+
+const hashToken = (token) =>
+  crypto.createHash("sha256").update(token).digest("hex");
+
+const fetchUserProfile = async (userId, role) => {
+  let query = "";
+  if (role === "student") {
+    query = `
+      SELECT u.user_id, u.role, u.status,
+             s.student_number, s.first_name, s.last_name, s.course, s.year_level, s.email, s.department_id,
+             d.department_name, d.department_abbreviation
+      FROM users u
+      JOIN students s ON u.user_id = s.student_id
+      LEFT JOIN departments d ON s.department_id = d.department_id
+      WHERE u.user_id = ?
+    `;
+  } else if (role === "faculty") {
+    query = `
+      SELECT u.user_id, u.role, u.status,
+             f.employee_id, f.first_name, f.last_name, f.specialization, f.email, f.department_id,
+             d.department_name, d.department_abbreviation
+      FROM users u
+      JOIN faculty f ON u.user_id = f.faculty_id
+      LEFT JOIN departments d ON f.department_id = d.department_id
+      WHERE u.user_id = ?
+    `;
+  } else if (role === "admin") {
+    query = `
+      SELECT u.user_id, u.role, u.status,
+             a.employee_id, a.first_name, a.last_name, a.position, a.email, a.department_id,
+             d.department_name, d.department_abbreviation
+      FROM users u
+      JOIN administrators a ON u.user_id = a.admin_id
+      LEFT JOIN departments d ON a.department_id = d.department_id
+      WHERE u.user_id = ?
+    `;
+  } else if (role === "superadmin") {
+    // No department_id -- superadmin is system-wide by design, so the
+    // profile has no department_name/department_abbreviation fields at all.
+    query = `
+      SELECT u.user_id, u.role, u.status,
+             sa.employee_id, sa.first_name, sa.last_name, sa.email
+      FROM users u
+      JOIN superadmins sa ON u.user_id = sa.superadmin_id
+      WHERE u.user_id = ?
+    `;
+  } else {
+    throw new Error("Invalid user role");
+  }
+
+  const [rows] = await pool.query(query, [userId]);
+  return rows[0] || null;
+};
+
+const login = async (req, res) => {
+  const { emailOrSchoolId, password, keepLoggedIn } = req.body;
+  const ipAddress = req.ip || req.headers["x-forwarded-for"] || "";
+  const userAgent = req.headers["user-agent"] || "";
+
+  if (!emailOrSchoolId || !password) {
+    return res
+      .status(400)
+      .json({ error: "Email/School ID and password are required" });
+  }
+
+  try {
+    const userQuery = `
+      SELECT u.user_id, u.password, u.role, u.status, u.failed_login_attempts, u.locked_until
+      FROM users u
+      LEFT JOIN students s ON u.user_id = s.student_id
+      LEFT JOIN faculty f ON u.user_id = f.faculty_id
+      LEFT JOIN administrators a ON u.user_id = a.admin_id
+      LEFT JOIN superadmins sa ON u.user_id = sa.superadmin_id
+      WHERE s.student_number = ? OR f.employee_id = ? OR a.employee_id = ? OR sa.employee_id = ?
+         OR s.email = ? OR f.email = ? OR a.email = ? OR sa.email = ?
+      LIMIT 1
+    `;
+
+    const [users] = await pool.query(userQuery, [
+      emailOrSchoolId,
+      emailOrSchoolId,
+      emailOrSchoolId,
+      emailOrSchoolId,
+      emailOrSchoolId,
+      emailOrSchoolId,
+      emailOrSchoolId,
+      emailOrSchoolId,
+    ]);
+
+    if (users.length === 0) {
+      await pool.query(
+        `INSERT INTO login_logs (user_id, user_id_attempted, ip_address, user_agent, login_status, failure_reason)
+         VALUES (NULL, ?, ?, ?, 'failed', 'User not found')`,
+        [emailOrSchoolId, ipAddress, userAgent],
+      );
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const user = users[0];
+
+    if (user.status !== "active") {
+      await pool.query(
+        `INSERT INTO login_logs (user_id, user_id_attempted, ip_address, user_agent, login_status, failure_reason)
+         VALUES (?, ?, ?, ?, 'failed', ?)`,
+        [
+          user.user_id,
+          emailOrSchoolId,
+          ipAddress,
+          userAgent,
+          `Account ${user.status}`,
+        ],
+      );
+      return res.status(403).json({
+        error: `Your account is currently ${user.status}. Please contact the administrator.`,
+      });
+    }
+
+    if (user.locked_until && new Date(user.locked_until) > new Date()) {
+      await pool.query(
+        `INSERT INTO login_logs (user_id, user_id_attempted, ip_address, user_agent, login_status, failure_reason)
+         VALUES (?, ?, ?, ?, 'failed', 'account_locked')`,
+        [user.user_id, emailOrSchoolId, ipAddress, userAgent],
+      );
+      const unlockTime = new Date(user.locked_until).toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      return res.status(423).json({
+        error: `Too many failed login attempts. Try again after ${unlockTime}.`,
+      });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      const nextAttempts = user.failed_login_attempts + 1;
+      const lockingNow = nextAttempts >= MAX_FAILED_ATTEMPTS;
+
+      await pool.query(
+        `UPDATE users SET failed_login_attempts = ?, locked_until = ? WHERE user_id = ?`,
+        [
+          lockingNow ? 0 : nextAttempts,
+          lockingNow
+            ? new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000)
+            : null,
+          user.user_id,
+        ],
+      );
+      await pool.query(
+        `INSERT INTO login_logs (user_id, user_id_attempted, ip_address, user_agent, login_status, failure_reason)
+         VALUES (?, ?, ?, ?, 'failed', 'Incorrect password')`,
+        [user.user_id, emailOrSchoolId, ipAddress, userAgent],
+      );
+
+      if (lockingNow) {
+        return res.status(423).json({
+          error: `Too many failed login attempts. Your account has been locked for ${LOCKOUT_MINUTES} minutes.`,
+        });
+      }
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const tokenPayload = {
+      userId: user.user_id,
+      role: user.role,
+    };
+    // "Keep me logged in" (mobile login, every role): a longer-lived token so
+    // reopening the app doesn't ask for a password again for weeks instead of
+    // after a day. Only the mobile apps send this -- web never does, so web
+    // sessions keep the normal lifetime (and its own 30-min idle timeout).
+    const keepLong = keepLoggedIn === true;
+    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
+      expiresIn: keepLong
+        ? process.env.JWT_KEEP_LOGGED_IN_EXPIRES_IN || "30d"
+        : process.env.JWT_EXPIRES_IN || "24h",
+    });
+
+    await pool.query(
+      "UPDATE users SET last_login_at = NOW(), failed_login_attempts = 0, locked_until = NULL WHERE user_id = ?",
+      [user.user_id],
+    );
+    await pool.query(
+      `INSERT INTO login_logs (user_id, user_id_attempted, ip_address, user_agent, login_status, failure_reason)
+       VALUES (?, ?, ?, ?, 'success', NULL)`,
+      [user.user_id, emailOrSchoolId, ipAddress, userAgent],
+    );
+
+    const decoded = jwt.decode(token);
+    await pool.query(
+      `INSERT INTO user_sessions (user_id, session_token, ip_address, user_agent, expires_at)
+       VALUES (?, ?, ?, ?, FROM_UNIXTIME(?))`,
+      [user.user_id, hashToken(token), ipAddress, userAgent, decoded.exp],
+    );
+
+    // Faculty presence broadcast: a professor now has a live session, so the
+    // session-gated availability seen by admin/students flips from "offline"
+    // to their stored toggle state. Mirrors the logout handler's "offline"
+    // broadcast so those screens refetch immediately instead of waiting for
+    // their 15-45s poll. Best-effort -- a hiccup here must not break login.
+    if (user.role === "faculty") {
+      try {
+        const [[fac]] = await pool.query(
+          "SELECT department_id, availability_status, unavailable_reason FROM faculty WHERE faculty_id = ?",
+          [user.user_id],
+        );
+        if (fac?.department_id) {
+          emitToDept(fac.department_id, "faculty:availability-status-changed", {
+            facultyId: Number(user.user_id),
+            availabilityStatus: fac.availability_status,
+            unavailableReason:
+              fac.availability_status === "unavailable"
+                ? fac.unavailable_reason
+                : null,
+          });
+        }
+      } catch (emitErr) {
+        console.error("Login presence broadcast error:", emitErr.message);
+      }
+    }
+
+    const profile = await fetchUserProfile(user.user_id, user.role);
+
+    res.json({ message: "Login successful", token, user: profile });
+  } catch (error) {
+    return sendServerError(res, error, "Login Server Error:");
+  }
+};
+
+const getCurrentUser = async (req, res) => {
+  try {
+    const { userId, role } = req.user;
+    const profile = await fetchUserProfile(userId, role);
+    if (!profile)
+      return res.status(404).json({ error: "User profile not found" });
+    res.json({ user: profile });
+  } catch (error) {
+    return sendServerError(res, error, "Get current user error:");
+  }
+};
+
+// Upserts by token (not user_id): a device's token can outlive one user's
+// session (shared/reissued campus devices), so re-registering on login just
+// reattaches the token to whoever's logged in now rather than erroring on
+// the existing unique constraint.
+const registerPushToken = async (req, res) => {
+  const { expoPushToken } = req.body;
+  if (!expoPushToken) {
+    return res.status(400).json({ error: "expoPushToken is required" });
+  }
+
+  try {
+    await pool.query(
+      `INSERT INTO push_tokens (user_id, expo_push_token) VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), updated_at = CURRENT_TIMESTAMP`,
+      [req.user.userId, expoPushToken],
+    );
+    res.json({ message: "Push token registered" });
+  } catch (error) {
+    console.error("Register push token error:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const logout = async (req, res) => {
+  try {
+    const authHeader = req.headers["authorization"];
+    const token = authHeader && authHeader.split(" ")[1];
+    if (token) {
+      const hashed = hashToken(token);
+      await pool.query(
+        `UPDATE user_sessions SET logout_at = NOW() WHERE session_token = ? AND logout_at IS NULL`,
+        [hashed],
+      );
+
+      // If this was a faculty session, tell the department room so the student
+      // Professor Schedules / admin Faculty Availability screens refetch and
+      // immediately show the professor as unavailable (they now have no live
+      // session). Fire-and-forget -- a hiccup here must not break logout.
+      const [[row]] = await pool.query(
+        `SELECT us.user_id AS faculty_id, u.role, f.department_id
+         FROM user_sessions us
+         JOIN users u ON u.user_id = us.user_id
+         LEFT JOIN faculty f ON f.faculty_id = us.user_id
+         WHERE us.session_token = ?
+         ORDER BY us.session_id DESC LIMIT 1`,
+        [hashed],
+      );
+      if (row?.role === "faculty" && row.department_id) {
+        emitToDept(row.department_id, "faculty:availability-status-changed", {
+          facultyId: Number(row.faculty_id),
+          availabilityStatus: "unavailable",
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Logout session update error:", error.message);
+  }
+  res.json({ message: "Logout successful" });
+};
+
+module.exports = {
+  login,
+  getCurrentUser,
+  logout,
+  registerPushToken,
+};

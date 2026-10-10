@@ -1,0 +1,564 @@
+/*
+ * Professor Queue (prof-queue.jsx).
+ *
+ * Every class is pq- prefixed and self-contained: this page deliberately
+ * doesn't import the admin queue stylesheets, whose bare class names collide
+ * across the stud-/adm-/prof- page triads. Queueing is blue across OAMS; the
+ * violet accents mark "passed to faculty", matching the office's screens.
+ */
+
+.pq-page {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ── Header ─────────────────────────────────────────────── */
+.pq-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.pq-page .page-breadcrumb {
+  display: flex;
+  align-items: center;
+}
+
+.pq-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.pq-title-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  color: #fff;
+}
+
+.pq-title-icon svg {
+  width: 1.75rem;
+  height: 1.75rem;
+  stroke: #fff;
+}
+
+.pq-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.pq-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0.25rem 0 0;
+  text-align: left;
+}
+
+.pq-error {
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+/* ── Tracker stat cards ─────────────────────────────────── */
+.pq-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.pq-stat-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 0.875rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.375rem;
+  transition: all 0.3s ease;
+}
+
+.pq-stat-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(59, 130, 246, 0.45);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.15);
+}
+
+.pq-stat-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.25rem;
+}
+
+.pq-stat-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.pq-stat-icon--blue { background: rgba(59, 130, 246, 0.14); color: #3b82f6; }
+.pq-stat-icon--violet { background: rgba(139, 92, 246, 0.14); color: #8b5cf6; }
+.pq-stat-icon--green { background: rgba(34, 197, 94, 0.14); color: var(--primary-color); }
+.pq-stat-icon--red { background: rgba(239, 68, 68, 0.14); color: #ef4444; }
+
+.pq-stat-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin: 0;
+}
+
+.pq-stat-value {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+  margin: 0;
+}
+
+/* Student number instead of a count -- smaller so it fits. */
+.pq-stat-value--text {
+  font-size: 1.25rem;
+  line-height: 1.6rem;
+  word-break: break-word;
+}
+
+.pq-val-blue { color: #3b82f6; }
+.pq-val-violet { color: #8b5cf6; }
+.pq-val-green { color: var(--primary-color); }
+.pq-val-red { color: #ef4444; }
+
+/* ── Cards ──────────────────────────────────────────────── */
+.pq-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  text-align: left;
+}
+
+.pq-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.pq-card-header h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.pq-card-header h3 svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  color: #3b82f6;
+  flex-shrink: 0;
+}
+
+.pq-current-card {
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+.pq-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.pq-muted {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-tertiary);
+}
+
+.pq-muted--center {
+  text-align: center;
+  padding: 1rem 0;
+}
+
+.pq-empty {
+  padding: 1.25rem;
+  border: 1px dashed var(--card-border);
+  border-radius: 0.875rem;
+  text-align: center;
+}
+
+.pq-empty h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.pq-empty p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+/* ── Services ───────────────────────────────────────────── */
+.pq-service-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.pq-service {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  background: var(--input-background, transparent);
+}
+
+.pq-service-name {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--text-primary);
+}
+
+.pq-service-location {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.pq-service-location svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+/* ── Badges / chips ─────────────────────────────────────── */
+.pq-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pq-badge--live { background: rgba(34, 197, 94, 0.15); color: var(--primary-color); border: 0.5px solid rgba(34, 197, 94, 0.4); }
+.pq-badge--idle { background: rgba(148, 163, 184, 0.15); color: var(--text-tertiary); border: 0.5px solid rgba(148, 163, 184, 0.4); }
+.pq-badge--serving { background: rgba(34, 197, 94, 0.15); color: var(--primary-color); border: 0.5px solid rgba(34, 197, 94, 0.4); }
+.pq-badge--called { background: rgba(245, 158, 11, 0.15); color: #d97706; border: 0.5px solid rgba(245, 158, 11, 0.4); }
+.pq-badge--priority { background: rgba(168, 85, 247, 0.16); color: #9333ea; }
+
+.pq-id-badge,
+.pq-ticket-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pq-id-badge {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+  border: 0.5px solid rgba(59, 130, 246, 0.35);
+}
+
+.pq-ticket-badge {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  text-transform: uppercase;
+}
+
+.pq-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pq-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.5rem;
+  background: var(--input-background, rgba(148, 163, 184, 0.1));
+  border: 1px solid var(--card-border);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.pq-chip svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  flex-shrink: 0;
+}
+
+.pq-chip--ready { color: #16a34a; border-color: rgba(34, 197, 94, 0.35); }
+.pq-chip--not-ready { color: #d97706; border-color: rgba(245, 158, 11, 0.35); }
+
+/* ── Current / next student ─────────────────────────────── */
+.pq-student {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.pq-student-top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pq-student-name {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.pq-detail {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.pq-detail strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.pq-hint {
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.65rem;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #d97706;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+/* Admin action-button pattern: coloured outline, tinted on hover. */
+.pq-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.pq-action-btn {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--card-border);
+  background: transparent;
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: inherit;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pq-action-btn svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex-shrink: 0;
+}
+
+.pq-action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pq-action-btn--primary { border-color: rgba(59, 130, 246, 0.4); color: #3b82f6; }
+.pq-action-btn--primary:hover:not(:disabled) { background: rgba(59, 130, 246, 0.12); border-color: #3b82f6; }
+.pq-action-btn--success { border-color: rgba(34, 197, 94, 0.4); color: #22c55e; }
+.pq-action-btn--success:hover:not(:disabled) { background: rgba(34, 197, 94, 0.12); border-color: #22c55e; }
+.pq-action-btn--danger { border-color: rgba(239, 68, 68, 0.4); color: #ef4444; }
+.pq-action-btn--danger:hover:not(:disabled) { background: rgba(239, 68, 68, 0.12); border-color: #ef4444; }
+
+/* ── Line ───────────────────────────────────────────────── */
+.pq-entry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pq-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1rem;
+  border: 1px solid var(--card-border);
+  border-left: 3px solid #8b5cf6;
+  border-radius: 0.875rem;
+  background: var(--input-background, transparent);
+}
+
+.pq-entry-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+}
+
+.pq-entry-position {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.65rem;
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  color: #fff;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pq-entry-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pq-entry-name {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.pq-entry-meta {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+}
+
+.pq-entry-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+.pq-entry-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+/* Outline button that fills on hover (admin queue button pattern). */
+.pq-return-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 0.55rem;
+  border: 1px solid #3b82f6;
+  background: var(--card-bg);
+  color: #3b82f6;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: inherit;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pq-return-btn svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.pq-return-btn:hover:not(:disabled) {
+  background: #3b82f6;
+  color: #fff;
+}
+
+.pq-return-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Responsive ─────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .pq-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .pq-page { padding: 1rem; }
+  .pq-title { font-size: 1.5rem; }
+  .pq-title-icon { width: 2.75rem; height: 2.75rem; }
+  .pq-title-icon svg { width: 1.4rem; height: 1.4rem; }
+  .pq-card { padding: 1.1rem; }
+  .pq-actions { flex-direction: column; }
+  .pq-action-btn { width: 100%; }
+  .pq-entry-top { flex-wrap: wrap; }
+  .pq-entry-badges { justify-content: flex-start; }
+  .pq-return-btn { width: 100%; justify-content: center; }
+}
+
+@media (max-width: 380px) {
+  .pq-stats { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,436 @@
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Link } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
+import "./adm-queue-analytics.css";
+import AdminPageShell from "../../components/AdminPageShell";
+import PageHeader from "../../components/PageHeader";
+import FilterSelect from "../../components/FilterSelect";
+import FilterDateRange from "../../components/FilterDateRange";
+import { toast } from "sonner";
+import api from "../../utils/api";
+import { useAuth } from "../../context/AuthContext";
+import { getManilaDateString, formatManilaDate, formatTimeString } from "../../utils/dateTime";
+import ExportMenu from "../../components/ExportMenu";
+import { exportTransactionsPdf } from "../../utils/exportPdf";
+
+// ── Icons ─────────────────────────────────────────────────────────────────────
+const BarChartIcon = () => (
+  <svg className="aqa-title-svg" viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+    <path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z" />
+  </svg>
+);
+const CheckCircleIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+    <polyline points="22 4 12 14.01 9 11.01" />
+  </svg>
+);
+const AlarmIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+    <circle cx="12" cy="13" r="8" />
+    <path d="M12 9v4l2 2" />
+    <path d="M5 3 2 6" />
+    <path d="m22 6-3-3" />
+    <path d="M6.38 18.7 4 21" />
+    <path d="M17.64 18.67 20 21" />
+  </svg>
+);
+const UsersIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+);
+const UserXIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <line x1="17" y1="8" x2="22" y2="13" />
+    <line x1="22" y1="8" x2="17" y2="13" />
+  </svg>
+);
+const ClockIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12 6 12 12 16 14" />
+  </svg>
+);
+const ChevronDownIcon = ({ className = "" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+);
+
+export default function AdminQueueAnalytics() {
+  const { user: authUser } = useAuth();
+  const user = authUser
+    ? {
+        ...authUser,
+        college: authUser.departmentName ?? "N/A College",
+        departmentAbbrev: authUser.departmentAbbrev ?? "CCS",
+      }
+    : { name: "Admin", college: "", departmentAbbrev: "CCS" };
+
+  const today = getManilaDateString();
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [serviceType, setServiceType] = useState("All Services");
+  const [serviceTypes, setServiceTypes] = useState(["All Services"]);
+  const [totals, setTotals] = useState({
+    accomplishedQueues: 0,
+    overtimeQueues: 0,
+    studentsServed: 0,
+    noShows: 0,
+    peakHour: "N/A",
+  });
+  const [queues, setQueues] = useState([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  // Starts true so the first load shows a loading state; later refreshes
+  // (filter change / socket / reconnect) update silently.
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Queue Analytics defaults to today (unlike Adm-Transactions' blank/all-
+  // time default) -- an unset date input just falls back to today here.
+  const effectiveStart = startDate || today;
+  const effectiveEnd = endDate || today;
+
+  // Monotonic request id: only the latest request may write state, so a slow
+  // Load-More (or an old filter's response) can't clobber a newer result.
+  const requestIdRef = useRef(0);
+
+  const fetchSummary = useCallback(
+    async (pageToFetch = 1, { append = false } = {}) => {
+      const requestId = ++requestIdRef.current;
+      try {
+        if (!append) setError(null);
+        const res = await api.get("/admin/queue-analytics/summary", {
+          params: {
+            startDate: effectiveStart,
+            endDate: effectiveEnd,
+            service: serviceType,
+            page: pageToFetch,
+            limit: 10,
+          },
+        });
+        if (requestId !== requestIdRef.current) return;
+        setTotals(res.data.totals);
+        setQueues((prev) => (append ? [...prev, ...(res.data.queues ?? [])] : (res.data.queues ?? [])));
+        setPage(res.data.page ?? pageToFetch);
+        setHasMore(!!res.data.hasMore);
+        if (res.data.serviceTypes) setServiceTypes(res.data.serviceTypes);
+      } catch (err) {
+        if (requestId !== requestIdRef.current) return;
+        console.error("Queue analytics summary fetch error:", err);
+        // A failed Load-More must not replace the rows already on screen.
+        if (append) toast.error("Could not load more queues");
+        else setError(err?.response?.data?.error || "Could not load queue analytics.");
+      } finally {
+        if (requestId === requestIdRef.current) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
+      }
+    },
+    [effectiveStart, effectiveEnd, serviceType],
+  );
+
+  // Initial + filter-driven fetch (fetchSummary changes identity with the
+  // date range / serviceType). No live socket refetch: this report doesn't
+  // need to update in real time.
+  useEffect(() => {
+    if (authUser) fetchSummary(1);
+  }, [authUser, fetchSummary]);
+
+  const handleLoadMore = () => {
+    setLoadingMore(true);
+    fetchSummary(page + 1, { append: true });
+  };
+
+  const rangeLabel =
+    effectiveStart === today && effectiveEnd === today
+      ? "Today"
+      : `${formatManilaDate(effectiveStart)} – ${formatManilaDate(effectiveEnd)}`;
+
+  // Prefixes a leading =/+/-/@ so spreadsheet apps treat the cell as text.
+  const csvEscape = (value) => {
+    let str = String(value ?? "");
+    if (/^[=+\-@]/.test(str)) str = `'${str}`;
+    return `"${str.replace(/"/g, '""')}"`;
+  };
+  const buildExportRow = (q) => [
+    q.label,
+    formatManilaDate(q.slotDate),
+    `${formatTimeString(q.startTime)} – ${formatTimeString(q.endTime)}`,
+    q.status === "completed" ? "Completed" : "Closed",
+    q.studentsServed,
+    q.noShows,
+    q.overtime ? "Yes" : "No",
+    q.avgWaitMinutes,
+  ];
+  const exportHeader = ["Queue", "Date", "Time Window", "Status", "Students Served", "No-Shows", "Overtime?", "Avg Wait (min)"];
+  // Export reflects the whole filtered range, not just whatever pages
+  // "Load More" has pulled onto the screen so far -- pages through the same
+  // endpoint (capped at 50/request server-side) until nothing's left.
+  const fetchAllQueuesForExport = async () => {
+    let all = [];
+    let fetchPage = 1;
+    let more = true;
+    while (more) {
+      const res = await api.get("/admin/queue-analytics/summary", {
+        params: { startDate: effectiveStart, endDate: effectiveEnd, service: serviceType, page: fetchPage, limit: 50 },
+      });
+      all = all.concat(res.data.queues ?? []);
+      more = !!res.data.hasMore;
+      fetchPage += 1;
+    }
+    return all;
+  };
+  const summaryRows = [
+    ["Accomplished Queues", totals.accomplishedQueues],
+    ["Overtime Queues", totals.overtimeQueues],
+    ["Students Served", totals.studentsServed],
+    ["No-Shows", totals.noShows],
+    ["Peak Hour", totals.peakHour],
+  ];
+  const exportFilenameBase = `queue-analytics-${effectiveStart}-to-${effectiveEnd}`;
+
+  const handleExportCsv = async () => {
+    try {
+      const allQueues = await fetchAllQueuesForExport();
+      const csv = [
+        ...summaryRows, [],
+        exportHeader, ...allQueues.map(buildExportRow),
+      ]
+        .map((row) => row.map(csvEscape).join(","))
+        .join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${exportFilenameBase}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success("Export complete");
+    } catch (err) {
+      console.error("Queue analytics CSV export error:", err);
+      toast.error("Could not export analytics");
+    }
+  };
+
+  const handleExportPdf = async () => {
+    try {
+      const allQueues = await fetchAllQueuesForExport();
+      exportTransactionsPdf({
+        title: "Queue Analytics Report",
+        subtitle: `${user.college} (${user.departmentAbbrev}) — ${rangeLabel} — Generated ${getManilaDateString()}`,
+        columns: exportHeader,
+        rows: allQueues.map(buildExportRow),
+        filename: `${exportFilenameBase}.pdf`,
+        summary: summaryRows.map(([label, value]) => ({ label, value })),
+      });
+      toast.success("Export complete");
+    } catch (err) {
+      console.error("Queue analytics PDF export error:", err);
+      toast.error("Could not export analytics");
+    }
+  };
+
+  const statCards = [
+    {
+      label: "Accomplished Queues",
+      value: totals.accomplishedQueues,
+      icon: <CheckCircleIcon />,
+      tone: "blue",
+    },
+    {
+      label: "Overtime Queues",
+      value: totals.overtimeQueues,
+      icon: <AlarmIcon />,
+      tone: "amber",
+    },
+    {
+      label: "Students Served",
+      value: totals.studentsServed,
+      icon: <UsersIcon />,
+      tone: "blue",
+    },
+    {
+      label: "No-Shows",
+      value: totals.noShows,
+      icon: <UserXIcon />,
+      tone: "red",
+    },
+    {
+      label: "Peak Hour",
+      value: totals.peakHour,
+      icon: <ClockIcon />,
+      tone: "blue",
+      isText: true,
+    },
+  ];
+
+  return (
+    <AdminPageShell outerClassName="aqa-layout" mainClassName="aqa-main">
+      <div className="aqa-content">
+        <PageHeader
+          breadcrumb={
+            <Link to="/admin/dashboard" className="page-breadcrumb-link">
+              <ChevronLeft />
+              Home
+            </Link>
+          }
+          icon={<BarChartIcon />}
+          iconClassName="aqa-title-icon"
+          title="Queue Analytics"
+          subtitle="Queue performance for your department."
+          headerClassName="aqa-page-header"
+          breadcrumbClassName="page-breadcrumb"
+          titleSectionClassName="aqa-title-section"
+          titleClassName="aqa-page-title"
+          subtitleClassName="aqa-page-subtitle"
+        />
+
+        {/* Stat cards */}
+        <div className="aqa-stats-grid">
+          {statCards.map((card) => (
+            <div
+              key={card.label}
+              className={`aqa-stat-card aqa-stat-${card.tone}`}
+            >
+              <div className={`aqa-stat-icon-box aqa-icon-box-${card.tone}`}>
+                {card.icon}
+              </div>
+              <p className="aqa-stat-label">{card.label}</p>
+              <p
+                className={`aqa-stat-value aqa-val-${card.tone} ${card.isText ? "aqa-stat-value-text" : ""}`}
+              >
+                {loading ? "—" : card.value}
+              </p>
+              <p className="aqa-stat-sub">{rangeLabel}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Filters */}
+        <div className="aqa-filters-card">
+          <div className="aqa-filters-header">
+            <div className="aqa-filters-header-text">
+              <h3 className="aqa-filters-title">Analytics Filters</h3>
+              <p className="aqa-filters-description">
+                {user.college} ({user.departmentAbbrev})
+              </p>
+            </div>
+            <ExportMenu
+              triggerClassName="aqa-export-btn"
+              disabled={queues.length === 0}
+              onExportCsv={handleExportCsv}
+              onExportPdf={handleExportPdf}
+            />
+          </div>
+          <div className="aqa-filters-grid">
+            <FilterDateRange
+              id="aqa-filter-date-range"
+              label="Date Range"
+              startValue={startDate}
+              endValue={endDate}
+              onStartChange={(e) => setStartDate(e.target.value)}
+              onEndChange={(e) => setEndDate(e.target.value)}
+              onClear={() => { setStartDate(""); setEndDate(""); }}
+            />
+            <FilterSelect
+              id="aqa-filter-service"
+              label="Service Type"
+              value={serviceType}
+              onChange={(e) => setServiceType(e.target.value)}
+              options={serviceTypes.map((s) => ({ value: s, label: s }))}
+              chevronIcon={<ChevronDownIcon className="filter-chevron" />}
+            />
+          </div>
+          {(startDate || endDate) && (
+            <p className="aqa-range-label">{rangeLabel}</p>
+          )}
+        </div>
+
+        {/* Per-queue-instance breakdown */}
+        <div className="aqa-svc-list">
+          {loading ? (
+            <div className="aqa-empty-state">
+              <BarChartIcon />
+              <h3>Loading analytics…</h3>
+            </div>
+          ) : error ? (
+            <div className="aqa-empty-state">
+              <BarChartIcon />
+              <h3>Could not load analytics</h3>
+              <p>{error}</p>
+            </div>
+          ) : queues.length === 0 ? (
+            <div className="aqa-empty-state">
+              <BarChartIcon />
+              <h3>No queues hosted in this range</h3>
+              <p>No queue lines finished or were closed in the selected date range.</p>
+            </div>
+          ) : (
+            <>
+              {queues.map((row) => (
+                <div key={row.slotId} className="aqa-svc-card">
+                  <div className="aqa-svc-card-head">
+                    <span className="aqa-svc-name">
+                      {row.isUniversal ? row.label : `${row.label} Queue`} for {formatManilaDate(row.slotDate)}: {formatTimeString(row.startTime)} – {formatTimeString(row.endTime)}
+                    </span>
+                    <span className={`aqa-queue-status-badge aqa-queue-status--${row.status}`}>
+                      {row.status === "completed" ? "Completed" : "Closed"}
+                    </span>
+                  </div>
+                  <div className="aqa-svc-metrics">
+                    <div className="aqa-svc-metric">
+                      <span className="aqa-svc-metric-label">Students Served</span>
+                      <span className="aqa-svc-metric-value aqa-val-blue">
+                        {row.studentsServed}
+                      </span>
+                    </div>
+                    <div className="aqa-svc-metric">
+                      <span className="aqa-svc-metric-label">No-Shows</span>
+                      <span className="aqa-svc-metric-value aqa-val-red">
+                        {row.noShows}
+                      </span>
+                    </div>
+                    <div className="aqa-svc-metric">
+                      <span className="aqa-svc-metric-label">Overtime</span>
+                      <span className={`aqa-svc-metric-value ${row.overtime ? "aqa-val-amber" : "aqa-val-blue"}`}>
+                        {row.overtime ? "Yes" : "No"}
+                      </span>
+                    </div>
+                    <div className="aqa-svc-metric">
+                      <span className="aqa-svc-metric-label">Avg Wait</span>
+                      <span className="aqa-svc-metric-value">
+                        {row.avgWaitMinutes > 0 ? `${row.avgWaitMinutes} min` : "—"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {hasMore && (
+                <div className="aqa-load-more">
+                  <button
+                    type="button"
+                    className="aqa-load-more-btn"
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? "Loading…" : "Load More"}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </AdminPageShell>
+  );
+}

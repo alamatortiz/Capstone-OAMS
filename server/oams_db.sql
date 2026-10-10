@@ -1,10 +1,1200 @@
+-- ============================================================
+-- OAMS Database Schema
+-- Path: server/oams_db.sql
+-- Run this file first, then server/db/mock/ccs_mock_data.sql
+--
+-- DANGER: The DROP DATABASE line below is commented out.
+-- Only uncomment it intentionally in a controlled environment.
+-- ============================================================
+
+-- CREATE DATABASE oams_db;
+-- DROP DATABASE oams_db;  ← DANGER: only run manually, never in automation
 USE oams_db;
 
-CREATE TABLE IF NOT EXISTS demo_counters (
-    counter_id INT PRIMARY KEY DEFAULT 1,
-    count_value INT NOT NULL DEFAULT 0
+-- ─────────────────────────────────────────────────────────────
+-- 1. DEPARTMENTS
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE departments (
+    department_id       INT          AUTO_INCREMENT PRIMARY KEY,
+    department_name     VARCHAR(100) NOT NULL,
+    department_abbreviation VARCHAR(20) NOT NULL,  -- tightened from VARCHAR(100)
+    office_location     VARCHAR(100),
+    office_hours        TEXT         NULL,
+    satisfaction_survey_url VARCHAR(500) NULL  -- external survey link, set per-department by superadmin
 );
 
-INSERT INTO demo_counters (counter_id, count_value) 
-VALUES (1, 0) 
-ON DUPLICATE KEY UPDATE count_value = count_value;
+-- ─────────────────────────────────────────────────────────────
+-- 2. PARENT USERS
+-- Holds credentials and role assignment only.
+-- Profile data lives in child tables (students/faculty/administrators).
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE users (
+    user_id             INT          AUTO_INCREMENT PRIMARY KEY,
+    password            VARCHAR(255) NOT NULL,
+    role                ENUM('student','faculty','admin','superadmin') NOT NULL,
+    status              ENUM('active','inactive','suspended') DEFAULT 'active',
+    last_login_at       TIMESTAMP    NULL,
+    failed_login_attempts INT        NOT NULL DEFAULT 0,
+    locked_until        TIMESTAMP    NULL DEFAULT NULL,
+    created_at          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_users_role (role)   -- added: role is queried on every authenticated request
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 3. CHILD USER TABLES
+-- NOTE: student_id / faculty_id / admin_id are NOT auto-increment —
+--       they mirror users.user_id via FK.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE students (
+    student_id      INT          PRIMARY KEY,
+    student_number  VARCHAR(20)  NOT NULL UNIQUE,
+    first_name      VARCHAR(50)  NOT NULL,
+    last_name       VARCHAR(50)  NOT NULL,
+    course          VARCHAR(100) NULL,
+    year_level      INT          NOT NULL,
+    email           VARCHAR(100) NOT NULL UNIQUE,
+    department_id   INT          NOT NULL,
+    FOREIGN KEY (student_id)    REFERENCES users(user_id)       ON DELETE CASCADE,
+    FOREIGN KEY (department_id) REFERENCES departments(department_id),
+    INDEX idx_students_dept (department_id)
+);
+
+CREATE TABLE faculty (
+    faculty_id          INT          PRIMARY KEY,
+    employee_id         VARCHAR(20)  NOT NULL UNIQUE,
+    first_name          VARCHAR(50)  NOT NULL,
+    last_name           VARCHAR(50)  NOT NULL,
+    specialization      VARCHAR(100),
+    position            VARCHAR(100) NOT NULL DEFAULT 'Faculty Member',
+    email               VARCHAR(100) NOT NULL UNIQUE,
+    department_id       INT          NOT NULL,
+    availability_status ENUM('available','unavailable') NOT NULL DEFAULT 'available',
+    unavailable_reason  VARCHAR(255) NULL,
+    FOREIGN KEY (faculty_id)    REFERENCES users(user_id)       ON DELETE CASCADE,
+    FOREIGN KEY (department_id) REFERENCES departments(department_id),
+    INDEX idx_faculty_dept (department_id)
+);
+
+-- NOTE: 'admin' (College Office Admin) is always department-scoped -- a
+-- secretary-level role handling one department's own operational work.
+-- System-wide concerns (Pinnacle Sync, cross-department User Management)
+-- belong to the separate 'superadmin' role below instead, which
+-- deliberately has no department_id at all -- see the superadmins table.
+CREATE TABLE administrators (
+    admin_id        INT          PRIMARY KEY,
+    employee_id     VARCHAR(20)  NOT NULL UNIQUE,
+    first_name      VARCHAR(50)  NOT NULL,
+    last_name       VARCHAR(50)  NOT NULL,
+    position        VARCHAR(100) NOT NULL,
+    email           VARCHAR(100) NOT NULL UNIQUE,
+    department_id   INT          NOT NULL,
+    FOREIGN KEY (admin_id)      REFERENCES users(user_id)       ON DELETE CASCADE,
+    FOREIGN KEY (department_id) REFERENCES departments(department_id)
+);
+
+-- System-wide role, not scoped to any department -- exists purely for
+-- Pinnacle Sync and cross-department User Management (see authorizeRoles
+-- call sites in adminRoutes.js's PINNACLE SYNC / USER ACCOUNT MANAGEMENT
+-- sections). Provisioned by direct SQL only; there is deliberately no
+-- self-registration or admin-driven creation path for this role.
+CREATE TABLE superadmins (
+    superadmin_id   INT          PRIMARY KEY,
+    employee_id     VARCHAR(20)  NOT NULL UNIQUE,
+    first_name      VARCHAR(50)  NOT NULL,
+    last_name       VARCHAR(50)  NOT NULL,
+    email           VARCHAR(100) NOT NULL UNIQUE,
+    FOREIGN KEY (superadmin_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 4. USER ACCOUNT MANAGEMENT
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE user_sessions (
+    session_id      INT          AUTO_INCREMENT PRIMARY KEY,
+    user_id         INT          NOT NULL,
+    session_token   VARCHAR(255) NOT NULL,
+    ip_address      VARCHAR(45),
+    user_agent      TEXT,
+    login_at        TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    expires_at      TIMESTAMP    NOT NULL,
+    logout_at       TIMESTAMP    NULL,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+-- One user can hold multiple tokens (phone + tablet). Unique on the token,
+-- not user_id, so re-registering on login upserts (device kept, owner may
+-- change -- shared/reissued devices on campus are a real case).
+CREATE TABLE push_tokens (
+    push_token_id   INT          AUTO_INCREMENT PRIMARY KEY,
+    user_id         INT          NOT NULL,
+    expo_push_token VARCHAR(255) NOT NULL,
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_push_tokens_token (expo_push_token)
+);
+
+-- Browser Web Push subscriptions (mobile's Expo push above is a separate,
+-- incompatible mechanism -- Expo's proprietary push service vs. the W3C
+-- Push API, so this is its own table rather than a shared one). One row per
+-- browser/device a user has enabled notifications on; unique on endpoint
+-- (not user_id) for the same reason push_tokens is unique on token.
+CREATE TABLE web_push_subscriptions (
+    subscription_id INT          AUTO_INCREMENT PRIMARY KEY,
+    user_id         INT          NOT NULL,
+    endpoint        VARCHAR(500) NOT NULL,
+    p256dh          VARCHAR(255) NOT NULL,
+    auth            VARCHAR(255) NOT NULL,
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_web_push_endpoint (endpoint)
+);
+
+CREATE TABLE login_logs (
+    log_id           INT          AUTO_INCREMENT PRIMARY KEY,
+    user_id          INT          NULL,               -- NULL on failed attempt for unknown user
+    user_id_attempted VARCHAR(50) NOT NULL,           -- the raw value typed at login
+    ip_address       VARCHAR(45),
+    user_agent       TEXT,
+    login_status     ENUM('success','failed') NOT NULL,
+    failure_reason   VARCHAR(255),
+    attempted_at     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 5. SERVICES & REQUIREMENTS (queue only)
+-- ─────────────────────────────────────────────────────────────
+
+-- Fixed set of on-campus premises (rooms/offices/windows) admins and
+-- faculty pick from instead of typing free text. department_id NULL =
+-- shared/global location (visible to every department's dropdown).
+CREATE TABLE locations (
+    location_id     INT          AUTO_INCREMENT PRIMARY KEY,
+    department_id   INT          NULL,
+    location_name   VARCHAR(100) NOT NULL,
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_location_dept_name (department_id, location_name)
+);
+
+CREATE TABLE services (
+    service_id            INT          AUTO_INCREMENT PRIMARY KEY,
+    service_name          VARCHAR(100) NOT NULL,
+    description           TEXT,
+    department_id         INT          NOT NULL,   -- the owning/creating department, always real
+    is_cross_college       BOOLEAN      NOT NULL DEFAULT FALSE, -- TRUE = other departments' students can also use it
+    location_id           INT          NULL,
+    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE RESTRICT,
+    FOREIGN KEY (location_id)   REFERENCES locations(location_id)     ON DELETE SET NULL
+);
+
+CREATE TABLE service_requirements (
+    requirement_id   INT          AUTO_INCREMENT PRIMARY KEY,
+    service_id       INT          NOT NULL,
+    requirement_name VARCHAR(255) NOT NULL,
+    description      TEXT,
+    is_mandatory     BOOLEAN      DEFAULT TRUE,
+    created_at       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_id) REFERENCES services(service_id) ON DELETE CASCADE
+);
+
+CREATE TABLE service_procedure_steps (
+    step_id      INT          AUTO_INCREMENT PRIMARY KEY,
+    service_id   INT          NOT NULL,
+    step_number  INT          NOT NULL,
+    step_title   VARCHAR(255) NOT NULL,
+    description  TEXT,
+    created_at   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_id) REFERENCES services(service_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_service_step (service_id, step_number)
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 5b. APPOINTMENT SERVICES (created by faculty, for appointments only)
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE appointment_services (
+    service_id      INT          AUTO_INCREMENT PRIMARY KEY,
+    service_name    VARCHAR(100) NOT NULL,
+    description     TEXT,
+    faculty_id      INT          NOT NULL,
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 5c. DOCUMENT SERVICES (document requests only)
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE document_services (
+    service_id       INT          AUTO_INCREMENT PRIMARY KEY,
+    service_name     VARCHAR(100) NOT NULL,
+    description      TEXT,
+    department_id    INT          NOT NULL,   -- the owning/creating department, always real
+    is_cross_college BOOLEAN      NOT NULL DEFAULT FALSE, -- TRUE = other departments' students/faculty can also use it
+    recipient_type   ENUM('students','faculty','both') NOT NULL DEFAULT 'students',
+    status           ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    processing_time  VARCHAR(100) NULL,
+    requires_coding  BOOLEAN      NOT NULL DEFAULT FALSE, -- TRUE = office must assign an official (dean-sanctioned) code before release
+    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE RESTRICT
+);
+
+CREATE TABLE document_requirements (
+    requirement_id   INT          AUTO_INCREMENT PRIMARY KEY,
+    service_id       INT          NOT NULL,
+    requirement_name VARCHAR(255) NOT NULL,
+    description      TEXT,
+    is_mandatory     BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_id) REFERENCES document_services(service_id) ON DELETE CASCADE
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 6. QUEUE SLOT MANAGEMENT
+-- Controls capacity per service window. Separate from appointments.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE queue_slots (
+    slot_id         INT          AUTO_INCREMENT PRIMARY KEY,
+    -- NULL only for a Universal Service Queue slot (is_universal = TRUE), which
+    -- covers every service in department_id rather than one specific service.
+    -- For a normal slot this is the one service being queued for.
+    service_id      INT          NULL,
+    -- The owning department. Always populated (for a normal slot it equals
+    -- services.department_id; for a universal slot it's the only dept link).
+    -- Every queue read path scopes on this instead of joining services, so a
+    -- NULL service_id never drops a universal slot from a dept-scoped query.
+    department_id   INT          NOT NULL,
+    is_universal    BOOLEAN      NOT NULL DEFAULT FALSE,
+    -- The secretary who CONFIGURED this slot's window. NULL when a faculty
+    -- member opened their own delegated queue directly. Distinct from
+    -- host_user_id below: this is "who set it up", that is "who is running it".
+    admin_id        INT          NULL,
+    -- Who is actually hosting. Generic users.user_id rather than a pair of
+    -- nullable admin/faculty columns: administrators.admin_id and
+    -- faculty.faculty_id are both PK-FKs onto users.user_id, so there's no
+    -- ID-space collision, and every ownership check stays one predicate
+    -- instead of a two-branch COALESCE in ~10 route handlers.
+    host_user_id    INT          NOT NULL,
+    host_role       ENUM('admin','faculty') NOT NULL DEFAULT 'admin',
+    slot_date       DATE         NOT NULL,
+    start_time      TIME         NOT NULL,
+    end_time        TIME         NOT NULL,
+    max_capacity    INT          NOT NULL DEFAULT 20,
+    current_count   INT          NOT NULL DEFAULT 0,
+    no_show_timeout_minutes INT  NOT NULL DEFAULT 15,
+    service_time_minutes INT     NOT NULL DEFAULT 15, -- admin-configured est. time per student for this specific queue instance
+    status          ENUM('open','paused','full','expired','completed','closed') DEFAULT 'open',
+    pause_reason    VARCHAR(255) NULL,
+    close_reason    VARCHAR(255) NULL,
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_id)    REFERENCES services(service_id),
+    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE RESTRICT,
+    FOREIGN KEY (admin_id)      REFERENCES administrators(admin_id),
+    FOREIGN KEY (host_user_id)  REFERENCES users(user_id),
+    -- Non-unique on purpose. A UNIQUE key here would let a completed/closed slot
+    -- permanently block re-hosting that same window ("Host Again"). Uniqueness
+    -- among *live* queues is enforced in POST /queue-hosting by the status-aware
+    -- overlap check, serialized by a SELECT ... FOR UPDATE on the owning service
+    -- row. The index still speeds that overlap lookup and backs the service_id FK.
+    INDEX idx_slot_window (service_id, slot_date, start_time),
+    -- Backs the dept-scoped lookups used everywhere now that scoping is by
+    -- department_id, and the "one live universal per dept" / overlap checks.
+    INDEX idx_slot_dept_date_status (department_id, slot_date, status),
+    -- Backs "which queues am I hosting today", the faculty hosting screen's
+    -- primary read.
+    INDEX idx_slot_host (host_user_id, slot_date, status)
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 7. QUEUE SYSTEM
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE queues (
+    queue_id        INT          AUTO_INCREMENT PRIMARY KEY,
+    student_id      INT          NOT NULL,
+    service_id      INT          NOT NULL,
+    slot_id         INT          NULL,
+    -- The professor this ticket was passed to by the college office. NULL =
+    -- the office's own line. The ticket deliberately STAYS on the office's
+    -- slot (slot_id unchanged) so capacity stays consumed and a professor-
+    -- served ticket counts as served on the office's queue; only "who is
+    -- serving / who is next / my position" become per-line. A professor's
+    -- line can span several office slots at once. See queueDisplay.js's
+    -- queueLanePredicate and routes/facultyQueueRoutes.js.
+    assigned_faculty_id INT      NULL,
+    assigned_at     TIMESTAMP    NULL,
+    assigned_by     INT          NULL,             -- users.user_id of the admin who passed it
+    queue_number    INT          NOT NULL,
+    -- queue_number CANNOT be renumbered to express priority or a transfer --
+    -- uq_queue_slot_number below turns any shuffle into a deadlock farm. So
+    -- queue_number stays a stable display label and the canonical ordering is
+    --   ORDER BY priority_rank DESC, created_at ASC, queue_id ASC
+    -- (see server/utils/queueDisplay.js). A priority credit sets rank 1; a
+    -- relayed entry keeps its ORIGINAL created_at, which by itself lands it
+    -- mid-line in the destination rather than at the back.
+    priority_rank   TINYINT      NOT NULL DEFAULT 0,
+    status          ENUM('waiting','serving','completed','cancelled','no_show') DEFAULT 'waiting',
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    -- Auto-touched on any change to this row (status, notes, etc). Lets the
+    -- transactions feeds (GET .../transactions) sort by "most recently
+    -- modified" instead of only "most recently created".
+    updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    called_at       TIMESTAMP    NULL,
+    -- Set when an admin confirms a called ('serving') student has physically
+    -- shown up, distinct from called_at. Stops the no-show sweeper's timeout
+    -- clock (queueNoShowSweeper.js) so a long service session isn't mistaken
+    -- for an absence -- see PATCH /queue-hosting/:slotId/mark-arrived.
+    arrived_at      TIMESTAMP    NULL,
+    -- One-shot: set the first time this entry reaches position #2 or #3 in
+    -- its slot (advanced by call-next or someone ahead leaving), so the
+    -- "you're almost up" reminder fires at most once -- see the post-commit
+    -- block in PATCH /queue-hosting/:slotId/call-next.
+    position_reminder_sent_at TIMESTAMP NULL DEFAULT NULL,
+    completed_at    TIMESTAMP    NULL,
+    cancelled_at    TIMESTAMP    NULL,
+    notes           TEXT,
+    -- Reason an admin gave when force-cancelling this entry by stopping the
+    -- whole queue slot. NULL when the student left voluntarily. Kept separate
+    -- from `notes` (the student's own concern text) so neither overwrites
+    -- the other.
+    admin_reason    VARCHAR(255) NULL,
+    -- Mirrors appointments.cancelled_by so both modules attribute an ended
+    -- record the same way. 'system_not_entertained' is the queue equivalent
+    -- of the appointment sweeper's value: the office closed before reaching
+    -- this student (they are also issued a queue_priority_credits row).
+    cancelled_by    ENUM('student','admin','faculty','system','system_no_show','system_not_entertained') NULL,
+    -- Set when staff relayed this entry here from another queue. The entry
+    -- keeps its original created_at so it doesn't lose its place.
+    transferred_from_slot_id INT NULL,
+    -- Provenance, so analytics can tell pre-cutover online joins from the
+    -- on-site QR joins that replaced them (2026-09-30 panel requirement).
+    joined_via      ENUM('online','onsite_qr') NOT NULL DEFAULT 'onsite_qr',
+    -- The service label to show for this ticket, frozen at join time. For a
+    -- normal queue it's the service's name as it was then; for a Universal
+    -- Service Queue it's "Universal Service Queue - <picked service>". Every
+    -- student-facing + history read path COALESCEs this over the live
+    -- services.service_name so a later rename never rewrites past tickets.
+    service_label_snapshot VARCHAR(150) NULL,
+    FOREIGN KEY (student_id) REFERENCES students(student_id),
+    FOREIGN KEY (service_id) REFERENCES services(service_id),
+    FOREIGN KEY (slot_id)    REFERENCES queue_slots(slot_id),
+    FOREIGN KEY (transferred_from_slot_id) REFERENCES queue_slots(slot_id) ON DELETE SET NULL,
+    FOREIGN KEY (assigned_faculty_id) REFERENCES faculty(faculty_id) ON DELETE SET NULL,
+    FOREIGN KEY (assigned_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    -- Defense-in-depth: queue numbers are generated app-side under a row
+    -- lock on the owning slot (POST /queues/join), but nothing previously
+    -- stopped a duplicate at the DB layer if that ever got bypassed.
+    UNIQUE KEY uq_queue_slot_number (slot_id, queue_number),
+    -- Supports the per-service/date-range aggregate queries used by
+    -- GET /admin/queue-analytics (performance, peak-hour, and trend
+    -- comparisons all filter+group on this pair).
+    INDEX idx_queues_service_created (service_id, created_at),
+    -- Backs the canonical waiting-list ordering described on priority_rank.
+    INDEX idx_queue_order (slot_id, status, priority_rank, created_at),
+    -- Backs a professor's line (same ordering, keyed by who it was passed to).
+    INDEX idx_queue_faculty_lane (assigned_faculty_id, status, priority_rank, created_at)
+);
+
+-- Audit trail for all queue status transitions
+CREATE TABLE queue_status_logs (
+    log_id          INT          AUTO_INCREMENT PRIMARY KEY,
+    queue_id        INT          NOT NULL,
+    old_status      VARCHAR(50),
+    new_status      VARCHAR(50)  NOT NULL,
+    changed_by      INT          NULL,
+    notes           TEXT,
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (queue_id)   REFERENCES queues(queue_id)   ON DELETE CASCADE,
+    FOREIGN KEY (changed_by) REFERENCES users(user_id)     ON DELETE SET NULL
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 7b. ON-SITE QUEUEING (2026-09-30 panel review)
+-- Queueing is on-site only: a student can no longer join from
+-- anywhere, they must scan a rotating code shown by the host.
+-- ─────────────────────────────────────────────────────────────
+
+-- Which faculty may host which service's queue. Authorization about a
+-- *service*, independent of any one slot -- queue_slots.host_user_id can only
+-- say who is running a queue right now, not who is permitted to.
+CREATE TABLE service_delegations (
+    delegation_id   INT          AUTO_INCREMENT PRIMARY KEY,
+    service_id      INT          NOT NULL,
+    faculty_id      INT          NOT NULL,
+    delegated_by    INT          NOT NULL,          -- administrators.admin_id
+    is_active       BOOLEAN      NOT NULL DEFAULT TRUE,
+    revoked_at      TIMESTAMP    NULL,
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    -- One row per pair; re-delegating flips is_active back on rather than
+    -- inserting a duplicate, so the record of who granted it is preserved.
+    UNIQUE KEY uq_service_faculty (service_id, faculty_id),
+    INDEX idx_delegation_faculty (faculty_id, is_active),
+    FOREIGN KEY (service_id)   REFERENCES services(service_id)       ON DELETE CASCADE,
+    FOREIGN KEY (faculty_id)   REFERENCES faculty(faculty_id)        ON DELETE CASCADE,
+    FOREIGN KEY (delegated_by) REFERENCES administrators(admin_id)
+);
+
+-- The rotating on-site join code. Only a sha256 hash is stored, never the raw
+-- token -- a DB dump must not hand someone a working join code.
+--
+-- Tokens are deliberately MULTI-USE within their TTL: many students scan the
+-- same screen at once. Replay is bounded by the short window (~60s) plus the
+-- existing per-slot duplicate-join guard, not by single-use consumption.
+CREATE TABLE queue_slot_tokens (
+    token_id        BIGINT       AUTO_INCREMENT PRIMARY KEY,
+    slot_id         INT          NOT NULL,
+    token_hash      CHAR(64)     NOT NULL,          -- sha256 hex of 32 random bytes
+    issued_by       INT          NOT NULL,          -- users.user_id of the host
+    issued_at       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    expires_at      DATETIME     NOT NULL,
+    -- Set when the slot is paused/closed or a newer token supersedes this one,
+    -- so a code left displayed on a sleeping screen dies immediately instead
+    -- of lingering until its TTL runs out.
+    revoked_at      DATETIME     NULL,
+    UNIQUE KEY uq_token_hash (token_hash),
+    INDEX idx_token_slot_exp (slot_id, expires_at),
+    FOREIGN KEY (slot_id)   REFERENCES queue_slots(slot_id) ON DELETE CASCADE,
+    FOREIGN KEY (issued_by) REFERENCES users(user_id)
+);
+
+-- A host forgiving a student's no-show block in person.
+--
+-- There is deliberately NO no_show_count column: strikes are derived by
+-- COUNTing today's queues.status='no_show' rows, so they can never drift out
+-- of sync with the entries they describe. This table records only the
+-- exceptions. cleared_at doubles as a watermark -- strikes are recounted from
+-- it, so a student who no-shows again after being forgiven is blocked again.
+CREATE TABLE queue_block_overrides (
+    override_id     INT          AUTO_INCREMENT PRIMARY KEY,
+    student_id      INT          NOT NULL,
+    block_date      DATE         NOT NULL,
+    cleared_by      INT          NOT NULL,          -- users.user_id (admin or faculty host)
+    cleared_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    note            VARCHAR(255) NULL,
+    INDEX idx_override_student_date (student_id, block_date),
+    FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+    FOREIGN KEY (cleared_by) REFERENCES users(user_id)
+);
+
+-- Compensation for being left unserved when a queue closes.
+--
+-- Nothing may be RESERVED for the student -- that would reintroduce the online
+-- reservation the panel removed. A credit is inert: it does nothing until the
+-- student physically comes back and scans in again, at which point it puts
+-- them at the front (priority_rank = 1) and is consumed. Never returning just
+-- lets it expire.
+CREATE TABLE queue_priority_credits (
+    credit_id         INT        AUTO_INCREMENT PRIMARY KEY,
+    student_id        INT        NOT NULL,
+    service_id        INT        NOT NULL,
+    source_queue_id   INT        NULL,              -- the entry that went unserved
+    reason            VARCHAR(255) NULL,
+    expires_at        DATETIME   NOT NULL,
+    consumed_at       DATETIME   NULL,
+    consumed_queue_id INT        NULL,              -- the entry that spent it
+    created_at        TIMESTAMP  DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_credit_lookup (student_id, service_id, consumed_at, expires_at),
+    FOREIGN KEY (student_id)        REFERENCES students(student_id) ON DELETE CASCADE,
+    FOREIGN KEY (service_id)        REFERENCES services(service_id) ON DELETE CASCADE,
+    FOREIGN KEY (source_queue_id)   REFERENCES queues(queue_id)     ON DELETE SET NULL,
+    FOREIGN KEY (consumed_queue_id) REFERENCES queues(queue_id)     ON DELETE SET NULL
+);
+
+-- Pre-processing: the student ticks off the service's requirements from their
+-- phone while waiting, so the host sees a pre-validated checklist when they're
+-- called. Keyed on the queue entry (not the student) so each visit stands alone.
+CREATE TABLE queue_requirement_checks (
+    queue_id        INT          NOT NULL,
+    requirement_id  INT          NOT NULL,
+    is_checked      BOOLEAN      NOT NULL DEFAULT FALSE,
+    checked_at      TIMESTAMP    NULL,
+    PRIMARY KEY (queue_id, requirement_id),
+    FOREIGN KEY (queue_id)       REFERENCES queues(queue_id)                     ON DELETE CASCADE,
+    FOREIGN KEY (requirement_id) REFERENCES service_requirements(requirement_id) ON DELETE CASCADE
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- FACULTY AVAILABILITY
+-- Recurring weekly schedule: faculty sets a day-of-week + time
+-- window that repeats every week until edited/removed.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE faculty_availability (
+    availability_id INT AUTO_INCREMENT PRIMARY KEY,
+    faculty_id       INT NOT NULL,
+    day_of_week      ENUM('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday') NOT NULL,
+    start_time       TIME NOT NULL,
+    end_time         TIME NOT NULL,
+    location         VARCHAR(150),
+    -- Optional free-text note a professor can attach to this slot (e.g. a
+    -- Google Meet link, a room change, a reminder). Purely informational --
+    -- never fires a notification, unlike everything else on this row.
+    slot_note        VARCHAR(500) NULL,
+    max_students     INT NULL,    -- NULL = indefinite (no cap on bookings)
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
+    INDEX idx_faculty_availability_faculty (faculty_id)
+);
+
+-- Links which appointment_services a faculty offers for a recurring weekly slot
+CREATE TABLE faculty_availability_services (
+    id                INT AUTO_INCREMENT PRIMARY KEY,
+    availability_id   INT NOT NULL,
+    service_id        INT NOT NULL,
+    FOREIGN KEY (availability_id) REFERENCES faculty_availability(availability_id) ON DELETE CASCADE,
+    FOREIGN KEY (service_id)      REFERENCES appointment_services(service_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_availability_service (availability_id, service_id)
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 8. APPOINTMENT SYSTEM
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE appointments (
+    appointment_id      INT          AUTO_INCREMENT PRIMARY KEY,
+    -- Assigned in application code at booking time via the same
+    -- nextTrackingNumber() helper (utils/trackingNumber.js, backed by the
+    -- tracking_counters table) document_requests/document_submissions use
+    -- ("APT-00001", ...) -- NULL only for rows booked before this column
+    -- existed.
+    tracking_number      VARCHAR(20)  NULL UNIQUE,
+    student_id          INT          NOT NULL,
+    faculty_id          INT          NOT NULL,
+    department_id       INT          NOT NULL,
+    service_id          INT          NULL,   -- FK to appointment_services (the chosen appointment type)
+    availability_id     INT          NULL,   -- FK to faculty_availability; the recurring template this was booked against
+    location_snapshot     VARCHAR(150) NULL, -- location captured at booking time, immune to the template being edited/deleted later
+    slot_note_snapshot    VARCHAR(500) NULL, -- faculty_availability.slot_note captured at booking time (same reason)
+    window_start_snapshot TIME         NULL, -- consultation window captured at booking time (same reason)
+    window_end_snapshot   TIME         NULL,
+    appointment_date    DATE         NOT NULL,
+    appointment_time    TIME         NOT NULL,
+    status              ENUM('pending','approved','rejected','completed','cancelled') DEFAULT 'pending',
+    -- Real-world instant the professor approved this request (PATCH
+    -- /professor/appointments/:id/status) -- separate from updated_at
+    -- (overwritten on every status change) so "approved at" survives a
+    -- later transition to completed. NULL until approved; never
+    -- overwritten afterward (see the write sites' "IS NULL" guards).
+    approved_at         TIMESTAMP    NULL DEFAULT NULL,
+    -- Real-world instant this appointment was first marked completed --
+    -- via the professor's own PATCH above, the student's self-service
+    -- PATCH /student/appointments/:appointmentId/complete, or
+    -- appointmentReminderSweeper.js's resolveStaleApproved() auto-complete.
+    -- Whichever of those three fires first wins; NULL until then. For the
+    -- sweeper specifically this is "when the sweeper noticed", not a
+    -- backdated reconstruction of the appointment window's end time (see
+    -- db.js's timezone comment) -- consistent with imminent_reminder_sent_at
+    -- below, which is stamped the same "when noticed" way.
+    completed_at        TIMESTAMP    NULL DEFAULT NULL,
+    -- 'system' = auto-cancelled because the availability slot it was booked
+    -- against got edited/deleted out from under it.
+    -- 'system_expired' = a pending request whose scheduled time passed
+    -- unanswered. Written together with status='rejected' (+ a context-aware
+    -- rejection_reason) by appointmentReminderSweeper.js's auto-reject, so
+    -- screens can tell a system rejection from a manual one (a professor's
+    -- manual rejection leaves cancelled_by NULL). Older rows may instead
+    -- carry it with status='cancelled', from before auto-rejection existed.
+    -- 'student_no_show' = the student self-reported, via PATCH
+    -- /student/appointments/:id/report-not-served, that the professor never
+    -- actually served them on an approved appointment -- a student-triggered
+    -- cancellation like plain 'student', but distinguished for activity-feed/
+    -- admin display. See cancel_reason below for its optional free-text note.
+    -- 'system_not_entertained' = the opposite direction of the same idea:
+    -- appointmentReminderSweeper.js's resolveStaleApproved() auto-cancels an
+    -- approved appointment (instead of auto-completing it) once its window
+    -- plus a grace period has passed with no "actions taken" (shared_comment)
+    -- ever recorded (context-aware text in cancel_reason) --
+    -- distinct from plain 'system', which already means "auto-cancelled
+    -- because the schedule template changed" and is asserted by two
+    -- hardcoded activity-feed strings (professorRoutes.js/studentRoutes.js).
+    cancelled_by        ENUM('student','faculty','system','system_expired','student_no_show','system_not_entertained') NULL, -- who/what closed the appointment (cancelled, or system-rejected via 'system_expired'), for activity-feed attribution
+    -- Separate from `notes` below (which is the student's own booking
+    -- purpose, set once at creation and never a good place to also store
+    -- the faculty member's rejection reason -- unlike document_requests.notes,
+    -- this column has no such dual-purpose precedent).
+    rejection_reason    TEXT         NULL,
+    -- Optional free-text the STUDENT provides when self-reporting a no-show
+    -- (cancelled_by = 'student_no_show') via PATCH
+    -- /student/appointments/:id/report-not-served. A deliberately separate
+    -- column from rejection_reason above, not a reuse of it -- see that
+    -- column's own comment for why.
+    cancel_reason        TEXT         NULL,
+    notes               TEXT,
+    -- Booking-time context the student types in themselves (not pulled from
+    -- students.year_level/course, which may be stale or unset) so the
+    -- professor knows which class/year the consultation concerns. Free-text
+    -- shorthand (e.g. "1 CS-A"), not split into separate year/program columns.
+    booking_year_program VARCHAR(150) NULL,
+    course_code          VARCHAR(50)  NULL,
+    -- One shared, overwritable comment either the student or the professor
+    -- can read/edit (e.g. a quick back-and-forth note) -- distinct from
+    -- `notes` above (student's one-time booking purpose) and from
+    -- `rejection_reason`. comment_updated_by/_at drive a "last updated by
+    -- ..." UI line since a single shared field has no author otherwise.
+    shared_comment       TEXT         NULL,
+    comment_updated_by   ENUM('student','faculty') NULL,
+    comment_updated_at   TIMESTAMP    NULL DEFAULT NULL,
+    created_at          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    -- Auto-touched on any change to this row. Lets the transactions feeds
+    -- sort by "most recently modified" -- appointments otherwise have no
+    -- other timestamp column, so without this an approved/completed
+    -- appointment would forever sort/display by its original booking time.
+    updated_at          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    -- Set by appointmentReminderSweeper.js's imminent pass once the T-10min
+    -- "your appointment starts soon" reminder has gone out (to BOTH the
+    -- student and the professor), so the sweep never re-sends it. Reset by
+    -- PATCH /professor/availability/:id when the window moves, so the
+    -- reminder re-fires for the new start time. (The former 24h-out
+    -- reminder and its reminder_sent_at column were removed.)
+    imminent_reminder_sent_at TIMESTAMP NULL DEFAULT NULL,
+    -- Computed from this row's own columns; NULL whenever status is
+    -- cancelled/rejected, so any number of cancelled/rejected rows can share
+    -- the same student/faculty/date/time -- only a genuinely ACTIVE duplicate
+    -- collides via uq_active_booking below. MySQL has no native partial/
+    -- filtered unique index, so this generated column is the standard
+    -- workaround. STORED (not VIRTUAL) so the unique index has a real
+    -- materialized value to check.
+    active_booking_key VARCHAR(80) GENERATED ALWAYS AS (
+        CASE WHEN status NOT IN ('cancelled', 'rejected')
+             THEN CONCAT(student_id, '_', faculty_id, '_', appointment_date, '_', appointment_time)
+             ELSE NULL END
+    ) STORED,
+    FOREIGN KEY (student_id)      REFERENCES students(student_id),
+    FOREIGN KEY (faculty_id)      REFERENCES faculty(faculty_id),
+    FOREIGN KEY (department_id)   REFERENCES departments(department_id),
+    FOREIGN KEY (service_id)      REFERENCES appointment_services(service_id)     ON DELETE SET NULL,
+    FOREIGN KEY (availability_id) REFERENCES faculty_availability(availability_id) ON DELETE SET NULL,
+    -- Targets ACTIVE bookings only (see active_booking_key above), so a
+    -- student cancelling then rebooking the same slot can always insert a
+    -- fresh row -- a second genuinely active booking for the same slot still
+    -- collides, as a defense-in-depth backstop behind the application-level
+    -- guard in POST /appointments/book-slot.
+    UNIQUE KEY uq_active_booking (active_booking_key),
+    -- student_id's FK needs its own supporting index now that
+    -- uq_appointment_slot (which used to cover it as a leftmost column) is
+    -- gone; faculty_id/service_id/availability_id already get one
+    -- automatically from their own FK definitions above.
+    INDEX idx_appointments_student (student_id),
+    INDEX idx_appointments_dept_service (department_id, service_id)
+);
+
+-- Optional student feedback on a finished appointment (2026-09-30 panel
+-- review: "evaluation/feedback after appointment").
+--
+-- appointment_id is the PRIMARY KEY, not merely indexed -- that is what
+-- enforces "exactly once" at the DB layer, so a double-submit races into a
+-- duplicate-key error instead of producing two rows. Deliberately separate
+-- from appointments.shared_comment, which is the professor's "actions taken"
+-- note and is not student-writable.
+CREATE TABLE appointment_feedback (
+    appointment_id  INT          PRIMARY KEY,
+    student_id      INT          NOT NULL,
+    feedback_text   TEXT         NOT NULL,
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_feedback_student (student_id),
+    FOREIGN KEY (appointment_id) REFERENCES appointments(appointment_id) ON DELETE CASCADE,
+    FOREIGN KEY (student_id)     REFERENCES students(student_id)         ON DELETE CASCADE
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 9. DOCUMENT PROCESSING
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE document_requests (
+    request_id              INT          AUTO_INCREMENT PRIMARY KEY,
+    tracking_number         VARCHAR(50)  NOT NULL UNIQUE, -- assigned in app code via utils/trackingNumber.js (REQ-00001, ...)
+    student_id              INT          NOT NULL,  
+    service_id              INT          NOT NULL,
+    request_type            VARCHAR(100) NOT NULL,
+    purpose                 VARCHAR(255) NOT NULL,
+    copies                  INT          NOT NULL DEFAULT 1,
+    -- 'cancelled' = student voluntarily withdrew the request while it was
+    -- still pending/processing. Kept as a status (not a DELETE) so it stays
+    -- visible in transaction history, same as queues/appointments.
+    status                  ENUM('pending','processing','ready','claimed','rejected','cancelled') DEFAULT 'pending',
+    estimated_completion    DATE         NULL,
+    needed_by               DATE         NULL,
+    -- Optional office-set "collect it by" date, set by an admin when marking
+    -- the request Ready. Distinct from needed_by (the requester's own
+    -- wish-date). Past this date the requester is nudged once (overdue_notified_at)
+    -- and the admin list flags it -- see documentPickupSweeper.js notifyOverdueClaims.
+    claim_by                DATE         NULL,
+    ready_at                TIMESTAMP    NULL DEFAULT NULL, -- when it became ready for pickup (first time); feeds processing-time analytics
+    -- Legacy column: the old Ready -> Released -> Claimed flow was collapsed to
+    -- Ready -> Claimed. No longer written or read; kept only so existing rows
+    -- and mock seeds don't error. Safe to drop in a later migration.
+    released_at             TIMESTAMP    NULL,
+    claimed_at              TIMESTAMP    NULL,
+    notes                   TEXT         NULL,
+    official_code           VARCHAR(100) NULL, -- manually entered by admin, dean-sanctioned; only set when the service requires_coding
+    -- Frozen copy of the document_services row (+ its requirements) as it stood
+    -- when this request was submitted: { name, description, processingTime,
+    -- recipientType, requiresCoding, isCrossCollege,
+    --   requirements: [{ name, description, isMandatory }] }.
+    -- The student/faculty detail view renders requirements/processing-time from
+    -- here, so a later edit to the catalogue type can't retro-change what a
+    -- finished request shows. Editing a type is blocked while any request for
+    -- it is still pending/processing, so this stays accurate up to that point.
+    service_snapshot        JSON         NULL,
+    -- TRUE when admin used "Generate Document" (QR/text-code prototype) on a
+    -- Ready request -- attaches a pickup code the requester can show the office.
+    -- Only gates the QR/code display on the requester's document status page now;
+    -- self-claim (Ready -> Claimed) is available regardless of this flag.
+    is_digital_delivery     BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at              TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    -- Auto-touched on any change to this row (status, notes, etc). Lets the
+    -- transactions feeds sort by "most recently modified" instead of only
+    -- "most recently created".
+    updated_at              TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    -- Set by documentPickupSweeper.js once it has notified an admin that this
+    -- request has sat unclaimed for 7+ days -- prevents re-escalating the
+    -- same request on every subsequent daily sweep (the student's own daily
+    -- reminder is separate and intentionally keeps repeating; see updated_at).
+    escalated_at            TIMESTAMP    NULL DEFAULT NULL,
+    -- Set by documentPickupSweeper.js's notifyOverdueClaims once the requester
+    -- has been nudged that this Ready request passed its claim_by date --
+    -- one-shot, so the daily sweep doesn't re-nudge.
+    overdue_notified_at     TIMESTAMP    NULL DEFAULT NULL,
+    FOREIGN KEY (student_id) REFERENCES students(student_id),
+    FOREIGN KEY (service_id) REFERENCES document_services(service_id),
+    INDEX idx_document_requests_tracking (tracking_number)
+);
+
+-- request_id is nullable because a generated_files row can belong to either a
+-- student document_requests row OR a faculty_document_requests row (never both)
+-- -- see the faculty_request_id column/FK/CHECK added via ALTER TABLE right
+-- after faculty_document_requests is created below (forward reference, so it
+-- can't be inline here). file_name/file_path are nullable because this table
+-- no longer tracks an actual generated file -- it exists purely to link an
+-- admin-assigned official_code's QR value to a request for the scan/verify flow.
+CREATE TABLE generated_files (
+    file_id         INT          AUTO_INCREMENT PRIMARY KEY,
+    request_id      INT          NULL,
+    -- UNIQUE (not just unique-by-convention via the QR-<tracking_number>
+    -- scheme) so a collision is a loud DB error instead of a silent
+    -- data-integrity gap -- codes double as a verification record even
+    -- after a document is claimed, so two requests must never share one.
+    -- NULLs don't count toward uniqueness in MySQL, so pre-existing NULL
+    -- rows (no code ever generated for that request) are unaffected.
+    qr_code         VARCHAR(255) UNIQUE,
+    generated_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (request_id) REFERENCES document_requests(request_id) ON DELETE CASCADE
+);
+
+CREATE TABLE qr_tracking_logs (
+    log_id          INT          AUTO_INCREMENT PRIMARY KEY,
+    file_id         INT          NOT NULL,
+    scanned_by      INT          NOT NULL,
+    scan_location   VARCHAR(100),
+    scan_time       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (file_id)    REFERENCES generated_files(file_id),
+    FOREIGN KEY (scanned_by) REFERENCES users(user_id)
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 9b. DOCUMENT SUBMISSIONS (student -> office: sending a document, e.g.
+--     for encoding -- as opposed to document_requests, which is the
+--     office -> student direction. Deliberately named distinctly from the
+--     dormant `submissions`/`submitted_files` tables further down (an
+--     unrelated, unbuilt professor class-assignment feature) to avoid
+--     confusing the two "submission" concepts.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE document_submissions (
+    submission_id   INT          AUTO_INCREMENT PRIMARY KEY,
+    tracking_number VARCHAR(50)  NOT NULL UNIQUE, -- assigned in app code via utils/trackingNumber.js (SUB-00001, ...)
+    -- Exactly one of student_id/faculty_id is set, per submitter_type --
+    -- enforced by the CHECK constraint below, not just convention. Faculty
+    -- submissions reuse this same table/attachment pipeline rather than a
+    -- parallel faculty_document_submissions table, since
+    -- document_submission_files and documentStatus.js's CANCEL_CONFIG were
+    -- both already built to generalize over multiple owner columns.
+    student_id      INT          NULL,
+    faculty_id      INT          NULL,
+    submitter_type  ENUM('student','faculty') NOT NULL DEFAULT 'student',
+    -- Direct FK, unlike document_requests.service_id -- there's no
+    -- document_services concept here (no type/copies/coding), so the
+    -- department is resolved once at creation time from the submitter's own
+    -- department_id and stored directly.
+    department_id   INT          NOT NULL,
+    title           VARCHAR(255) NOT NULL, -- student-authored; stands in for "document type" everywhere in the UI
+    purpose         VARCHAR(255) NOT NULL,
+    -- Same lifeline as document_requests now: Pending -> Processing -> Ready
+    -- -> Claimed (+ Rejected, Cancelled). 'ready' = admin has processed the
+    -- submission (and attached any return files); the submitter then self-marks
+    -- it Claimed once they've collected it.
+    status          ENUM('pending','processing','ready','claimed','rejected','cancelled') DEFAULT 'pending',
+    needed_by       DATE         NULL,
+    -- Optional office-set "collect it by" date -- see document_requests.claim_by.
+    claim_by        DATE         NULL,
+    ready_at        TIMESTAMP    NULL DEFAULT NULL, -- see document_requests.ready_at
+    notes           TEXT         NULL, -- admin processing/rejection notes, mirrors document_requests.notes
+    claimed_at      TIMESTAMP    NULL,
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    -- Set by documentSubmissionStaleSweeper.js once it has notified an admin
+    -- that this submission has sat in pending/processing for 7+ days --
+    -- prevents re-escalating the same submission on every subsequent daily
+    -- sweep, mirroring document_requests.escalated_at.
+    escalated_at    TIMESTAMP    NULL DEFAULT NULL,
+    -- One-shot claim_by-overdue nudge dedupe -- see document_requests.overdue_notified_at.
+    overdue_notified_at TIMESTAMP NULL DEFAULT NULL,
+    FOREIGN KEY (student_id)    REFERENCES students(student_id),
+    FOREIGN KEY (faculty_id)    REFERENCES faculty(faculty_id),
+    FOREIGN KEY (department_id) REFERENCES departments(department_id),
+    CONSTRAINT chk_document_submissions_one_submitter CHECK (
+        (submitter_type = 'student' AND student_id IS NOT NULL AND faculty_id IS NULL) OR
+        (submitter_type = 'faculty' AND faculty_id IS NOT NULL AND student_id IS NULL)
+    ),
+    INDEX idx_document_submissions_tracking (tracking_number),
+    INDEX idx_document_submissions_student (student_id),
+    INDEX idx_document_submissions_faculty (faculty_id),
+    INDEX idx_document_submissions_dept (department_id)
+);
+
+-- One table for BOTH attachment channels (the student's uploaded files AND
+-- the office's return files), disambiguated by `direction` -- not two
+-- separate tables, since both channels need identical columns and identical
+-- budget logic (5 files / 10MB each, independently per direction via
+-- "AND direction = ?"). All reads/writes go through
+-- server/utils/documentSubmissionAttachments.js, which always takes an
+-- explicit `direction` argument, so a missing filter can't leak one
+-- channel's files into the other.
+CREATE TABLE document_submission_files (
+    file_id         INT          AUTO_INCREMENT PRIMARY KEY,
+    submission_id   INT          NOT NULL,
+    direction       ENUM('student_upload','admin_return') NOT NULL,
+    filename        VARCHAR(255) NOT NULL, -- original filename, display only
+    file_path       VARCHAR(255) NOT NULL, -- UUID-based name actually on disk
+    mime_type       VARCHAR(100) NOT NULL,
+    file_size       INT          NOT NULL,
+    uploaded_by     INT          NOT NULL, -- users.user_id -- the student for student_upload rows, the admin for admin_return rows
+    uploaded_at     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (submission_id) REFERENCES document_submissions(submission_id) ON DELETE CASCADE,
+    FOREIGN KEY (uploaded_by)   REFERENCES users(user_id),
+    INDEX idx_document_submission_files_submission (submission_id, direction)
+);
+
+-- Auto-generates tracking_number on insert (SUB-00001, SUB-00002, ...).
+-- Unlike ts_auto_tracking_number/_faculty (which only exist in
+-- server/db/mock/ccs_mock_data.sql, not here -- a fresh DB never gets those
+-- unless the mock file happens to run after this one), this trigger is
+-- defined directly in the schema file where it belongs.
+-- DROP TRIGGER IF EXISTS ts_auto_tracking_number_submission;
+-- DELIMITER //
+-- CREATE TRIGGER ts_auto_tracking_number_submission
+-- BEFORE INSERT ON document_submissions
+-- FOR EACH ROW
+-- BEGIN
+--     DECLARE next_id INT;
+--     SELECT COALESCE(MAX(submission_id), 0) + 1 INTO next_id FROM document_submissions;
+--     SET NEW.tracking_number = CONCAT('SUB-', LPAD(next_id, 5, '0'));
+-- END//
+-- DELIMITER ;
+
+-- ─────────────────────────────────────────────────────────────
+-- 11. ANNOUNCEMENTS
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE announcements (
+    announcement_id  INT          AUTO_INCREMENT PRIMARY KEY,
+    title           TEXT         NOT NULL,
+    content         TEXT         NOT NULL,
+    type            ENUM('important','event','reminder','general') NOT NULL DEFAULT 'general',
+    status          ENUM('active','archived')                      NOT NULL DEFAULT 'active',
+    created_by      VARCHAR(255) NULL,
+    is_pinned       BOOLEAN      NOT NULL DEFAULT FALSE,
+    -- Who this announcement is for. Faculty-audience announcements have no
+    -- real category -- `type` is always forced to 'general' for them
+    -- server-side and the type picker is hidden client-side, since the ENUM
+    -- above has no NULL option and adding one would ripple through every
+    -- existing type-keyed lookup for no benefit.
+    audience        ENUM('students','faculty') NOT NULL DEFAULT 'students',
+    department_id   INT          NOT NULL,   -- the posting department, always real
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    -- Deliberately NOT "ON UPDATE CURRENT_TIMESTAMP" -- pin/archive/restore all
+    -- run their own UPDATE against this row and must NOT bump this column, only
+    -- an actual content edit (or a restore, treated as a repost) should. Those
+    -- specific handlers set this explicitly in their own UPDATE statement.
+    updated_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE RESTRICT,
+    INDEX idx_announcements_pinned_updated (is_pinned, updated_at),
+    INDEX idx_announcements_audience (audience, department_id, status)
+);
+
+-- Up to 5 files per announcement, sharing a combined 50MB budget enforced
+-- app-side (multer only enforces per-file size + file count natively).
+CREATE TABLE announcement_attachments (
+    attachment_id   INT          AUTO_INCREMENT PRIMARY KEY,
+    announcement_id INT          NOT NULL,
+    filename        VARCHAR(255) NOT NULL, -- original filename, display only
+    file_path       VARCHAR(255) NOT NULL, -- UUID-based name actually on disk, relative to server root
+    mime_type       VARCHAR(100) NOT NULL,
+    file_size       INT          NOT NULL, -- bytes; used for the shared-budget check and UI totals
+    uploaded_at     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (announcement_id) REFERENCES announcements(announcement_id) ON DELETE CASCADE,
+    INDEX idx_announcement_attachments_announcement (announcement_id)
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 12. EXTERNAL SYNC (Pinnacle / SSO Microservice)
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE external_sync_logs (
+    sync_id           INT          AUTO_INCREMENT PRIMARY KEY,
+    external_system   VARCHAR(50)  DEFAULT 'Pinnacle',
+    sync_type         ENUM('auth','profile','enrollment','schedule') NOT NULL,
+    sync_status       ENUM('pending','success','failed') DEFAULT 'pending',
+    synced_at         TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 13. DATA ADMIN MANAGEMENT
+-- ─────────────────────────────────────────────────────────────
+
+-- Full audit trail for all admin-initiated actions
+CREATE TABLE audit_logs (
+    log_id           INT          AUTO_INCREMENT PRIMARY KEY,
+    -- FKs directly to users, not administrators -- administrators.admin_id
+    -- already mirrors users.user_id 1:1, so this loses nothing for existing
+    -- admin-authored rows, and it lets superadmin actions (logAudit is
+    -- called from the now-superadmin-only Pinnacle Sync / User Management
+    -- routes too) get logged without violating the FK.
+    admin_id         INT          NOT NULL,
+    action           ENUM('CREATE','READ','UPDATE','DELETE','LOGIN','LOGOUT','EXPORT') NOT NULL,
+    target_table     VARCHAR(100),
+    target_record_id INT,
+    old_values       JSON,
+    new_values       JSON,
+    ip_address       VARCHAR(45),
+    user_agent       TEXT,
+    created_at       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (admin_id) REFERENCES users(user_id)
+);
+
+-- System configuration controlled by admins
+CREATE TABLE system_settings (
+    setting_id      INT          AUTO_INCREMENT PRIMARY KEY,
+    setting_key     VARCHAR(100) NOT NULL UNIQUE,
+    setting_value   TEXT,
+    description     TEXT,
+    updated_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 14. NOTIFICATIONS
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE notifications (
+    notification_id  INT          AUTO_INCREMENT PRIMARY KEY,
+    user_id          INT          NOT NULL,
+    message          TEXT         NOT NULL,
+    type             ENUM('queue','document','appointment','announcement') NOT NULL DEFAULT 'queue',
+    is_read          BOOLEAN      DEFAULT FALSE,
+    created_at       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 15. FACULTY DOCUMENT REQUESTS (faculty requesting their own documents)
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS faculty_document_requests (
+    request_id           INT          AUTO_INCREMENT PRIMARY KEY,
+    tracking_number      VARCHAR(50)  NOT NULL UNIQUE,
+    faculty_id           INT          NOT NULL,
+    service_id           INT          NOT NULL,
+    request_type         VARCHAR(100) NOT NULL DEFAULT 'General',
+    purpose              VARCHAR(255) NOT NULL,
+    copies               INT          NOT NULL DEFAULT 1,
+    -- 'cancelled' = faculty voluntarily withdrew the request while it was
+    -- still pending/processing. Kept as a status (not a DELETE) so it stays
+    -- visible in transaction history, same as queues/appointments.
+    status               ENUM('pending','processing','ready','claimed','rejected','cancelled') DEFAULT 'pending',
+    estimated_completion DATE         NULL,
+    needed_by            DATE         NULL,
+    -- Optional office-set "collect it by" date -- see document_requests.claim_by.
+    claim_by             DATE         NULL,
+    ready_at             TIMESTAMP    NULL DEFAULT NULL, -- see document_requests.ready_at
+    -- Legacy column (see document_requests.released_at) -- no longer written/read.
+    released_at          TIMESTAMP    NULL,
+    claimed_at           TIMESTAMP    NULL,
+    notes                TEXT         NULL,
+    official_code        VARCHAR(100) NULL, -- manually entered by admin, dean-sanctioned; only set when the service requires_coding
+    -- See document_requests.service_snapshot -- identical frozen-catalogue copy,
+    -- mirrored here for faculty-sourced requests.
+    service_snapshot     JSON         NULL,
+    -- See document_requests.is_digital_delivery for the full explanation --
+    -- identical prototype behavior, mirrored here for faculty-sourced requests.
+    is_digital_delivery  BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at           TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    -- Auto-touched on any change to this row. Lets the transactions feeds
+    -- sort by "most recently modified" instead of only "most recently created".
+    updated_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    -- Set by documentPickupSweeper.js once it has notified an admin that this
+    -- request has sat unclaimed for 7+ days -- see document_requests.escalated_at
+    -- for the full reasoning (identical pattern, mirrored here).
+    escalated_at         TIMESTAMP    NULL DEFAULT NULL,
+    -- One-shot claim_by-overdue nudge dedupe -- see document_requests.overdue_notified_at.
+    overdue_notified_at  TIMESTAMP    NULL DEFAULT NULL,
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
+    FOREIGN KEY (service_id) REFERENCES document_services(service_id),
+    INDEX idx_faculty_doc_requests_faculty (faculty_id)
+);
+
+-- generated_files can belong to either a student or a faculty document request, never both.
+-- Added here via ALTER (not inline in the generated_files CREATE TABLE above) because
+-- faculty_document_requests has to exist first for the FK to be valid.
+--
+-- Split into 3 separate ALTER TABLE statements (not one multi-clause ALTER) --
+-- TiDB's DDL engine validates each clause against the table's state *before*
+-- the statement runs, not sequentially within it like MySQL does, so a FK
+-- referencing a column added earlier in the same ALTER fails with
+-- "Key column ... doesn't exist in table" on TiDB even though the column is
+-- right there. Splitting sidesteps this; still a single statement each on
+-- real MySQL, so this stays compatible both ways.
+ALTER TABLE generated_files
+    ADD COLUMN faculty_request_id INT NULL AFTER request_id;
+ALTER TABLE generated_files
+    ADD CONSTRAINT fk_generated_files_faculty_request
+        FOREIGN KEY (faculty_request_id) REFERENCES faculty_document_requests(request_id) ON DELETE CASCADE;
+-- No chk_generated_files_one_parent CHECK on TiDB: it refused to create a
+-- CHECK referencing request_id/faculty_request_id at all ("cannot be used
+-- in a check constraint ... needed in a foreign key constraint referential
+-- action") because both columns are also targets of an ON DELETE CASCADE
+-- FK -- real MySQL allows this combination, TiDB doesn't. "Exactly one of
+-- request_id/faculty_request_id is set" is enforced app-side only now, by
+-- whichever code path inserts generated_files (only ever sets one or the
+-- other already, in practice) -- no DB-level backstop for this one case.
+
+-- ─────────────────────────────────────────────────────────────
+-- 15b. DOCUMENT REQUEST FILES (admin -> requester: soft-copy files the office
+--      attaches to a document REQUEST, e.g. when the requested document can be
+--      provided digitally instead of a hard copy. Mirrors document_submission_files'
+--      'admin_return' channel, but for the document_requests / faculty_document_requests
+--      direction. One direction only (office -> requester), so no `direction` enum.
+--      Exactly one of request_id / faculty_request_id is set -- enforced app-side
+--      (same as generated_files above; no CHECK for TiDB compatibility).
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE document_request_files (
+    file_id            INT          AUTO_INCREMENT PRIMARY KEY,
+    request_id         INT          NULL,
+    faculty_request_id INT          NULL,
+    filename           VARCHAR(255) NOT NULL, -- original display name
+    file_path          VARCHAR(255) NOT NULL, -- server-generated UUID name on disk
+    mime_type          VARCHAR(100) NOT NULL,
+    file_size          INT          NOT NULL,
+    uploaded_by        INT          NOT NULL, -- users.user_id -- the admin who attached it
+    uploaded_at        TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (request_id)         REFERENCES document_requests(request_id)         ON DELETE CASCADE,
+    FOREIGN KEY (faculty_request_id) REFERENCES faculty_document_requests(request_id) ON DELETE CASCADE,
+    FOREIGN KEY (uploaded_by)        REFERENCES users(user_id),
+    INDEX idx_document_request_files_request (request_id),
+    INDEX idx_document_request_files_faculty (faculty_request_id)
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 16. SECTIONS & SUBMISSIONS (schema only -- no routes/controllers/UI yet)
+-- Professors will eventually host a section of students and post file-
+-- submission assignments; students submit files that were either generated
+-- by COAMS itself (always carries a reference_code) or issued by the school
+-- some other way (code optional). Reserved for a future feature -- kept here
+-- now so the schema exists ahead of time.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE sections (
+    section_id      INT          AUTO_INCREMENT PRIMARY KEY,
+    faculty_id      INT          NOT NULL,
+    department_id   INT          NOT NULL,
+    section_name    VARCHAR(100) NOT NULL,
+    status          ENUM('active','archived') DEFAULT 'active',
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (faculty_id)    REFERENCES faculty(faculty_id) ON DELETE CASCADE,
+    FOREIGN KEY (department_id) REFERENCES departments(department_id),
+    INDEX idx_sections_faculty (faculty_id)
+);
+
+-- Join table (not a direct FK on students) so a student's enrollment history
+-- survives being dropped and re-enrolled without any change to `students`.
+CREATE TABLE section_enrollments (
+    enrollment_id   INT          AUTO_INCREMENT PRIMARY KEY,
+    section_id      INT          NOT NULL,
+    student_id      INT          NOT NULL,
+    status          ENUM('enrolled','dropped') DEFAULT 'enrolled',
+    enrolled_at     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (section_id) REFERENCES sections(section_id) ON DELETE CASCADE,
+    FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_section_enrollments_section_student (section_id, student_id)
+);
+
+CREATE TABLE submissions (
+    submission_id   INT          AUTO_INCREMENT PRIMARY KEY,
+    section_id      INT          NOT NULL,
+    title           VARCHAR(255) NOT NULL,
+    description     TEXT         NULL,
+    requires_code   BOOLEAN      NOT NULL DEFAULT FALSE, -- mirrors document_services.requires_coding
+    deadline        DATETIME     NULL,
+    status          ENUM('open','closed') DEFAULT 'open',
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (section_id) REFERENCES sections(section_id) ON DELETE CASCADE,
+    INDEX idx_submissions_section (section_id)
+);
+
+-- A submitted file is either COAMS-generated (always carries a reference_code,
+-- mirroring generated_files.qr_code) or issued by the school some other way
+-- (code optional) -- enforced by the CHECK below. Mirrors announcement_attachments
+-- for the filename/file_path/mime_type/file_size shape; this feature will reuse
+-- server/middleware/upload.js's existing multer config when it's eventually built.
+CREATE TABLE submitted_files (
+    submitted_file_id INT          AUTO_INCREMENT PRIMARY KEY,
+    submission_id     INT          NOT NULL,
+    student_id        INT          NOT NULL,
+    filename          VARCHAR(255) NOT NULL,
+    file_path         VARCHAR(255) NOT NULL,
+    mime_type         VARCHAR(100) NOT NULL,
+    file_size         INT          NOT NULL,
+    source            ENUM('coams','school') NOT NULL,
+    reference_code    VARCHAR(100) NULL,
+    submitted_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (submission_id) REFERENCES submissions(submission_id) ON DELETE CASCADE,
+    FOREIGN KEY (student_id)    REFERENCES students(student_id),
+    CHECK (source = 'school' OR reference_code IS NOT NULL),
+    INDEX idx_submitted_files_submission (submission_id)
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 17. FAQS
+-- Admin-authored question/answer pairs, department-scoped exactly like
+-- announcements (see idx_faqs_department / getAdminDepartmentId). No
+-- audience split (students only -- no faculty concept for FAQs), no
+-- type/category, no pin/archive/restore -- a flat, stable list ordered by
+-- insertion (created_at), never reshuffled by edits the way announcements'
+-- updated_at-driven "repost" ordering is. created_by is a denormalized
+-- name snapshot, same reasoning as announcements.created_by (survives the
+-- admin's own record changing later).
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE faqs (
+    faq_id          INT          AUTO_INCREMENT PRIMARY KEY,
+    question        TEXT         NOT NULL,
+    answer          TEXT         NOT NULL,
+    department_id   INT          NOT NULL,
+    created_by      VARCHAR(255) NULL,
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE RESTRICT,
+    INDEX idx_faqs_department (department_id)
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- TRACKING NUMBER COUNTERS
+-- ─────────────────────────────────────────────────────────────
+-- One row per prefix (APT, REQ, FDR, SUB) holding the last number issued --
+-- see utils/trackingNumber.js. A request locks its prefix's row while taking
+-- a number, so simultaneous requests can't collide, and the increment rolls
+-- back with a failed request, so numbers never skip.
+--
+-- Deliberately created EMPTY: the server seeds each row at startup
+-- (ensureTrackingCounters) from the highest number already in use. Seeding
+-- 0 here would stick (the seed is INSERT IGNORE) even after mock data loads
+-- higher numbers, and the counter would then hand out duplicates.
+CREATE TABLE IF NOT EXISTS tracking_counters (
+    prefix     VARCHAR(10)  PRIMARY KEY,
+    last_number INT UNSIGNED NOT NULL
+);
+
+-- ============================================================
+-- Schema definition ends here.
+-- Seed data (departments, users, mock records) is in:
+--   server/db/mock/ccs_mock_data.sql
+-- Run this file first, then ccs_mock_data.sql.
+-- ============================================================

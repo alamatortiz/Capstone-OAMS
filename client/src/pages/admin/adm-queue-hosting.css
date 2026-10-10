@@ -1,0 +1,1401 @@
+/* ===== DARK MODE (DEFAULT) ===== */
+:root,
+[data-theme="dark"] {
+  --primary-color: #22c55e;
+  --primary-dark: #16a34a;
+  --primary-light: #86efac;
+
+  --background: #0a0f0a;
+  --card: #111612;
+  --sidebar: #0f1510;
+
+  --foreground: #f0fdf4;
+  --card-foreground: #f0fdf4;
+
+  --secondary: #1a3a1f;
+  --muted: #1a3a1f;
+  --muted-foreground: #94a3b8;
+
+  --border: #1e3a23;
+  --input: #1a3a1f;
+  --input-background: #0f1e12;
+
+  --accent: #16532a;
+  --accent-foreground: #dcfce7;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  --dark-bg: var(--background);
+  --card-bg: var(--card);
+  --card-border: var(--border);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--foreground);
+  --text-tertiary: var(--muted-foreground);
+
+  --sidebar-width: 14rem;
+
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: var(--destructive);
+  --blue: #3b82f6;
+  --cyan: #06b6d4;
+  --purple: #a855f7;
+  --violet: #7c3aed;
+  --pink: #ec4899;
+  --orange: #f97316;
+
+  --icon-sun-color: #fbbf24;
+  --icon-moon-color: #64748b;
+}
+
+/* ===== LIGHT MODE ===== */
+[data-theme="light"] {
+  --primary-color: #15803d;
+  --primary-dark: #166534;
+  --primary-light: #22c55e;
+
+  --background: #f8fafc;
+  --card: #ffffff;
+  --sidebar: #f1f5f9;
+
+  --foreground: #1e293b;
+  --card-foreground: #1e293b;
+
+  --secondary: #e2e8f0;
+  --muted: #e2e8f0;
+  --muted-foreground: #64748b;
+
+  --border: #e2e8f0;
+  --input: #f1f5f9;
+  --input-background: #f8fafc;
+
+  --accent: #d1fae5;
+  --accent-foreground: #065f46;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+
+  --dark-bg: var(--background);
+  --card-bg: var(--card);
+  --card-border: var(--border);
+  --text-primary: var(--foreground);
+  --text-secondary: #334155;
+  --text-tertiary: var(--muted-foreground);
+
+  --sidebar-width: 14rem;
+
+  --success: #059669;
+  --warning: #d97706;
+  --danger: var(--destructive);
+  --blue: #2563eb;
+  --cyan: #0891b2;
+  --purple: #9333ea;
+  --violet: #6d28d9;
+  --pink: #db2777;
+  --orange: #ea580c;
+
+  --icon-sun-color: #fbbf24;
+  --icon-moon-color: #1e293b;
+}
+
+/* ===== Layout shell ===== */
+.aqh-dashboard-with-sidebar {
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--dark-bg);
+  color: var(--text-primary);
+  font-family: "Inter", sans-serif;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
+}
+
+/* ===== Main Content ===== */
+.aqh-dashboard-main {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  overflow-y: auto;
+  transition: margin-left 0.3s ease;
+}
+
+.aqh-page-container {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .aqh-dashboard-main {
+    margin-left: 0;
+    margin-top: 4rem;
+  }
+}
+
+/* ===== Breadcrumb (mirrors professor/student pages) =====
+   Scoped to .aqh-page-container so these generic class names don't leak onto
+   other admin screens once this (lazily loaded) stylesheet is in the document. */
+.aqh-page-container .page-breadcrumb {
+  display: flex;
+  align-items: center;
+}
+.aqh-page-container .page-breadcrumb-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  padding: 0.5rem 0.875rem 0.5rem 0;
+  border-radius: 0.5rem;
+  color: var(--text-tertiary);
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.aqh-page-container .page-breadcrumb-link:hover {
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+}
+.aqh-page-container .page-breadcrumb-link svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke: currentColor;
+  flex-shrink: 0;
+}
+
+/* ===== Page Header ===== */
+.aqh-header-block {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.aqh-page-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* The "Open Queue Line" CTA sits on its own row below the header. */
+.aqh-actions-row {
+  display: flex;
+  /* Gained a second button (Restrictions) -- it held only one before, so
+     there was no gap and the two sat flush against each other. */
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.aqh-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.aqh-title-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.aqh-title-icon svg {
+  width: 1.75rem;
+  height: 1.75rem;
+  stroke: white;
+  stroke-width: 2;
+}
+
+.aqh-page-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.aqh-page-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0.25rem 0 0 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.aqh-open-queue-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.25rem;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border: none;
+  border-radius: 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.aqh-open-queue-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 16px rgba(59, 130, 246, 0.35);
+}
+
+.aqh-open-queue-btn svg {
+  width: 1rem;
+  height: 1rem;
+  stroke: currentColor;
+}
+
+/* ===== Summary Stat Cards (mirrors adm-queue's .queue-system-stats layout,
+   but each card keeps its own per-status accent colour) ===== */
+.aqh-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1rem;
+}
+
+.aqh-summary-card {
+  background: var(--card-bg);
+  border: 1.5px solid rgba(59, 130, 246, 0.3);
+  border-radius: 1rem;
+  padding: 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.5rem;
+  transition: all 0.3s ease;
+}
+
+.aqh-summary-card:hover {
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 8px 16px rgba(59, 130, 246, 0.1);
+}
+
+.aqh-summary-paused {
+  border-color: rgba(245, 158, 11, 0.35);
+}
+.aqh-summary-paused:hover {
+  border-color: rgba(245, 158, 11, 0.55);
+  box-shadow: 0 8px 16px rgba(245, 158, 11, 0.12);
+}
+
+.aqh-summary-closed {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+.aqh-summary-closed:hover {
+  border-color: rgba(239, 68, 68, 0.55);
+  box-shadow: 0 8px 16px rgba(239, 68, 68, 0.12);
+}
+
+.aqh-summary-still-serving {
+  border-color: rgba(249, 115, 22, 0.35);
+}
+.aqh-summary-still-serving:hover {
+  border-color: rgba(249, 115, 22, 0.55);
+  box-shadow: 0 8px 16px rgba(249, 115, 22, 0.12);
+}
+
+.aqh-summary-completed {
+  border-color: rgba(16, 185, 129, 0.35);
+}
+.aqh-summary-completed:hover {
+  border-color: rgba(16, 185, 129, 0.55);
+  box-shadow: 0 8px 16px rgba(16, 185, 129, 0.12);
+}
+
+.aqh-summary-content {
+  text-align: center;
+}
+
+.aqh-summary-label {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  margin: 0 0 0.375rem 0;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  text-align: center;
+}
+
+.aqh-summary-value {
+  font-size: 2.25rem;
+  font-weight: 800;
+  line-height: 1;
+  margin: 0;
+  text-align: center;
+}
+
+.aqh-value-active {
+  color: #3b82f6;
+}
+.aqh-value-paused {
+  color: var(--warning);
+}
+.aqh-value-still-serving {
+  color: #f97316;
+}
+.aqh-value-completed {
+  color: #10b981;
+}
+.aqh-value-closed {
+  color: #ef4444;
+}
+
+.aqh-summary-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.aqh-summary-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Translucent tint of the card's own accent (mirrors .queue-stat-box-icon-box) */
+.aqh-icon-active {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.08) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+.aqh-icon-paused {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.08) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  color: var(--warning);
+}
+.aqh-icon-still-serving {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(249, 115, 22, 0.08) 100%);
+  border: 1px solid rgba(249, 115, 22, 0.2);
+  color: #f97316;
+}
+.aqh-icon-completed {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.08) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+.aqh-icon-closed {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.08) 100%);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+/* ===== Search & Filter Card (mirrors stud-queue's .filters-card) ===== */
+.aqh-filters-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  border-radius: 1rem;
+  padding: 1rem 1.5rem 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.aqh-filters-header {
+  margin-bottom: 1.5rem;
+}
+
+.aqh-filters-title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.aqh-filters-description {
+  font-size: 0.9375rem;
+  color: var(--text-tertiary);
+  margin: 0.4rem 0 0 0;
+  text-align: center;
+}
+
+.aqh-filters-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .aqh-filters-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+  .aqh-filter-group--search {
+    grid-column: 1 / -1;
+  }
+}
+
+.aqh-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.aqh-filter-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.aqh-search-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.aqh-search-wrapper svg {
+  position: absolute;
+  left: 0.875rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.aqh-form-input.aqh-search-input {
+  padding-left: 2.5rem;
+}
+
+/* ===== Queue Cards ===== */
+.aqh-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.aqh-queue-card {
+  background: var(--card-bg);
+  border: 1.5px solid rgba(59, 130, 246, 0.3);
+  border-radius: 1rem;
+  padding: 1.25rem 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.aqh-queue-card:hover {
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 8px 16px rgba(59, 130, 246, 0.1);
+}
+
+/* Every status shares the neutral card + blue border/hover; the (uppercase,
+   colour-coded) status badge carries the status meaning. Finished lines read
+   muted. */
+.aqh-card-closed,
+.aqh-card-completed {
+  opacity: 0.85;
+}
+
+.aqh-queue-card--clickable {
+  cursor: pointer;
+}
+
+.aqh-queue-card--clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(59, 130, 246, 0.15);
+}
+
+.aqh-queue-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Row that holds the college logo to the left of the title block */
+.aqh-queue-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.aqh-queue-card-logo {
+  width: 2.25rem;
+  height: 2.25rem;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  flex-shrink: 0;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
+}
+
+.aqh-queue-card-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.2rem 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.aqh-queue-card-dept {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.aqh-queue-card-top-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* Status badge — adm-queue's .status-badge colour mapping + all-caps, at this
+   screen's smaller size. active/completed=green, paused=amber, full/expired=
+   orange, closed=red. */
+.aqh-status-badge {
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.aqh-status-active {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--primary-color);
+  border: 0.5px solid rgba(34, 197, 94, 0.4);
+}
+
+.aqh-status-paused {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--warning);
+  border: 0.5px solid rgba(245, 158, 11, 0.4);
+}
+
+.aqh-status-closed {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 0.5px solid rgba(239, 68, 68, 0.4);
+}
+
+.aqh-status-still-serving {
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+  border: 0.5px solid rgba(249, 115, 22, 0.4);
+}
+
+.aqh-status-completed {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--primary-color);
+  border: 0.5px solid rgba(34, 197, 94, 0.4);
+}
+
+/* Secondary "currently serving" pill — kept semantic (positive = green,
+   waiting on the student = amber), independent of the status-badge remap. */
+.aqh-status-serving {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--primary-color);
+  border: 0.5px solid rgba(34, 197, 94, 0.4);
+}
+
+.aqh-status-called {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--warning);
+  border: 0.5px solid rgba(245, 158, 11, 0.4);
+}
+
+/* Students the office passed to a professor -- still occupying seats on this
+   queue, but being handled outside the office line. */
+.aqh-status-with-faculty {
+  background: rgba(139, 92, 246, 0.15);
+  color: #8b5cf6;
+  border: 0.5px solid rgba(139, 92, 246, 0.4);
+}
+
+.aqh-queue-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* Resting appearance mirrors adm-faqs' .faq-action-btn; each variant keeps its
+   own semantic hover accent. */
+.aqh-action-btn {
+  padding: 0.5rem 0.875rem;
+  background: transparent;
+  border: 1px solid var(--card-border);
+  border-radius: 0.625rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.2s ease;
+}
+
+.aqh-action-btn svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  stroke: currentColor;
+}
+
+.aqh-action-pause:hover {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.aqh-action-resume:hover {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.aqh-action-close:hover {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: var(--destructive);
+  color: #ef4444;
+}
+
+.aqh-action-btn--repeat {
+  text-transform: uppercase;
+}
+
+.aqh-action-btn--repeat:hover {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+/* ===== Queue stat rows ===== */
+.aqh-queue-stats-row {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.aqh-stats-row-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+.aqh-stats-row-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.aqh-queue-stat {
+  text-align: left;
+}
+
+.aqh-queue-stat-label {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin: 0 0 0.375rem 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.aqh-queue-stat-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.aqh-stat-value-sm {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* "Opened At" — date stacked above time */
+.aqh-stat-datetime {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+/* Capacity bar */
+.aqh-capacity-bar-track {
+  margin-top: 0.4rem;
+  width: 100%;
+  height: 0.5rem;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 0.25rem;
+  overflow: hidden;
+}
+
+.aqh-capacity-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  transition: width 0.3s ease;
+}
+
+.aqh-closed-meta {
+  margin: 0.6rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+  text-align: left;
+}
+
+/* Empty / loading states — mirrors adm-queue's .queue-empty-state */
+.aqh-empty-state {
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--text-tertiary);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  border-radius: 1rem;
+  background: var(--card-bg);
+}
+
+.aqh-empty-state svg {
+  width: 3rem;
+  height: 3rem;
+  color: var(--text-tertiary);
+  display: block;
+  margin: 0 auto 1rem;
+  stroke: currentColor;
+}
+
+.aqh-empty-state h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+}
+
+.aqh-empty-state p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+/* ===== Modal (mirrors adm-document-processing's .adp-modal shell, blue) ===== */
+.aqh-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+
+.aqh-modal {
+  width: 100%;
+  max-width: 640px;
+  max-height: 90vh;
+  max-height: 90dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1.25rem;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.35);
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.aqh-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.5rem 1.5rem 1.25rem;
+  border-bottom: 1px solid var(--card-border);
+  flex-shrink: 0;
+  text-align: left;
+}
+
+.aqh-modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  text-align: left;
+}
+
+.aqh-modal-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  text-align: left;
+}
+
+.aqh-modal-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.aqh-modal-close-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.aqh-modal-close-btn svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.aqh-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Blue hero band (mirrors .adp-modal-hero) */
+.aqh-modal-hero {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border-radius: 1rem;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 10px 30px rgba(59, 130, 246, 0.2);
+}
+
+.aqh-modal-hero-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 0 0.375rem 0;
+}
+
+.aqh-modal-hero-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.aqh-modal-hero-purpose {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.92);
+  margin: 0.75rem 0 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  line-height: 1.5;
+}
+
+.aqh-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  text-align: left;
+}
+
+.aqh-form-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.aqh-form-select-wrap {
+  position: relative;
+}
+
+.aqh-form-select {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  color: var(--text-primary);
+  padding: 0.625rem 2.25rem 0.625rem 0.875rem;
+  border-radius: 0.75rem;
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.aqh-form-select:hover {
+  border-color: #3b82f6;
+}
+
+.aqh-form-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* Disabled while "Host all services" is ticked -- :hover still matches on a
+   disabled <select> in Chrome/FF, so override it explicitly. */
+.aqh-form-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.aqh-form-select:disabled:hover {
+  border-color: var(--card-border);
+}
+
+.aqh-form-select:disabled + .aqh-select-chevron {
+  opacity: 0.4;
+}
+
+/* "Host all services" checkbox row */
+.aqh-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  cursor: pointer;
+}
+
+.aqh-checkbox-row input {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: #3b82f6;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.aqh-checkbox-row span {
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  line-height: 1.35;
+}
+
+.aqh-select-chevron {
+  position: absolute;
+  right: 0.875rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-tertiary);
+  display: flex;
+}
+
+.aqh-select-chevron svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.aqh-form-input {
+  width: 100%;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  color: var(--text-primary);
+  padding: 0.625rem 0.875rem;
+  border-radius: 0.75rem;
+  font-family: inherit;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.aqh-form-input:hover {
+  border-color: #3b82f6;
+}
+
+.aqh-form-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.aqh-time-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.aqh-time-input-wrap input {
+  flex: 1;
+}
+
+.aqh-time-input-wrap svg {
+  position: absolute;
+  right: 0.875rem;
+  width: 0.9rem;
+  height: 0.9rem;
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+
+/* The browser draws its own clock/picker icon in this same corner for
+   type="time" inputs -- without suppressing it, it renders stacked directly
+   under the custom SVG above, showing as two overlapping clock icons. */
+.aqh-time-input-wrap input[type="time"]::-webkit-calendar-picker-indicator {
+  opacity: 0;
+}
+
+.aqh-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.aqh-modal-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 1.1rem 1.5rem;
+  border-top: 1px solid var(--card-border);
+  flex-shrink: 0;
+}
+
+.aqh-btn-cancel,
+.aqh-btn-submit {
+  flex: 1;
+  min-width: 120px;
+  padding: 0.65rem 1.25rem;
+  border-radius: 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.aqh-btn-cancel {
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.aqh-btn-cancel:hover {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: #3b82f6;
+  color: var(--text-primary);
+}
+
+.aqh-btn-submit {
+  border: none;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+}
+
+.aqh-btn-submit:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(59, 130, 246, 0.35);
+}
+
+@media (max-width: 480px) {
+  .aqh-modal-footer {
+    flex-direction: column;
+  }
+  .aqh-btn-cancel,
+  .aqh-btn-submit {
+    width: 100%;
+  }
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 1024px) {
+  .aqh-summary-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .aqh-stats-row-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .aqh-stats-row-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .aqh-page-container {
+    padding: 0.75rem;
+    gap: 1rem;
+  }
+  .aqh-filters-card {
+    padding: 1rem;
+  }
+  .aqh-page-title {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 640px) {
+  /* This rule is later in the file than the 768px block above, so it wins
+     the cascade -- keep it explicit or padding grows as the screen shrinks. */
+  .aqh-page-container {
+    padding: 0.75rem;
+  }
+  .aqh-title-icon {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+  .aqh-page-title {
+    font-size: 1.25rem;
+  }
+  .aqh-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .aqh-actions-row .aqh-open-queue-btn,
+  .aqh-actions-row .aqh-restrictions-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .aqh-stats-row-4,
+  .aqh-stats-row-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .aqh-form-row {
+    grid-template-columns: 1fr;
+  }
+  .aqh-queue-card-top-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .aqh-queue-card-logo {
+    width: 1.85rem;
+    height: 1.85rem;
+    min-width: 1.85rem;
+    min-height: 1.85rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .aqh-summary-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 380px) {
+  .aqh-stats-row-3,
+  .aqh-stats-row-4 { grid-template-columns: 1fr; }
+}
+
+/* ── Join-code popup (on the .aqh-modal shell above) ──────────────────── */
+.aqh-modal--qr {
+  max-width: 600px;
+}
+
+.aqh-qr-code-area {
+  display: flex;
+  justify-content: center;
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  background: var(--input-background, transparent);
+}
+
+.aqh-action-qr:hover {
+  border-color: var(--blue, #3b82f6);
+  color: var(--blue, #3b82f6);
+}
+
+/* ── No-show restrictions ───────────────────────────────────────────── */
+
+/* Header-level companion to "Open Queue Line": identical geometry and hover
+   motion (.aqh-open-queue-btn), red because it is about blocked students. */
+.aqh-restrictions-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.25rem;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border: none;
+  border-radius: 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.aqh-restrictions-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 16px rgba(239, 68, 68, 0.35);
+}
+
+.aqh-restrictions-btn svg {
+  width: 1rem;
+  height: 1rem;
+  stroke: currentColor;
+}
+
+/* Only rendered when someone is actually restricted, so it reads as an
+   alert rather than a permanent "0". */
+.aqh-restrictions-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Kept at/below the 0.9rem text line box -- a taller badge becomes the
+     tallest item in the flex row and silently stretches the button. */
+  min-width: 1rem;
+  height: 1rem;
+  padding: 0 0.3rem;
+  background: #fff;
+  color: #dc2626;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Restrictions popup: the blue .aqh-modal shell, re-tinted red. */
+.aqh-modal--danger .aqh-modal-hero {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  box-shadow: 0 10px 30px rgba(239, 68, 68, 0.2);
+}
+
+.aqh-modal--danger .aqh-btn-cancel:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: #ef4444;
+}
+
+.aqh-restriction-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.aqh-restriction-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 0.875rem;
+  background: rgba(239, 68, 68, 0.04);
+  text-align: left;
+}
+
+.aqh-restriction-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.aqh-restriction-name {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.aqh-restriction-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.aqh-restriction-id,
+.aqh-restriction-strikes {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.aqh-restriction-id {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+  border: 0.5px solid rgba(59, 130, 246, 0.35);
+}
+
+.aqh-restriction-strikes {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 0.5px solid rgba(239, 68, 68, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* Lifting is the constructive action here, so it reads green (the admin
+   action-button pattern: coloured outline, fills on hover). */
+.aqh-restriction-lift {
+  flex-shrink: 0;
+  padding: 0.5rem 0.9rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--primary-color);
+  background: transparent;
+  color: var(--primary-color);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.aqh-restriction-lift:hover {
+  background: var(--primary-color);
+  color: #fff;
+}
+
+.aqh-restriction-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 1.5rem 1rem;
+  border: 1px dashed var(--card-border);
+  border-radius: 1rem;
+  text-align: center;
+}
+
+.aqh-restriction-empty svg {
+  width: 2.5rem;
+  height: 2.5rem;
+  color: var(--primary-color);
+  margin-bottom: 0.25rem;
+}
+
+.aqh-restriction-empty h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.aqh-restriction-empty p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 480px) {
+  .aqh-restriction-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .aqh-restriction-lift {
+    width: 100%;
+  }
+}

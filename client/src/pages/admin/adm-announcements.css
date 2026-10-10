@@ -1,0 +1,1527 @@
+.ann-page {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  text-align: left;
+}
+
+/* ===== Breadcrumb (self-contained so its rendered height/gap can't be
+   clobbered by whichever other admin page's CSS happened to load last) ===== */
+.ann-page .page-breadcrumb {
+  display: flex;
+  align-items: center;
+}
+.ann-page .page-breadcrumb-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  padding: 0.5rem 0.875rem 0.5rem 0;
+  border-radius: 0.5rem;
+  color: var(--text-tertiary);
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.ann-page .page-breadcrumb-link:hover {
+  color: var(--primary-color);
+  background: rgba(34, 197, 94, 0.1);
+}
+.ann-page .page-breadcrumb-link svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke: currentColor;
+  flex-shrink: 0;
+}
+
+/* ===== Header row ===== */
+.ann-header-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+  text-align: left;
+}
+
+.ann-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.ann-title-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+  color: #fff;
+}
+
+.ann-title-icon svg {
+  width: 1.75rem;
+  height: 1.75rem;
+  stroke: #fff;
+  color: #fff;
+}
+
+.ann-page-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.25rem 0;
+  text-align: left;
+}
+
+.ann-page-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  text-align: left;
+}
+
+.ann-header-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.ann-btn-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.25);
+  align-self: flex-start;
+  width: fit-content;
+}
+
+.ann-btn-new:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(34, 197, 94, 0.35);
+}
+
+.ann-btn-new svg {
+  width: 1rem;
+  height: 1rem;
+  stroke: currentColor;
+}
+
+@media (max-width: 640px) {
+  .ann-header-actions {
+    flex-direction: column;
+  }
+}
+
+/* ===== FAQs management entry -- full card button =====
+   Same geometry as stud-appointments' .ab-prof-sched-card, recoloured green
+   (that card is purple and scoped to stud-appointments.css -- not reused). */
+.ann-faqs-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.12) 0%, rgba(34, 197, 94, 0.08) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 0.875rem;
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
+}
+
+.ann-faqs-card:hover {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.14) 100%);
+  border-color: rgba(34, 197, 94, 0.55);
+  box-shadow: 0 6px 20px rgba(34, 197, 94, 0.22);
+  transform: translateY(-2px);
+  color: var(--text-primary);
+}
+
+.ann-faqs-card-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.625rem;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.35);
+}
+
+.ann-faqs-card-icon svg {
+  width: 1.375rem;
+  height: 1.375rem;
+  color: #fff;
+  stroke: #fff;
+}
+
+.ann-faqs-card-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  min-width: 0;
+  text-align: left;
+}
+
+.ann-faqs-card-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--primary-color);
+}
+
+.ann-faqs-card-subtitle {
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
+
+.ann-faqs-card-chevron {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+
+[data-theme="light"] .ann-faqs-card {
+  background: linear-gradient(135deg, rgba(21, 128, 61, 0.08) 0%, rgba(21, 128, 61, 0.04) 100%);
+  border-color: rgba(21, 128, 61, 0.25);
+}
+
+[data-theme="light"] .ann-faqs-card:hover {
+  background: linear-gradient(135deg, rgba(21, 128, 61, 0.14) 0%, rgba(21, 128, 61, 0.09) 100%);
+  border-color: rgba(21, 128, 61, 0.45);
+}
+
+/* ===== Source toggle ===== */
+/* Mirrors adm-document-processing.css's .adp-source-toggle, but colored with
+   this page's own accent (var(--primary-color)) instead of that page's
+   orange -- the active color should match whatever page it's on, not carry
+   a fixed "faculty" meaning. */
+.ann-source-toggle {
+  display: inline-flex;
+  gap: 0.35rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.875rem;
+  padding: 0.35rem;
+  width: fit-content;
+}
+.ann-source-btn {
+  padding: 0.65rem 1.6rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.6rem;
+  color: var(--text-tertiary);
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.ann-source-btn:hover:not(.ann-source-btn-active) {
+  color: var(--text-primary);
+}
+.ann-source-btn-active {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: #fff;
+  cursor: default;
+}
+
+/* ===== Stats grid ===== */
+.ann-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 1024px) {
+  .ann-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .ann-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Card style mirrors adm-transactions.css's .admin-transaction-stat-card:
+   centered column, green icon-box on top, big green value -- all four cards
+   share the one green treatment (no per-type accent colours). */
+.ann-stat-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 0.875rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.375rem;
+  transition: all 0.3s ease;
+}
+
+.ann-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.45);
+}
+
+[data-theme="light"] .ann-stat-card {
+  border-color: rgba(21, 128, 61, 0.18);
+}
+[data-theme="light"] .ann-stat-card:hover {
+  box-shadow: 0 8px 24px rgba(21, 128, 61, 0.1);
+  border-color: rgba(21, 128, 61, 0.35);
+}
+
+.ann-stat-icon-box {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.25rem;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.08) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  color: var(--primary-color);
+}
+
+.ann-stat-icon-box svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke: currentColor;
+}
+
+.ann-stat-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin: 0;
+}
+
+.ann-stat-value {
+  font-size: 2.25rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--primary-color);
+  margin: 0;
+}
+
+/* ===== Filters =====
+   Mirrors adm-transactions.css's `.admin-transaction-container .filters-card`
+   block. Every selector is scoped under `.ann-page` because none of these
+   class names (`filters-card`, `filter-*`) are declared globally -- each page
+   keeps its own scoped copy (codebase convention). */
+.ann-page .filters-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  border-radius: 1rem;
+  padding: 1rem 1.5rem 1.5rem;
+  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.1);
+  transition: all 0.3s ease;
+}
+
+[data-theme="light"] .ann-page .filters-card {
+  border-color: rgba(21, 128, 61, 0.25);
+}
+
+.ann-page .filters-header {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.ann-page .filters-header-text {
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+}
+
+.ann-page .filters-title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  text-align: center;
+}
+
+.ann-page .filters-description {
+  font-size: 0.9375rem;
+  color: var(--text-tertiary);
+  margin: 0.4rem 0 0 0;
+  text-align: center;
+}
+
+.ann-page .filters-search-row {
+  margin-bottom: 1rem;
+}
+
+.ann-page .filters-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 640px) {
+  .ann-page .filters-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ann-page .filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ann-page .filter-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.ann-page .filter-select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.ann-page .filter-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.ann-page .filter-search-wrapper svg {
+  position: absolute;
+  left: 0.875rem;
+  width: 1rem;
+  height: 1rem;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  stroke: currentColor;
+  z-index: 1;
+}
+
+.ann-page .filter-search-input {
+  width: 100%;
+  padding: 0.75rem 1.25rem 0.75rem 2.5rem;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.ann-page .filter-search-input::placeholder { color: var(--text-tertiary); }
+.ann-page .filter-search-input:hover { border-color: rgba(34, 197, 94, 0.3); }
+.ann-page .filter-search-input:focus {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.1);
+}
+
+.ann-page .filter-select {
+  width: 100%;
+  padding: 0.75rem 1.25rem;
+  padding-right: 2.75rem;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.ann-page .filter-select:hover { border-color: rgba(34, 197, 94, 0.3); }
+.ann-page .filter-select:focus {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.1);
+}
+
+.ann-page .filter-select option {
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.ann-page .filter-chevron {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.ann-page .filter-chevron svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
+  stroke-width: 2;
+  stroke: currentColor;
+}
+
+.ann-page .filter-select:focus + .filter-chevron {
+  color: #22c55e;
+}
+
+/* Retained for the create/edit modals only (see `.ann-modal select.ann-select`
+   further down, which fully overrides width/padding). */
+.ann-select {
+  flex: 0 0 auto;
+  min-width: 170px;
+  padding: 0.65rem 0.85rem;
+  background: var(--input-background);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.ann-select:focus {
+  outline: none;
+  border-color: rgba(34, 197, 94, 0.6);
+}
+
+@media (max-width: 640px) {
+  .ann-btn-new {
+    align-self: stretch;
+    justify-content: center;
+  }
+}
+
+/* ===== List ===== */
+.ann-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.ann-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  border-bottom: 2px solid var(--card-border);
+}
+
+.ann-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.75rem 1.25rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.ann-tab:hover {
+  color: var(--primary-color);
+}
+
+.ann-tab-active {
+  color: var(--primary-color);
+}
+
+.ann-tab-active::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--primary-color);
+}
+
+.ann-items {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Per-tab empty state — matches stud-announcements' .ann-empty-state card. */
+.ann-empty {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+.ann-empty svg {
+  width: 3rem;
+  height: 3rem;
+  color: var(--text-tertiary);
+  opacity: 1;
+  margin: 0 auto 1rem;
+}
+
+.ann-empty h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+}
+
+.ann-empty p {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .ann-empty {
+    padding: 2rem 1rem;
+  }
+}
+
+/* ===== Announcement item =====
+   Matches the student `.announcement-card` visual from stud-announcements.css
+   (rounded card on --card-bg, hover lift, gradient icon square with a white
+   glyph) while keeping the admin action-button row underneath. Class names stay
+   `ann-`-prefixed on purpose -- adm-dashboard.css (also loaded on this page)
+   defines conflicting bare `.announcement-*` rules. */
+.ann-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ann-item:hover {
+  transform: translateY(-4px);
+  border-color: rgba(34, 197, 94, 0.4);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15);
+}
+
+.ann-item-icon {
+  width: 3rem;
+  height: 3rem;
+  min-width: 3rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ann-item-icon svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: #fff;
+  stroke: #fff;
+  stroke-width: 2;
+}
+
+.ann-icon-important {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+.ann-icon-event {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+}
+.ann-icon-reminder {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+.ann-icon-general {
+  background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
+}
+.ann-icon-pinned {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+}
+
+.ann-item-body {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.ann-item-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.375rem;
+}
+
+.ann-item-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.ann-item-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.ann-pin-flag {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: var(--primary-color);
+  flex-shrink: 0;
+}
+
+.ann-badge {
+  flex-shrink: 0;
+  padding: 0.375rem 0.875rem;
+  border-radius: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+.ann-badge-important {
+  background: rgba(239, 68, 68, 0.18);
+  color: #ef4444;
+  border: 0.5px solid rgba(239, 68, 68, 0.4);
+}
+.ann-badge-event {
+  background: rgba(249, 115, 22, 0.18);
+  color: #f97316;
+  border: 0.5px solid rgba(249, 115, 22, 0.4);
+}
+.ann-badge-reminder {
+  background: rgba(59, 130, 246, 0.18);
+  color: #3b82f6;
+  border: 0.5px solid rgba(59, 130, 246, 0.4);
+}
+.ann-badge-general {
+  background: rgba(148, 163, 184, 0.18);
+  color: #94a3b8;
+  border: 0.5px solid rgba(148, 163, 184, 0.35);
+}
+.ann-badge-pinned {
+  background: rgba(34, 197, 94, 0.18);
+  color: var(--primary-color);
+  border: 0.5px solid rgba(34, 197, 94, 0.4);
+}
+.ann-item-desc {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  margin: 0 0 0.75rem 0;
+  line-height: 1.6;
+  text-align: justify;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Posted/Reposted timestamp — vertical icon+text stack, mirrors
+   adm-appointment's .admin-appointment-requested-meta. */
+.ann-item-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.ann-item-meta-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-tertiary);
+}
+
+.ann-item-meta-date,
+.ann-item-meta-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+}
+
+.ann-item-meta-date svg,
+.ann-item-meta-time svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex-shrink: 0;
+}
+
+.ann-item-meta-author {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin-top: 0.15rem;
+}
+
+.ann-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ann-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 0.55rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+}
+
+.ann-action-btn img {
+  width: 0.85rem;
+  height: 0.85rem;
+  display: block;
+}
+
+.ann-action-btn svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.ann-action-btn:hover {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.ann-action-pin-on {
+  color: var(--primary-color);
+  border-color: rgba(34, 197, 94, 0.45);
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.ann-action-edit {
+  color: #3b82f6;
+  border-color: rgba(59, 130, 246, 0.35);
+}
+.ann-action-edit:hover {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.ann-action-archive {
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+.ann-action-archive:hover {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.ann-action-restore {
+  color: var(--primary-color);
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.ann-action-delete {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+.ann-action-delete:hover {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.55);
+}
+
+@media (max-width: 640px) {
+  .ann-item {
+    flex-direction: column;
+  }
+  .ann-item-top {
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+}
+
+/* ===== Modals ===== */
+.ann-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 200;
+}
+
+.ann-modal {
+  width: 100%;
+  max-width: 640px;
+  max-height: 90vh;
+  max-height: 90dvh;
+  overflow-y: auto;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+  text-align: left;
+}
+
+.ann-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.ann-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.25rem 0;
+  text-align: left;
+}
+
+.ann-modal-title svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: var(--primary-color);
+}
+
+.ann-modal-close {
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 0.4rem;
+  flex-shrink: 0;
+}
+
+.ann-modal-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.ann-modal-close svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+/* Form-modal shell — Create/Edit adopt the adm-appointment view-details modal
+   structure (sticky header + scrolling body + sticky footer). Scoped so the
+   View modal keeps the plain .ann-modal layout. */
+.ann-modal--form {
+  max-width: 42rem;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.ann-modal--form .ann-modal-header {
+  padding: 1.5rem 1.5rem 1.25rem;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--card-border);
+  flex-shrink: 0;
+}
+.ann-modal--form .ann-modal-title {
+  font-size: 1.125rem;
+  margin: 0;
+}
+.ann-form-body {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  overflow-y: auto;
+  flex: 1;
+}
+.ann-form-body .ann-field {
+  margin-bottom: 0;
+}
+.ann-modal--form .ann-modal-footer {
+  margin: 0;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--card-border);
+  flex-shrink: 0;
+}
+
+/* ===== View modal — same sticky-shell pattern as .ann-modal--form, styled
+   after adm-document-processing's .adp-modal (green theme). ===== */
+.ann-modal--view {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.ann-modal--view .ann-modal-header {
+  padding: 1.5rem 1.5rem 1.25rem;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--card-border);
+  flex-shrink: 0;
+  align-items: center;
+}
+.ann-modal--view .ann-modal-close:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+.ann-modal-header-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0;
+}
+.ann-pin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.375rem 0.875rem;
+  border-radius: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+.ann-pin-badge svg {
+  width: 0.7rem;
+  height: 0.7rem;
+}
+.ann-pin-badge--on {
+  background: rgba(34, 197, 94, 0.18);
+  color: var(--primary-color);
+  border: 0.5px solid rgba(34, 197, 94, 0.4);
+}
+.ann-pin-badge--off {
+  background: rgba(148, 163, 184, 0.18);
+  color: var(--text-tertiary);
+  border: 0.5px solid rgba(148, 163, 184, 0.35);
+}
+
+.ann-view-body {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  overflow-y: auto;
+  flex: 1;
+}
+.ann-view-body .ann-view-block,
+.ann-view-body .ann-view-grid,
+.ann-view-body .ann-attachment-view {
+  margin-top: 0;
+}
+
+.ann-modal--view .ann-modal-footer {
+  margin: 0;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--card-border);
+  flex-shrink: 0;
+}
+.ann-modal--view .ann-modal-footer .ann-btn-secondary,
+.ann-modal--view .ann-modal-footer .ann-btn-primary {
+  flex: 1;
+  min-width: 120px;
+  justify-content: center;
+}
+@media (max-width: 480px) {
+  .ann-modal--view .ann-modal-footer {
+    flex-direction: column;
+  }
+}
+
+.ann-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  text-align: left;
+}
+
+.ann-field label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.ann-input,
+.ann-textarea,
+.ann-modal select.ann-select {
+  width: 100%;
+  background: var(--input-background);
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  padding: 0.6rem 0.75rem;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.875rem;
+}
+
+.ann-textarea {
+  resize: vertical;
+  min-height: 130px;
+  line-height: 1.5;
+}
+
+.ann-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 520px) {
+  .ann-field-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Attachments ───────────────────────────────────────────────────────── */
+.ann-attachment-flag {
+  width: 0.9rem;
+  height: 0.9rem;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.ann-file-input {
+  width: 100%;
+  background: var(--input-background);
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  padding: 0.5rem 0.75rem;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.8rem;
+}
+
+/* Native "Choose Files" button -- pin to a light chip with near-black text so
+   it stays readable regardless of the OS color-scheme (see the same rule in
+   adm-document-processing.css for the why). */
+.ann-file-input::file-selector-button,
+.ann-file-input::-webkit-file-upload-button {
+  margin-right: 0.6rem;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: #e5e7eb;
+  color: #111827;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ann-file-input::file-selector-button:hover,
+.ann-file-input::-webkit-file-upload-button:hover {
+  background: #d1d5db;
+}
+
+.ann-attachment-filename {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.ann-attachment-filename svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.ann-attachment-hint {
+  font-size: 0.72rem;
+  color: var(--text-tertiary, var(--text-secondary));
+}
+
+.ann-attachment-budget {
+  font-size: 0.72rem;
+  color: var(--text-tertiary, var(--text-secondary));
+  font-weight: 400;
+}
+
+.ann-attachment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.ann-attachment-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--card-border);
+  border-radius: 0.6rem;
+  background: var(--input-background);
+}
+
+.ann-attachment-chip .ann-attachment-filename {
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  color: var(--text-secondary);
+  font-family: inherit;
+}
+
+/* Only saved attachments render as a <button> and are actually clickable --
+   newly-queued files render as a <span> with the same class, so the pointer
+   cursor is scoped to the button variant only. */
+.ann-attachment-chip button.ann-attachment-filename {
+  cursor: pointer;
+}
+
+.ann-attachment-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0.4rem;
+  color: var(--text-tertiary, var(--text-secondary));
+  cursor: pointer;
+}
+
+.ann-attachment-remove:hover {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+}
+
+.ann-attachment-remove svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.ann-attachment-view {
+  margin-top: 1rem;
+}
+
+.ann-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--card-border);
+}
+
+.ann-btn-secondary {
+  padding: 0.6rem 1.1rem;
+  border-radius: 0.65rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.ann-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ann-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.1rem;
+  border-radius: 0.65rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: #ffffff;
+}
+
+.ann-btn-primary:hover {
+  box-shadow: 0 8px 16px rgba(34, 197, 94, 0.3);
+}
+
+.ann-btn-primary svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+/* View modal specifics — hero band mirrors .adp-modal-hero (green) */
+.ann-view-banner {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  border-radius: 1rem;
+  padding: 1.25rem 1.5rem;
+  color: #ffffff;
+  display: block;
+  box-shadow: 0 10px 30px rgba(34, 197, 94, 0.2);
+}
+
+.ann-view-banner-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 0 0.375rem 0;
+}
+
+.ann-view-banner h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.3;
+  text-align: left;
+}
+
+.ann-view-banner-date {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.92);
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.ann-view-banner-date svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.ann-view-block {
+  background: var(--secondary);
+  border-radius: 0.75rem;
+  padding: 0.9rem 1rem;
+  margin-top: 0.5rem;
+}
+
+.ann-view-block p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  text-align: justify;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.ann-view-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+@media (max-width: 520px) {
+  .ann-view-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ann-view-label {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 0.35rem 0;
+  text-align: left;
+}
+
+.ann-view-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.ann-status-pill {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.ann-status-active {
+  background: rgba(34, 197, 94, 0.18);
+  color: var(--primary-color);
+}
+.ann-status-archived {
+  background: rgba(148, 163, 184, 0.18);
+  color: var(--text-tertiary);
+}
+
+/* ===== Toasts ===== */
+.ann-toast-stack {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 320px;
+}
+
+.ann-toast {
+  background: var(--card-bg);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  border-left: 4px solid var(--primary-color);
+  padding: 0.75rem 1rem;
+  border-radius: 0.65rem;
+  font-size: 0.825rem;
+  color: var(--text-primary);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  animation: ann-toast-in 0.2s ease;
+  text-align: left;
+}
+
+.ann-toast-error {
+  border-color: rgba(239, 68, 68, 0.4);
+  border-left-color: #ef4444;
+}
+
+@keyframes ann-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===== Dash error banner reuse (kept local) ===== */
+.ann-error-banner {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+/* ===== Back button ===== */
+.ann-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid var(--border, #e5e7eb);
+  background: transparent;
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+  align-self: flex-start;
+}
+.ann-back-btn:hover {
+  background: var(--bg-hover, #f3f4f6);
+  color: var(--text-primary, #111827);
+}
+
+/* ===== Loading state ===== */
+.ann-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 3rem 1rem;
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.875rem;
+}
+.ann-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border, #e5e7eb);
+  border-top-color: var(--primary-color, #22c55e);
+  border-radius: 50%;
+  animation: ann-spin 0.7s linear infinite;
+}
+@keyframes ann-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 380px) {
+  .ann-stats-grid { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,1542 @@
+/* ===== IMPORT EXISTING STUDENT DASHBOARD CSS VARIABLES ===== */
+
+/* ===== DARK MODE (DEFAULT) ===== */
+:root,
+[data-theme="dark"] {
+  /* Primary Colors */
+  --primary-color: #22c55e;
+  --primary-dark: #16a34a;
+  --primary-light: #86efac;
+
+  /* Dark green theme */
+  --background: #0a0f0a;
+  --card: #111612;
+  --sidebar: #0f1510;
+
+  --foreground: #f0fdf4;
+  --card-foreground: #f0fdf4;
+
+  --secondary: #1a3a1f;
+  --muted: #1a3a1f;
+  --muted-foreground: #94a3b8;
+
+  --border: #1e3a23;
+  --input: #1a3a1f;
+  --input-background: #0f1e12;
+
+  --accent: #16532a;
+  --accent-foreground: #dcfce7;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  /* Theme Colors */
+  --dark-bg: var(--background);
+  --card-bg: var(--card);
+  --card-border: var(--border);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--foreground);
+  --text-tertiary: var(--muted-foreground);
+
+  --sidebar-width: 14rem;
+
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: var(--destructive);
+  --blue: #3b82f6;
+  --cyan: #06b6d4;
+  --purple: #a855f7;
+  --violet: #7c3aed;
+  --pink: #ec4899;
+}
+
+/* ===== LIGHT MODE ===== */
+[data-theme="light"] {
+  /* Primary Colors - Adjusted for light mode */
+  --primary-color: #15803d;
+  --primary-dark: #166534;
+  --primary-light: #22c55e;
+
+  /* Light backgrounds */
+  --background: #f8fafc;
+  --card: #ffffff;
+  --sidebar: #f1f5f9;
+
+  --foreground: #1e293b;
+  --card-foreground: #1e293b;
+
+  --secondary: #e2e8f0;
+  --muted: #e2e8f0;
+  --muted-foreground: #64748b;
+
+  --border: #e2e8f0;
+  --input: #f1f5f9;
+  --input-background: #f8fafc;
+
+  --accent: #d1fae5;
+  --accent-foreground: #065f46;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+
+  /* Theme Colors */
+  --dark-bg: var(--background);
+  --card-bg: var(--card);
+  --card-border: var(--border);
+  --text-primary: var(--foreground);
+  --text-secondary: #334155;
+  --text-tertiary: var(--muted-foreground);
+
+  --sidebar-width: 14rem;
+
+  --success: #059669;
+  --warning: #d97706;
+  --danger: var(--destructive);
+  --blue: #2563eb;
+  --cyan: #0891b2;
+  --purple: #9333ea;
+  --violet: #6d28d9;
+  --pink: #db2777;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--dark-bg);
+  color: var(--text-primary);
+  font-family: "Inter", sans-serif;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
+}
+
+/* ===== Dashboard With Sidebar Layout ===== */
+.qpage-with-sidebar {
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--dark-bg);
+  transition: background-color 0.3s ease;
+}
+
+/* ===== Main Content ===== */
+.qpage-main {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  overflow-y: auto;
+  transition: margin-left 0.3s ease;
+}
+
+.queue-page {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.3rem;
+  width: 100%;
+}
+
+@media (max-width: 1024px) {
+  .qpage-main {
+    margin-left: 0;
+    margin-top: 4rem;
+  }
+}
+
+/* ===== Queue Header ===== */
+.queue-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.page-breadcrumb {
+  display: flex;
+  align-items: center;
+}
+
+.queue-page .breadcrumb-link,
+.queue-page .breadcrumb-link:visited,
+.queue-page .breadcrumb-link:active,
+.queue-page .breadcrumb-link:focus {
+  outline: none;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 0.5rem 0.875rem 0.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-family: inherit;
+  text-decoration: none;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.queue-page .breadcrumb-link:hover {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: var(--primary-color);
+}
+
+.queue-page .breadcrumb-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.queue-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.queue-title-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  flex-shrink: 0;
+}
+
+.queue-title-icon .icon {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.queue-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  transition: color 0.3s ease;
+  text-align: left;
+}
+
+.queue-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0.25rem 0 0 0;
+  transition: color 0.3s ease;
+}
+
+/* ===== My Active Queues Section ===== */
+.queues-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ===== Queue Tabs ===== */
+/* No margin-top here on purpose: the header→tabs gap is the .queue-page flex
+   gap (1.3rem) alone, matching stud-document-status's .dss-tabs-container. */
+.qp-tabs-list {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid var(--card-border);
+  flex-wrap: wrap;
+  transition: border-color 0.3s ease;
+}
+
+.qp-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.qp-tab svg { width: 1rem; height: 1rem; flex-shrink: 0; stroke: currentColor; }
+
+.qp-tab-icon { width: 1rem; height: 1rem; flex-shrink: 0; stroke: currentColor; }
+
+.qp-tabs-list .qp-tab:hover { color: var(--blue); }
+.qp-tabs-list .qp-tab.active { color: var(--blue); }
+.qp-tabs-list .qp-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px; left: 0; right: 0;
+  height: 2px;
+  background: var(--blue);
+}
+
+.qp-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--blue);
+  transition: background 0.2s;
+}
+
+.qp-tab.active .qp-tab-count {
+  background: rgba(59, 130, 246, 0.28);
+}
+
+/* ===== Queue Card ===== */
+.queue-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.active-queue-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+}
+
+.active-queue-card:hover {
+  box-shadow: 0 12px 28px rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.available-queue-card {
+  border-color: rgba(59, 130, 246, 0.15);
+}
+
+.available-queue-card:hover {
+  box-shadow: 0 12px 28px rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.available-queue-card .qp-card-content {
+  align-items: center;
+}
+
+.available-queue-card .qp-left {
+  align-items: flex-start;
+}
+
+.available-queue-card .qp-header-row {
+  align-items: center;
+}
+
+.available-queue-card .queue-join-btn {
+  align-self: flex-start;
+  flex-shrink: 0;
+}
+
+.qp-card-content {
+  padding: 1.05rem;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.1rem;
+  text-align: left;
+}
+
+@media (max-width: 768px) {
+  .qp-card-content {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 1.25rem;
+  }
+}
+
+.qp-left {
+  display: flex;
+  gap: 0.9rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.qp-college-logo {
+  width: 2.5rem;
+  height: 2.5rem;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.qp-college-logo-sm {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.qp-logo-wrapper {
+  width: 2.9rem;
+  height: 2.9rem;
+  border-radius: 50%;
+  background: var(--card-bg);
+  padding: 0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+}
+
+[data-theme="light"] .qp-logo-wrapper {
+  background: #f1f5f9;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.qp-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.qp-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  text-align: left;
+}
+
+.qp-service-name {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  margin: 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.qp-college-name {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  margin: 0.15rem 0 0 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.qp-number-badge,
+.queue-status-badge {
+  padding: 0.3rem 0.7rem;
+  border-radius: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+
+  flex: none;
+  flex-shrink: 0;
+  flex-grow: 0;
+
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease,
+    border-color 0.3s ease,
+    opacity 0.3s ease;
+
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  align-self: flex-start; /* ← prevents flex stretch */
+  width: fit-content; /* ← fallback */
+  white-space: nowrap; /* ← keeps text on one line */
+}
+
+.qp-number-badge {
+  background: var(--blue);
+  color: white;
+  font-family: "Inter", sans-serif;
+}
+
+.queue-status-badge {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.queue-status-badge--paused,
+.queue-status-badge--full {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+/* ===== Queue Stats Grid ===== */
+.qp-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.65rem;
+  margin-bottom: 0.5rem;
+}
+
+@media (max-width: 1024px) {
+  .qp-stats-grid {
+    gap: 0.55rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .qp-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+}
+
+.qp-stat {
+  background: rgba(17, 22, 18, 0.5);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 0.75rem;
+  padding: 0.45rem 0.4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+[data-theme="light"] .qp-stat {
+  background: rgba(248, 250, 252, 0.7);
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.qp-stat-label {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  text-align: center;
+  transition: color 0.3s ease;
+}
+
+.qp-stat .qp-stat-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--blue);
+  line-height: 1.2;
+  margin-top: 0.2rem;
+  text-align: center;
+  transition: color 0.3s ease;
+}
+
+.qp-stat--serving .qp-stat-value-sm {
+  font-size: 0.9rem;
+}
+
+.qp-stat-value-sm {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+  margin-top: 0.2rem;
+  text-align: center;
+  transition: color 0.3s ease;
+}
+
+/* ===== Queue Details Grid (Available Queues) ===== */
+/* Card cells styled to read like stud-transactions' .tx-stat-card — vertical,
+   centred, icon on top, large value below — but kept on the blue accent and
+   with the round icon badge. Scoped to .queue-details-grid so the bare
+   .queue-detail-item that adm-queue.css also consumes is left untouched. */
+.queue-details-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.55rem;
+  margin-top: 0.55rem;
+}
+
+.queue-details-grid .queue-detail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.4rem;
+  background: var(--card-bg);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 0.875rem;
+  padding: 0.7rem;
+  transition: all 0.3s ease;
+}
+
+.queue-details-grid .queue-detail-item:hover {
+  border-color: rgba(59, 130, 246, 0.45);
+}
+
+[data-theme="light"] .queue-details-grid .queue-detail-item {
+  background: var(--card-bg);
+  border-color: rgba(37, 99, 235, 0.18);
+}
+
+.detail-icon {
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.detail-icon.waiting {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--blue);
+}
+
+.detail-icon.time {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--blue);
+}
+
+.detail-icon.serving {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--blue);
+}
+
+.detail-icon .icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.detail-label {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  transition: color 0.3s ease;
+}
+
+.queue-detail-item .detail-value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--blue);
+  margin: 0.2rem 0 0 0;
+  line-height: 1;
+  transition: color 0.3s ease;
+  text-align: center;
+}
+
+/* ===== Action Buttons ===== */
+.queue-leave-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1rem;
+  background: transparent;
+  border: 1.5px solid rgba(239, 68, 68, 0.3);
+  border-radius: 0.75rem;
+  color: #ef4444;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.active-queue-card .queue-leave-btn {
+  width: 100%;
+  flex-shrink: 1;
+  margin-top: 0.25rem;
+}
+
+.queue-leave-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.5);
+  transform: translateY(-2px);
+}
+
+.queue-leave-btn .icon {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+
+.leave-text {
+  display: inline;
+}
+
+.qp-void-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 4px;
+  font-size: 0.8125rem;
+  color: var(--danger);
+  text-align: left;
+}
+
+.qp-void-warning-icon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
+@media (max-width: 768px) {
+  .queue-leave-btn {
+    width: 100%;
+  }
+}
+
+/* A flex row (not inline text) so the icon is centred against the label
+   rather than sitting on the text baseline; line-height 1 + the app font
+   keep the label's line box from pushing it off-centre (buttons otherwise
+   fall back to the browser's own font and line-height: normal). */
+.queue-join-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.55rem 1.1rem;
+  background: linear-gradient(
+    135deg,
+    #3b82f6 0%,
+    #6366f1 100%
+  );
+  color: white;
+  border: none;
+  border-radius: 0.75rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.queue-join-btn-icon {
+  width: 1rem;
+  height: 1rem;
+  display: block;
+  flex-shrink: 0;
+}
+
+.queue-join-btn:hover:not(:disabled) {
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.3);
+  transform: translateY(-2px);
+}
+
+.queue-join-btn:disabled,
+.queue-join-btn.disabled {
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+[data-theme="light"] .queue-join-btn:disabled,
+[data-theme="light"] .queue-join-btn.disabled {
+  background: #e2e8f0;
+  color: #94a3b8;
+}
+
+@media (max-width: 768px) {
+  .queue-join-btn {
+    width: 100%;
+  }
+}
+
+/* ===== Filters Card ===== */
+/* Scoped to .queue-page so these generic class names don't bleed into/from
+   stud-transactions.css (orange) and stud-appointments.css (purple), which
+   define the same .filters-card/.filter-* class names for their own themes. */
+.queue-page .filters-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  border-radius: 1rem;
+  padding: 1rem 1.5rem 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.queue-page .filters-header {
+  margin-bottom: 1.5rem;
+}
+
+.queue-page .filters-title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  font-family: "Inter", sans-serif;
+  color: var(--text-primary);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+.queue-page .filters-description,
+.queue-page .filters-header .filters-description {
+  font-size: 0.9375rem;
+  color: var(--text-tertiary);
+  margin: 0.4rem 0 0 0;
+  transition: color 0.3s ease;
+  text-align: center;
+}
+
+.queue-page .filters-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .queue-page .filters-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+}
+
+.queue-page .filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.queue-page .filter-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  transition: color 0.3s ease;
+  text-align: left;
+}
+
+.queue-page .filter-select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.queue-page .filter-select {
+  width: 100%;
+  padding: 0.75rem 1.25rem;
+  padding-right: 2.75rem;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: "Inter", sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* Higher-specificity overrides to beat transactions.css and appointment-booking.css SPA bleed */
+.queue-page .filters-card .filter-select {
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  display: block !important;
+  position: static !important;
+  border: 1px solid var(--card-border) !important;
+  background-image: none !important;
+  background-repeat: initial !important;
+  background-position: initial !important;
+  background-size: initial !important;
+}
+
+.queue-page .filters-card .filter-select-wrapper {
+  display: block !important;
+}
+
+/* Focus border color must beat the anti-bleed !important border above.
+   No :hover rule here by design -- the highlight only shows on focus/click. */
+.queue-page .filters-card .filter-select:focus {
+  outline: none;
+  border-color: var(--blue) !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.queue-page .filters-card .filters-header {
+  padding: 0 !important;
+  border-bottom: none !important;
+}
+
+.queue-page .filter-chevron {
+  position: absolute;
+  right: 1rem;
+  /* Match the vertical centering used in transactions page */
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.queue-page .filter-chevron svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
+  stroke-width: 2;
+}
+
+.queue-page .filter-select:focus + .filter-chevron {
+  color: var(--blue);
+}
+
+.queue-page .filter-select option {
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .queue-page .filter-select {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #1e293b;
+}
+
+[data-theme="light"] .queue-page .filter-select option {
+  background: white;
+  color: #1e293b;
+}
+
+/* ===== Available Queues List ===== */
+.available-queues-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ===== No Queues Found ===== */
+.no-queues-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  border-radius: 1rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.no-queues-icon {
+  width: 3rem;
+  height: 3rem;
+  color: var(--text-tertiary);
+  margin: 0 auto 1rem;
+  transition: color 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.no-queues-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.no-queues-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+  transition: color 0.3s ease;
+}
+
+.no-queues-description {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+/* ===== Responsive Design ===== */
+@media (max-width: 768px) {
+  .queue-page {
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .queue-title {
+    font-size: 1.5rem;
+  }
+
+  .qp-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .qp-card-content {
+    padding: 1rem;
+  }
+
+  .qp-college-logo {
+    width: 3.5rem;
+    height: 3.5rem;
+  }
+
+  .qp-service-name {
+    font-size: 0.95rem;
+  }
+
+  .queue-join-btn,
+  .queue-leave-btn {
+    font-size: 0.8125rem;
+    padding: 0.625rem 1rem;
+  }
+
+  .queue-page .filters-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .queue-page {
+    padding: 0.75rem;
+    gap: 1rem;
+  }
+
+  .queue-title {
+    font-size: 1.375rem;
+  }
+
+  .queue-title-section {
+    gap: 0.75rem;
+  }
+
+  .qp-card-content {
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .qp-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  .qp-stat {
+    padding: 0.625rem;
+  }
+
+  .qp-college-logo {
+    width: 3rem;
+    height: 3rem;
+  }
+
+  .qp-service-name {
+    font-size: 0.9375rem;
+  }
+
+  .queue-join-btn,
+  .queue-leave-btn {
+    width: 100%;
+    font-size: 0.8rem;
+    padding: 0.625rem;
+  }
+
+  .detail-icon {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .no-queues-card {
+    padding: 2rem 1rem;
+  }
+
+  .queue-page .filters-grid {
+    gap: 0.75rem;
+  }
+
+  .queue-details-grid {
+    gap: 0.5rem;
+  }
+
+  .queue-details-grid .queue-detail-item {
+    padding: 0.75rem 0.5rem;
+    gap: 0.4rem;
+  }
+}
+
+/* Dark mode specific improvements */
+[data-theme="dark"] .queue-card {
+  background: linear-gradient(
+    135deg,
+    rgba(17, 22, 18, 0.9) 0%,
+    rgba(15, 21, 16, 1) 100%
+  );
+}
+
+[data-theme="dark"] .queue-page .filters-card {
+  background: linear-gradient(
+    135deg,
+    rgba(17, 22, 18, 0.9) 0%,
+    rgba(15, 21, 16, 1) 100%
+  );
+}
+
+/* Light mode specific improvements */
+[data-theme="light"] .queue-card {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(248, 250, 252, 1) 100%
+  );
+}
+
+[data-theme="light"] .queue-page .filters-card {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+[data-theme="light"] .qp-stat {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+/* ===== Service Detail View (recycled from avail-services) ===== */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.avail-services-details-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.avail-services-service-hero {
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  color: white;
+  box-shadow: 0 10px 30px rgba(59, 130, 246, 0.2);
+  transition: all 0.3s ease;
+}
+
+.avail-services-hero-content {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.avail-services-hero-logo {
+  width: 5.5rem;
+  height: 5.5rem;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.avail-services-hero-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 0.5rem;
+}
+
+.avail-services-hero-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.avail-services-hero-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.avail-services-hero-service-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+  margin: 0 0 0.2rem 0;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.avail-services-hero-title p {
+  font-size: 1.05rem;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+  text-align: left;
+}
+
+.avail-services-hero-meta-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.avail-services-service-hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+  text-align: left;
+}
+
+.avail-services-service-hero-icon {
+  width: 1rem;
+  height: 1rem;
+  stroke: currentColor;
+  flex-shrink: 0;
+}
+
+.avail-services-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 1.75rem;
+}
+
+@media (max-width: 768px) {
+  .avail-services-details-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.avail-services-details-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 1.125rem;
+  overflow: hidden;
+  text-align: left;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.avail-services-details-card-header {
+  padding: 1.25rem;
+  border-bottom: 1px solid rgba(59, 130, 246, 0.1);
+}
+
+.avail-services-details-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+.avail-services-details-card-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--blue);
+  stroke: currentColor;
+}
+
+.avail-services-details-card-text {
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+.avail-services-details-card-content {
+  padding: 1.25rem;
+}
+
+.avail-services-requirements-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.avail-services-requirement-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  text-align: left;
+}
+
+.avail-services-requirement-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--blue);
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+  stroke: currentColor;
+}
+
+.avail-services-requirement-item span {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  transition: color 0.3s ease;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.avail-services-requirement-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.avail-services-requirement-name-row .avail-services-requirement-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+.avail-services-requirement-name-row .avail-services-requirement-badge.is-mandatory {
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--blue);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.avail-services-requirement-name-row .avail-services-requirement-badge.is-optional {
+  background: rgba(100, 116, 139, 0.1);
+  color: var(--text-tertiary);
+  border: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+.avail-services-procedure-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.avail-services-procedure-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  text-align: left;
+}
+
+.avail-services-procedure-number {
+  width: 1.625rem;
+  height: 1.625rem;
+  border-radius: 50%;
+  background: #3b82f6;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.avail-services-procedure-item .avail-services-procedure-title {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  transition: color 0.3s ease;
+  padding-top: 0.1875rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.avail-services-cta-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(99, 102, 241, 0.05) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 1rem;
+  padding: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  text-align: left;
+}
+
+.avail-services-cta-content h3 {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0;
+  margin-bottom: 0.375rem;
+  transition: color 0.3s ease;
+  letter-spacing: -0.25px;
+}
+
+.avail-services-cta-content p {
+  font-size: 0.9375rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  transition: color 0.3s ease;
+  font-weight: 500;
+}
+
+
+.avail-services-queue-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.875rem 1.625rem;
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  color: white;
+  border: none;
+  border-radius: 0.75rem;
+  /* Same centring fix as .queue-join-btn. */
+  font-family: inherit;
+  line-height: 1;
+  font-size: 0.9375rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+  white-space: nowrap;
+  letter-spacing: -0.25px;
+}
+
+.avail-services-queue-btn:hover:not(:disabled) {
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  transform: translateY(-2px);
+}
+
+.avail-services-queue-btn:active {
+  transform: translateY(0);
+}
+
+.avail-services-queue-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.avail-services-queue-btn-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  display: block;
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
+@media (max-width: 768px) {
+  .avail-services-cta-card {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .avail-services-queue-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .avail-services-service-hero {
+    padding: 1.25rem;
+  }
+
+  .avail-services-hero-content {
+    gap: 1rem;
+  }
+
+  .avail-services-hero-logo {
+    width: 4rem;
+    height: 4rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .avail-services-service-hero {
+    padding: 1rem;
+  }
+
+  .avail-services-hero-content {
+    gap: 0.75rem;
+  }
+
+  .avail-services-hero-logo {
+    width: 3.25rem;
+    height: 3.25rem;
+  }
+
+  .avail-services-hero-meta-row {
+    gap: 0.625rem;
+  }
+
+  .avail-services-cta-card {
+    flex-direction: column;
+    gap: 1rem;
+  }
+}
+
+/* ── Phone tiers ───────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  /* 3-up detail grid is ~100px per cell at this width -- labels wrap badly. */
+  .queue-details-grid { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+  .qp-stats-grid { gap: 0.5rem; }
+}
+
+@media (max-width: 380px) {
+  .queue-details-grid,
+  .qp-stats-grid { grid-template-columns: 1fr; }
+}
+
+/* ── No-show block banner ───────────────────────────────────────────
+   Shown on the queue list so a restricted student finds out before
+   walking to the office, not at the counter. */
+.queue-block-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin: 1rem 0;
+  padding: 0.9rem 1.1rem;
+  border-radius: 0.75rem;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.queue-block-banner-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+  color: #ef4444;
+  margin-top: 0.1rem;
+}
+
+.queue-block-banner strong {
+  display: block;
+  color: #ef4444;
+  font-size: 0.95rem;
+  margin-bottom: 0.2rem;
+}
+
+.queue-block-banner p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}

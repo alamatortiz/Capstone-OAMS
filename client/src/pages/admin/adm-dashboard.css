@@ -1,0 +1,1278 @@
+
+/* ===== DARK MODE (DEFAULT) ===== */
+:root,
+[data-theme="dark"] {
+  /* Primary Colors */
+  --primary-color: #22c55e;
+  --primary-dark: #16a34a;
+  --primary-light: #86efac;
+
+  /* Dark green theme */
+  --background: #0a0f0a;
+  --card: #111612;
+  --sidebar: #0f1510;
+
+  --foreground: #f0fdf4;
+  --card-foreground: #f0fdf4;
+
+  --secondary: #1a3a1f;
+  --muted: #1a3a1f;
+  --muted-foreground: #94a3b8;
+
+  --border: #1e3a23;
+  --input: #1a3a1f;
+  --input-background: #0f1e12;
+
+  --accent: #16532a;
+  --accent-foreground: #dcfce7;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  /* Theme Colors */
+  --dark-bg: var(--background);
+  --card-bg: var(--card);
+  --card-border: var(--border);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--foreground);
+  --text-tertiary: var(--muted-foreground);
+
+  --sidebar-width: 14rem;
+
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: var(--destructive);
+  --blue: #3b82f6;
+  --cyan: #06b6d4;
+  --purple: #a855f7;
+  --violet: #7c3aed;
+  --pink: #ec4899;
+  --orange: #f97316;
+  
+  /* Icon Colors */
+  --icon-sun-color: #fbbf24;
+  --icon-moon-color: #64748b;
+}
+
+/* ===== LIGHT MODE ===== */
+[data-theme="light"] {
+  /* Primary Colors - Adjusted for light mode */
+  --primary-color: #15803d;
+  --primary-dark: #166534;
+  --primary-light: #22c55e;
+
+  /* Light backgrounds */
+  --background: #f8fafc;
+  --card: #ffffff;
+  --sidebar: #f1f5f9;
+
+  --foreground: #1e293b;
+  --card-foreground: #1e293b;
+
+  --secondary: #e2e8f0;
+  --muted: #e2e8f0;
+  --muted-foreground: #64748b;
+
+  --border: #e2e8f0;
+  --input: #f1f5f9;
+  --input-background: #f8fafc;
+
+  --accent: #d1fae5;
+  --accent-foreground: #065f46;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+
+  /* Theme Colors */
+  --dark-bg: var(--background);
+  --card-bg: var(--card);
+  --card-border: var(--border);
+  --text-primary: var(--foreground);
+  --text-secondary: #334155;
+  --text-tertiary: var(--muted-foreground);
+
+  --sidebar-width: 14rem;
+
+  --success: #059669;
+  --warning: #d97706;
+  --danger: var(--destructive);
+  --blue: #2563eb;
+  --cyan: #0891b2;
+  --purple: #9333ea;
+  --violet: #6d28d9;
+  --pink: #db2777;
+  --orange: #ea580c;
+  
+  /* Icon Colors */
+  --icon-sun-color: #fbbf24;
+  --icon-moon-color: #1e293b;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--dark-bg);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ===== Shared Back Button ===== */
+.admin-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 0.5rem;
+  transition: color 0.2s ease, background-color 0.2s ease;
+  margin-bottom: 1rem;
+  align-self: flex-start;
+}
+.admin-back-btn:hover {
+  color: var(--primary-color);
+  background-color: rgba(34, 197, 94, 0.1);
+}
+.admin-back-btn svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* ===== Shared Breadcrumb (matches professor/student pages) ===== */
+.page-breadcrumb {
+  display: flex;
+  align-items: center;
+}
+.page-breadcrumb-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  padding: 0.5rem 0.875rem 0.5rem 0;
+  border-radius: 0.5rem;
+  color: var(--text-tertiary);
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.page-breadcrumb-link:hover {
+  color: var(--primary-color);
+  background: rgba(34, 197, 94, 0.1);
+}
+.page-breadcrumb-link svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke: currentColor;
+  flex-shrink: 0;
+}
+
+/* ===== Admin Dashboard With Sidebar Layout ===== */
+.admin-dashboard-with-sidebar {
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--dark-bg);
+  transition: background-color 0.3s ease;
+}
+
+/* ===== Main Content ===== */
+.admin-dashboard-main {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  overflow-y: auto;
+  transition: margin-left 0.3s ease;
+}
+
+.admin-dashboard {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .admin-dashboard-main {
+    margin-left: 0;
+    margin-top: 4rem;
+  }
+}
+
+/* ===== Welcome Banner ===== */
+.welcome-banner.admin-banner {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  color: white;
+  box-shadow: 0 10px 30px rgba(34, 197, 94, 0.2);
+  transition: all 0.3s ease;
+}
+
+.banner-backdrop {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  pointer-events: none;
+}
+
+.banner-backdrop-1 {
+  width: 10rem;
+  height: 10rem;
+  top: -2rem;
+  right: -2rem;
+}
+
+.banner-backdrop-2 {
+  width: 6rem;
+  height: 6rem;
+  bottom: -2.5rem;
+  right: 4rem;
+  opacity: 0.5;
+}
+
+.banner-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* Greeting + logo + name row -- mirrors stud-dashboard / prof-dashboard banners */
+.admin-dashboard .banner-greeting {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.5rem;
+  font-weight: 400;
+  margin-bottom: 0.15rem;
+  text-align: left;
+}
+
+.admin-dashboard .banner-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: flex-start;
+}
+
+.banner-title-row .banner-ccs-logo {
+  width: 4.5rem;
+  height: 4.5rem;
+  object-fit: contain;
+  flex-shrink: 0;
+  display: block;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.2));
+}
+
+.banner-title {
+  font-size: 2.25rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.1;
+  text-align: justify;
+  text-justify: inter-word;
+}
+
+@media (min-width: 768px) {
+  .banner-title {
+    font-size: 2.75rem;
+  }
+}
+
+.banner-badges {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.banner-badges .badge {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 0.375rem 0.875rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(10px);
+}
+
+/* ===== Stats Grid ===== */
+.admin-dashboard .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+}
+
+@media (min-width: 1024px) {
+  .admin-dashboard .stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.admin-dashboard .stat-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 1.125rem;
+  padding: 1.5rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-dashboard .stat-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, transparent 100%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.admin-dashboard .stat-card:hover {
+  box-shadow: 0 12px 28px rgba(34, 197, 94, 0.15);
+  transform: translateY(-4px);
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.admin-dashboard .stat-card:hover::before {
+  opacity: 1;
+}
+
+.admin-dashboard .stat-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  width: 100%;
+  margin-top: 0.875rem;
+  margin-bottom: 1.75rem;
+}
+
+.admin-dashboard .stat-title,
+.admin-dashboard .stat-value,
+.admin-dashboard .stat-description {
+  text-align: left;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.admin-dashboard .stat-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.admin-dashboard .stat-icon .icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: inherit;
+  stroke: currentColor;
+  fill: none;
+}
+
+.admin-dashboard .stat-icon.bg-blue-50 {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.08) 100%);
+  color: var(--blue);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+[data-theme="light"] .admin-dashboard .stat-icon.bg-blue-50 {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0.04) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+}
+
+.admin-dashboard .stat-icon.bg-emerald-50 {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.08) 100%);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+[data-theme="light"] .admin-dashboard .stat-icon.bg-emerald-50 {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.04) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+}
+
+.admin-dashboard .stat-icon.bg-orange-50 {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(249, 115, 22, 0.08) 100%);
+  color: var(--orange);
+  border: 1px solid rgba(249, 115, 22, 0.2);
+}
+
+[data-theme="light"] .admin-dashboard .stat-icon.bg-orange-50 {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(249, 115, 22, 0.04) 100%);
+  border: 1px solid rgba(249, 115, 22, 0.15);
+}
+
+.admin-dashboard .stat-icon.bg-purple-50 {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.08) 100%);
+  color: var(--purple);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+[data-theme="light"] .admin-dashboard .stat-icon.bg-purple-50 {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.12) 0%, rgba(168, 85, 247, 0.04) 100%);
+  border: 1px solid rgba(168, 85, 247, 0.15);
+}
+
+.admin-dashboard .stat-icon.bg-green-50 {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.08) 100%);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+[data-theme="light"] .admin-dashboard .stat-icon.bg-green-50 {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.12) 0%, rgba(34, 197, 94, 0.04) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.15);
+  color: #15803d;
+}
+
+.admin-dashboard .stat-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-top: 0.75rem;
+  transition: color 0.3s ease;
+}
+
+.admin-dashboard .stat-value {
+  font-size: 2.25rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  transition: color 0.3s ease;
+  margin-top: 0.75rem;
+}
+
+.admin-dashboard .stat-value.stat-loading {
+  animation: statPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes statPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+.admin-dashboard .stat-description {
+  font-size: 0.825rem;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+  margin-top: 0.75rem;
+  transition: color 0.3s ease;
+}
+
+/* ===== Admin Management Section ===== */
+.admin-management-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(127, 29, 29, 0.08) 0%, rgba(127, 29, 29, 0.05) 100%);
+  border: 1.5px solid rgba(239, 68, 68, 0.3);
+  border-radius: 1rem;
+  transition: all 0.3s ease;
+}
+
+.section-header-admin {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.section-title-admin {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.section-title-admin-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: flex-start;
+}
+
+.section-title-admin h2 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  transition: color 0.3s ease;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.section-title-admin .icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--primary-color);
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.section-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  transition: color 0.3s ease;
+  margin: 0;
+}
+
+.admin-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+@media (min-width: 1024px) {
+  .admin-tools-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.admin-tool-card {
+  background: var(--card-bg);
+  border: 1.5px solid rgba(34, 197, 94, 0.25);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.75rem;
+}
+
+.admin-tool-text {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  gap: 0.25rem;
+}
+
+.admin-tool-card .tool-title {
+  display: block;
+  margin: 0;
+  text-align: left;
+}
+
+.admin-tool-card .tool-description {
+  display: block;
+  margin: 0;
+  text-align: left;
+}
+
+.admin-tool-card:hover {
+  border-color: rgba(34, 197, 94, 0.5);
+  background: rgba(34, 197, 94, 0.05);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(34, 197, 94, 0.1);
+}
+
+.admin-tool-icon {
+  width: 3rem;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  color: white;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+/* ── Admin tool icon background colours ── */
+
+/* User Management — whitish slate gray */
+.admin-tool-icon.bg-user-mgmt {
+  background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
+  box-shadow: 0 4px 12px rgba(100, 116, 139, 0.3);
+}
+
+/* Data Management — charcoal slate */
+.admin-tool-icon.bg-data-mgmt {
+  background: linear-gradient(135deg, #475569 0%, #334155 100%);
+  box-shadow: 0 4px 12px rgba(51, 65, 85, 0.4);
+}
+
+/* Data Management icon is stroke-only — must not be filled */
+.admin-tool-icon.bg-data-mgmt svg {
+  fill: none;
+  stroke: white;
+  stroke-width: 2;
+}
+
+.admin-tool-icon.bg-purple-500 {
+  background: #a855f7;
+}
+
+.admin-tool-icon.bg-blue-600 {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.admin-tool-icon.bg-cyan-500 {
+  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+}
+
+/* Fill-based icons (QueueAnalytics, Sync, QRCode) */
+.admin-tool-icon svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: white;
+}
+
+.tool-icon-svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: white;
+  fill: currentColor;
+}
+
+.tool-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+.tool-description {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+/* ===== Quick Actions Section ===== */
+.quick-actions-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(34, 197, 94, 0.05) 100%);
+  border: 1.5px solid rgba(34, 197, 94, 0.3);
+  border-radius: 1rem;
+  transition: all 0.3s ease;
+}
+
+/* Plain section header — mirrors prof-dashboard.css .section-header (bare class
+   is scoped per-role on the other dashboards). */
+.admin-dashboard .section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.5rem;
+}
+
+.admin-dashboard .section-header h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+/* Scoped so the 3-up grid does not leak onto the student / professor
+   dashboards, which define their own bare .quick-actions-grid. */
+.admin-dashboard .quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.admin-dashboard .quick-action-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.quick-action-text {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.quick-action-text .action-description {
+  margin-top: 0;
+}
+
+.admin-dashboard .quick-action-card:hover {
+  box-shadow: 0 8px 16px rgba(34, 197, 94, 0.15);
+  transform: translateY(-2px);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.action-icon {
+  width: 3rem;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  color: white;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.action-icon.bg-green-500 {
+  background: #22c55e;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+}
+
+.action-icon.bg-blue-500 {
+  background: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.action-icon.bg-orange-500 {
+  background: #f97316;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+}
+
+.action-icon.bg-purple-500 {
+  background: #a855f7;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+}
+
+.action-icon svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: white;
+}
+
+.action-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+.action-description {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+/* ===== Faculty Availability preview card — prof-dashboard "appointments
+   preview" style, ported to purple, full width ===== */
+.faculty-avail-preview-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 1rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.faculty-avail-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.25rem 1rem;
+}
+
+.faculty-avail-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.faculty-avail-card-title .icon {
+  width: 1.15rem;
+  height: 1.15rem;
+  color: var(--purple);
+}
+
+.faculty-avail-view-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--purple);
+  text-decoration: none;
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.5rem;
+  transition: background 0.2s ease;
+}
+
+.faculty-avail-view-all:hover {
+  background: rgba(168, 85, 247, 0.1);
+}
+
+.faculty-avail-view-all .icon {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.faculty-avail-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 1.25rem 1.25rem;
+}
+
+.faculty-avail-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 0;
+  color: var(--text-tertiary);
+  font-size: 0.875rem;
+}
+
+.faculty-avail-empty-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(168, 85, 247, 0.12);
+  color: var(--purple);
+}
+
+.faculty-avail-empty-icon .icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.faculty-avail-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
+  border-radius: 0.75rem;
+  background-color: rgba(168, 85, 247, 0.06);
+  transition: all 0.3s ease;
+  margin-bottom: 0.75rem;
+}
+
+.faculty-avail-item:last-child {
+  margin-bottom: 0;
+}
+
+.faculty-avail-item:hover {
+  background-color: rgba(168, 85, 247, 0.12);
+  border-color: rgba(168, 85, 247, 0.5);
+}
+
+.faculty-avail-item-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.25) 0%, rgba(168, 85, 247, 0.15) 100%);
+  color: var(--purple);
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
+}
+
+.faculty-avail-item-icon .icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.faculty-avail-item-details {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 0.2rem;
+}
+
+.faculty-avail-item-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.faculty-avail-item-college {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.faculty-avail-item-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.faculty-avail-item-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.faculty-avail-item-badge--available {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.faculty-avail-item-badge--busy {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.faculty-avail-item-badge--unavailable {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+/* ===== Office Hours (full-width, green-themed, mirrors stud/prof dashboards) ===== */
+.adm-office-hours-card {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  border-radius: 1rem;
+  padding: 1.5rem 2rem;
+  color: white;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.adm-office-hours-card::before {
+  content: '';
+  position: absolute;
+  width: 12rem;
+  height: 12rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  top: -3rem;
+  right: -3rem;
+  pointer-events: none;
+}
+
+.adm-office-hours-card::after {
+  content: '';
+  position: absolute;
+  width: 7rem;
+  height: 7rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.04);
+  bottom: -2rem;
+  right: 8rem;
+  pointer-events: none;
+}
+
+.adm-hours-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  position: relative;
+  z-index: 1;
+} 
+
+.adm-hours-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: white;
+  margin: 0;
+}
+
+.adm-hours-title .icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.adm-hours-dept {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.12);
+  padding: 0.375rem 0.875rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  white-space: normal;
+  font-weight: 700;
+  flex-shrink: 1;
+  max-width: 100%;
+}
+
+.adm-hours-body {
+  position: relative;
+  z-index: 1;
+}
+
+.adm-hours-schedule {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.adm-hours-item {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  flex: 1;
+  min-width: 180px;
+  backdrop-filter: blur(4px);
+}
+
+.adm-hours-day {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 0.25rem 0;
+}
+
+.adm-hours-time {
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  margin: 0;
+}
+
+.adm-hours-location {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+
+.adm-hours-location-label {
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.65);
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.4px;
+}
+
+.adm-hours-location-value {
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.adm-hours-loading,
+.adm-hours-empty {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.adm-hours-retry {
+  display: inline;
+  padding: 0;
+  background: none;
+  border: none;
+  color: white;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* ===== Error banner ===== */
+.dash-error-banner {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 0.75rem;
+  padding: 0.875rem 1.25rem;
+  color: #ef4444;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* ===== Activity placeholders ===== */
+.activity-loading,
+.activity-empty {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  padding: 1rem 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 1024px) {
+
+  .admin-dashboard-main {
+    padding-left: 0;
+    padding-top: 0;
+  }
+
+  .admin-dashboard {
+    padding: 1rem;
+  }
+
+  .admin-dashboard .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .admin-dashboard .quick-actions-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* superadmin dashboard reuses this stylesheet */
+  .admin-tools-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-dashboard {
+    padding: 0.75rem;
+    gap: 1rem;
+  }
+
+  .banner-title {
+    font-size: 1.875rem;
+  }
+
+  .admin-dashboard .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .admin-dashboard .quick-actions-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-tools-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  /* This rule is later in the file than the 768px block above, so it wins
+     the cascade -- keep it explicit or padding grows as the screen shrinks. */
+  .admin-dashboard {
+    padding: 0.75rem;
+  }
+
+  .adm-office-hours-card {
+    padding: 1.25rem 1.25rem;
+  }
+
+  .adm-hours-dept {
+    font-size: 0.75rem;
+  }
+  
+  .admin-tool-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .banner-title {
+    font-size: 1.75rem;
+  }
+
+  .admin-dashboard .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  .mobile-logo .logo-img {
+    height: 2rem;
+  }
+
+  .admin-tools-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-dashboard .quick-actions-grid {
+    grid-template-columns: 1fr;
+  }
+}
+/* ── Phone tiers ───────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .admin-dashboard { padding: 0.625rem; gap: 0.875rem; }
+
+  .welcome-banner.admin-banner { padding: 1.125rem; }
+  .admin-dashboard .banner-title { font-size: 1.4rem; }
+
+  .admin-dashboard .stats-grid { gap: 0.625rem; }
+  .admin-tools-grid { gap: 0.625rem; }
+}
+
+@media (max-width: 380px) {
+  .admin-dashboard .stats-grid,
+  .admin-tools-grid { grid-template-columns: 1fr; }
+  .admin-dashboard .banner-title { font-size: 1.25rem; }
+}

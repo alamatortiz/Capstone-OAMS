@@ -1,0 +1,974 @@
+/* ===== Document Status Page — Overrides & Extensions ===== */
+/* Fully self-contained — does not depend on other pages' CSS. */
+
+/* ===== DARK MODE (DEFAULT) ===== */
+:root,
+[data-theme="dark"] {
+  --background: #0a0f0a;
+  --card: #111612;
+  --foreground: #f0fdf4;
+  --muted-foreground: #94a3b8;
+  --border: #1e3a23;
+  --text-primary: var(--foreground);
+  --text-secondary: var(--foreground);
+  --text-tertiary: var(--muted-foreground);
+  --card-bg: var(--card);
+  --card-border: var(--border);
+}
+
+/* ===== LIGHT MODE ===== */
+[data-theme="light"] {
+  --background: #f8fafc;
+  --card: #ffffff;
+  --foreground: #1e293b;
+  --muted-foreground: #64748b;
+  --border: #e2e8f0;
+  --text-primary: var(--foreground);
+  --text-secondary: #334155;
+  --text-tertiary: var(--muted-foreground);
+  --card-bg: var(--card);
+  --card-border: var(--border);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* ─── Page Shell ─────────────────────────────────────────────────────────── */
+.dss-with-sidebar {
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--dark-bg);
+  transition: background-color 0.3s ease;
+}
+
+.dss-main {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  overflow-y: auto;
+  transition: margin-left 0.3s ease;
+}
+
+@media (max-width: 1024px) {
+  .dss-main {
+    margin-left: 0;
+    margin-top: 4rem;
+  }
+}
+
+/* ─── Page Header ────────────────────────────────────────────────────────── */
+.dss-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.dss-status-container .page-breadcrumb {
+  display: flex;
+  align-items: center;
+}
+
+.dss-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.dss-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.2;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.dss-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0.25rem 0 0 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+/* ─── Title Icon (orange, matching Documents color) ─────────────────────── */
+.dss-title-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
+}
+
+.dss-title-icon svg {
+  width: 1.75rem;
+  height: 1.75rem;
+  stroke: currentColor;
+}
+
+/* ─── Hero Card ──────────────────────────────────────────────────────────── */
+.dss-hero-card {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  color: white;
+  box-shadow: 0 10px 30px rgba(249, 115, 22, 0.2);
+  transition: all 0.3s ease;
+}
+
+.dss-hero-content {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.dss-hero-logo {
+  width: 5.5rem;
+  height: 5.5rem;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dss-hero-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 0.5rem;
+}
+
+.dss-hero-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.dss-hero-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+}
+
+.dss-hero-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: left;
+  align-items: flex-start;
+}
+
+.dss-hero-doc-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: white;
+  margin: 0 0 0.2rem 0;
+  text-align: left;
+  line-height: 1.2;
+}
+
+.dss-hero-title p {
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+  text-align: left;
+}
+
+.dss-hero-badge {
+  background: white;
+  color: #ea580c;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  font-family: "Inter", sans-serif;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .dss-hero-content {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .dss-hero-doc-name {
+    font-size: 1.1rem;
+  }
+  .dss-hero-badge {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+/* ─── Status Badges ──────────────────────────────────────────────────────── */
+.dss-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.5rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  transition: all 0.3s ease;
+}
+
+.dss-badge-pending {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.dss-badge-processing {
+  background: rgba(59, 130, 246, 0.18);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.dss-badge-ready {
+  background: rgba(34, 197, 94, 0.18);
+  color: var(--primary-color);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+.dss-badge-claimed {
+  background: rgba(34, 197, 94, 0.18);
+  color: var(--primary-color);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+.dss-badge-rejected {
+  background: rgba(239, 68, 68, 0.18);
+  color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.dss-badge-cancelled {
+  background: rgba(239, 68, 68, 0.18);
+  color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+[data-theme="light"] .dss-badge-pending {
+  background: rgba(217, 119, 6, 0.1);
+  color: #92400e;
+  border-color: rgba(217, 119, 6, 0.3);
+}
+[data-theme="light"] .dss-badge-processing {
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  border-color: rgba(37, 99, 235, 0.25);
+}
+[data-theme="light"] .dss-badge-ready {
+  background: rgba(5, 150, 105, 0.1);
+  color: #065f46;
+  border-color: rgba(5, 150, 105, 0.25);
+}
+[data-theme="light"] .dss-badge-claimed {
+  background: rgba(5, 150, 105, 0.1);
+  color: #065f46;
+  border-color: rgba(5, 150, 105, 0.25);
+}
+[data-theme="light"] .dss-badge-rejected {
+  background: rgba(220, 38, 38, 0.08);
+  color: #991b1b;
+  border-color: rgba(220, 38, 38, 0.2);
+}
+[data-theme="light"] .dss-badge-cancelled {
+  background: rgba(220, 38, 38, 0.08);
+  color: #991b1b;
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+/* ─── Detail Grid ────────────────────────────────────────────────────────── */
+.dss-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .dss-detail-grid {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+.dss-detail-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.dss-detail-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ─── Detail Rows (inside dss-card-content) ──────────────────────────────── */
+.dss-detail-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(249, 115, 22, 0.08);
+  transition: border-color 0.3s ease;
+}
+
+.dss-detail-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: var(--text-tertiary);
+  transition: color 0.3s ease;
+}
+
+.dss-detail-value {
+  font-size: 0.9375rem;
+  color: var(--text-primary);
+  line-height: 1.55;
+  transition: color 0.3s ease;
+}
+
+/* ─── Attachments (Send a Document) ─────────────────────────────────────── */
+.dss-attach-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.dss-attach-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--card-border);
+  border-radius: 0.6rem;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dss-attach-chip:hover {
+  background: rgba(249, 115, 22, 0.08);
+  border-color: #f97316;
+  color: #f97316;
+}
+
+.dss-attach-chip svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+/* ─── Document List ──────────────────────────────────────────────────────── */
+.dss-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.dss-list-item {
+  background: var(--card);
+  border: 1px solid rgba(249, 115, 22, 0.25);
+  border-radius: 1rem;
+  padding: 1.05rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.dss-list-item:hover {
+  box-shadow: 0 12px 28px rgba(249, 115, 22, 0.15);
+  transform: translateY(-2px);
+  border-color: rgba(249, 115, 22, 0.4);
+}
+
+/* ─── Doc-card layout inside list items ──────────────────────────────────── */
+.dss-list-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+
+.dss-list-title-section {
+  flex: 1;
+  text-align: left;
+}
+
+.dss-list-title-section h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f97316;
+  margin: 0 0 0.2rem 0;
+  transition: color 0.3s ease;
+}
+
+[data-theme="light"] .dss-list-title-section h3 {
+  color: #ea580c;
+}
+
+.dss-list-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+}
+
+.dss-list-card-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: left;
+}
+
+.dss-list-card-field label,
+.dss-list-card-field-full label {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: color 0.3s ease;
+}
+
+.dss-list-card-field p {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #f97316;
+  margin: 0;
+  line-height: 1.4;
+  transition: color 0.3s ease;
+}
+
+.dss-list-card-field-full {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: left;
+}
+
+.dss-list-card-field-full p {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.5;
+  transition: color 0.3s ease;
+}
+
+.dss-list-icon-wrap {
+  width: 2.25rem;
+  height: 2.25rem;
+  background: rgba(249, 115, 22, 0.1);
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.3s ease;
+}
+
+[data-theme="light"] .dss-list-icon-wrap {
+  background: rgba(249, 115, 22, 0.08);
+}
+
+.dss-list-college {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+.dss-list-claimed-date,
+.dss-list-claimed-time {
+  font-size: 0.8125rem;
+  color: var(--text-tertiary);
+  margin: 0.25rem 0 0 0;
+  transition: color 0.3s ease;
+}
+
+.dss-list-header-right {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.dss-tracking-pill {
+  padding: 0.3rem 0.7rem;
+  border-radius: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: #f97316;
+  color: white;
+  font-family: "Inter", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ─── Count pill inside each tab ─────────────────────────────────────────── */
+.dss-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+  transition: background 0.2s;
+}
+
+.dss-tab.active .dss-tab-count {
+  background: rgba(249, 115, 22, 0.25);
+}
+
+[data-theme="light"] .dss-tab-count {
+  background: rgba(234, 88, 12, 0.1);
+  color: #ea580c;
+}
+
+[data-theme="light"] .dss-tab.active .dss-tab-count {
+  background: rgba(234, 88, 12, 0.2);
+}
+
+/* ─── Tabs ───────────────────────────────────────────────────────────────── */
+.dss-tabs-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+  margin-bottom: 2rem;
+}
+
+.dss-tabs-list {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid var(--card-border);
+  flex-wrap: wrap;
+  transition: border-color 0.3s ease;
+}
+
+.dss-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.dss-tab svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.doc-status-page .dss-tab:hover {
+  color: #f97316;
+}
+
+.doc-status-page .dss-tab.active {
+  color: #f97316;
+}
+
+.doc-status-page .dss-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #f97316;
+}
+
+/* ─── Card shell (self-contained, orange accent) ─────────────────────────── */
+.dss-card {
+  background: #111612;
+  border: 1px solid rgba(249, 115, 22, 0.25);
+  border-radius: 1.125rem;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme="light"] .dss-card {
+  background: #ffffff;
+}
+
+.dss-card-header {
+  padding: 1.25rem;
+  border-bottom: 1px solid rgba(249, 115, 22, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: border-color 0.3s ease;
+}
+
+.dss-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+.dss-card-title svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #f97316;
+  stroke: currentColor;
+}
+
+.dss-card-content {
+  padding: 1.25rem;
+}
+
+/* ─── Requirements card content (chrome now shared with base .dss-card) ──── */
+.dss-requirements-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.dss-requirement-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  text-align: left;
+}
+
+.dss-requirement-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  color: #f97316;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+  stroke: currentColor;
+}
+
+.dss-requirement-item span {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  transition: color 0.3s ease;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.dss-requirement-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.dss-requirement-name-row .dss-requirement-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+.dss-requirement-name-row .dss-requirement-badge.is-mandatory {
+  background: rgba(249, 115, 22, 0.12);
+  color: #f97316;
+  border: 1px solid rgba(249, 115, 22, 0.3);
+}
+
+.dss-requirement-name-row .dss-requirement-badge.is-optional {
+  background: rgba(100, 116, 139, 0.1);
+  color: var(--text-tertiary);
+  border: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+[data-theme="light"] .dss-requirement-name-row .dss-requirement-badge.is-mandatory {
+  color: #ea580c;
+}
+
+/* ─── Cancel card (self-contained copy of queue-status's cancel card) ────── */
+.dss-cancel-card {
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  background-color: rgba(239, 68, 68, 0.05);
+}
+
+[data-theme="light"] .dss-cancel-card {
+  background-color: rgba(239, 68, 68, 0.03);
+}
+
+.dss-cancel-title {
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dss-cancel-title svg {
+  color: #ef4444;
+}
+
+.dss-cancel-btn {
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.dss-cancel-btn:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+/* ─── Mark as Claimed card + button — matches the appointment
+   "Mark as Completed" card (.apst-card.apst-complete-card in
+   stud-appointment-status.css) exactly. ──────────────────────────────────── */
+.dss-claim-card {
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  background-color: rgba(34, 197, 94, 0.05);
+}
+
+[data-theme="light"] .dss-claim-card {
+  background-color: rgba(34, 197, 94, 0.03);
+}
+
+.dss-claim-card .dss-card-header {
+  border-bottom-color: rgba(34, 197, 94, 0.15);
+}
+
+.dss-claim-title,
+.dss-claim-card .dss-card-title svg {
+  color: #22c55e;
+}
+
+.dss-claim-desc {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin-bottom: 0.75rem;
+  line-height: 1.5;
+}
+
+.dss-claim-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  border-radius: 0.75rem;
+  color: #86efac;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dss-claim-btn:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.55);
+  color: #4ade80;
+}
+
+.dss-claim-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+[data-theme="light"] .dss-claim-btn {
+  background: rgba(21, 128, 61, 0.08);
+  border-color: rgba(21, 128, 61, 0.25);
+  color: #166534;
+}
+
+[data-theme="light"] .dss-claim-btn:hover:not(:disabled) {
+  background: rgba(21, 128, 61, 0.15);
+  border-color: rgba(21, 128, 61, 0.4);
+  color: #14532d;
+}
+
+/* ─── Empty state (self-contained copy) ──────────────────────────────────── */
+.dss-empty-state {
+  background: var(--card-bg);
+  border: 1px solid rgba(249, 115, 22, 0.25);
+  border-radius: 1.125rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.dss-empty-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  color: var(--text-primary);
+  margin: 0 auto 0.5rem;
+  stroke: currentColor;
+  transition: color 0.3s ease;
+}
+
+.dss-empty-title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-primary);
+  margin-bottom: 0.35rem;
+  transition: color 0.3s ease;
+}
+
+.dss-empty-text {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin-bottom: 0.75rem;
+  transition: color 0.3s ease;
+}
+
+/* ─── Concern/notes text (self-contained copy) ───────────────────────────── */
+.dss-concern-text {
+  color: var(--text-secondary);
+  line-height: 1.6;
+  transition: color 0.3s ease;
+  text-align: justify;
+}
+
+/* ─── Rejection reason (emphasized callout, matches the app's other
+   "reason" banners rather than a plain text row) ──────────────────────── */
+.dss-reject-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.dss-reject-notice svg {
+  color: #ef4444;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.dss-reject-notice p {
+  margin: 0;
+  font-size: 0.85rem;
+  text-align: justify;
+  line-height: 1.4;
+}
+
+.dss-reject-notice .dss-reject-reason {
+  margin-top: 0.35rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ─── Page container (self-contained copy) ───────────────────────────────── */
+.dss-status-container {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.3rem;
+  width: 100%;
+}
+
+/* ─── Breadcrumb (self-contained copy) ───────────────────────────────────── */
+.dss-status-container .breadcrumb-link {
+  outline: none;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  padding: 0.5rem 0.875rem 0.5rem 0;
+  border-radius: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.dss-status-container .breadcrumb-link:hover {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: var(--primary-color);
+}
+
+.dss-status-container .breadcrumb-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .dss-list-item {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .dss-list-card-grid { grid-template-columns: 1fr; }
+}

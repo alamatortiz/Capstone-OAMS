@@ -1,0 +1,51 @@
+.offline-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.6rem 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  font-family: inherit;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.offline-banner--offline {
+  background: #92400e;
+  color: #fef3c7;
+  border: 1px solid #f59e0b;
+}
+
+.offline-banner--back {
+  background: #065f46;
+  color: #d1fae5;
+  border: 1px solid #10b981;
+}
+
+.offline-banner svg { flex-shrink: 0; }
+
+.offline-banner button {
+  background: rgba(255, 255, 255, 0.15);
+  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0.5rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.offline-banner button:hover { background: rgba(255, 255, 255, 0.25); }
+
+.offline-banner .offline-banner-dismiss {
+  background: none;
+  border-color: transparent;
+  opacity: 0.8;
+}

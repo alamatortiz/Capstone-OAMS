@@ -1,0 +1,1603 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import type { ComponentProps } from 'react';
+import {
+  Alert,
+  Image,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
+import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
+import { notify } from '@/utils/notifications';
+import { formatManilaDate, formatManilaTime, getManilaDateString } from '@/utils/date';
+import { filterByRange } from '@/utils/dateRange';
+import { isAutoRejected } from '@/utils/appointmentActions';
+import NotificationBell from '@/components/NotificationBell';
+import RefreshButton from '@/components/RefreshButton';
+import QueueReasonModal from '@/components/QueueReasonModal';
+import ProfessorAvailabilityToggle from '@/components/ProfessorAvailabilityToggle';
+import { useProfessorAvailability } from '@/hooks/useProfessorAvailability';
+import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
+
+const pncLogo = require('@/assets/Pnc-Logo.png');
+const oamsLogo = require('@/assets/oams_logo.png');
+const darkModeIcon = require('@/assets/darkmode_icon.png');
+const sunIcon = require('@/assets/sun_icon.png');
+
+type IoniconName = ComponentProps<typeof Ionicons>['name'];
+
+function OamsLogo({
+  style,
+  outline,
+}: {
+  style: { height: number; width: number };
+  outline: boolean;
+}) {
+  if (!outline) {
+    return <Image source={oamsLogo} style={style} resizeMode="contain" />;
+  }
+  const layerStyle = {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    width: style.width,
+    height: style.height,
+  };
+  return (
+    <View style={[style, { position: 'relative', overflow: 'hidden' }]}>
+      {[
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ].map(([dx, dy]) => (
+        <Image
+          key={`${dx}-${dy}`}
+          source={oamsLogo}
+          resizeMode="contain"
+          style={[
+            layerStyle,
+            { tintColor: '#ffffff', transform: [{ translateX: dx }, { translateY: dy }] },
+          ]}
+        />
+      ))}
+      <Image source={oamsLogo} resizeMode="contain" style={layerStyle} />
+    </View>
+  );
+}
+
+// ─── Field shapes documented here mirror what Field shapes mirror what
+// GET /professor/appointments really returns (studentName, studentId, course,
+// appointmentType, date, time, location, purpose, status, requestedAt) — this
+// screen otherwise ports the actual wired prof-appointments.jsx/.css 1:1
+// (no stat cards — that's a design-mockup-only feature, not part of the real
+// page), including the "All" tab's embedded This Week/Month/All Time range
+// picker, which on mobile opens as a small modal instead of a native <select>. ───
+type AppointmentStatus = 'pending' | 'approved' | 'completed' | 'rejected' | 'cancelled';
+
+interface Appointment {
+  id: number;
+  trackingNumber?: string | null;
+  studentName: string;
+  studentId: string;
+  course: string | null;
+  bookingYearProgram: string | null;
+  courseCode: string | null;
+  appointmentType: string | null;
+  date: string;
+  time: string;
+  location: string;
+  purpose: string;
+  status: AppointmentStatus;
+  requestedAt: string;
+  requestedAtRaw: string | null;
+  approvedAtRaw?: string | null;
+  completedAtRaw?: string | null;
+  cancelledBy?: 'student' | 'faculty' | 'system' | 'system_expired' | 'student_no_show' | 'system_not_entertained' | null;
+  cancelReason?: string | null;
+  windowStartRaw?: string | null;
+  windowEndRaw?: string | null;
+  slotNote?: string | null;
+  sharedComment?: string | null;
+  commentUpdatedBy?: 'student' | 'faculty' | null;
+  commentUpdatedAt?: string | null;
+  rejectionReason?: string | null;
+  studentFeedback?: { text: string; createdAt: string | null } | null;
+}
+
+const manilaTimeNow = () =>
+  new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
+
+// Mirrors the server's approve rule (and web's approveBlockedReason): only on
+// the appointment's date and inside its consultation window; skipped when the
+// window is unknown.
+function approveBlockedReason(apt: Appointment): string | null {
+  const start = apt.windowStartRaw?.slice(0, 5);
+  const end = apt.windowEndRaw?.slice(0, 5);
+  if (!start || !end) return null;
+  if (apt.date.slice(0, 10) !== getManilaDateString()) return `You can only approve on the scheduled date (${apt.date.slice(0, 10)}).`;
+  const now = manilaTimeNow();
+  if (now < start) return `The consultation window hasn't opened yet (opens ${start}).`;
+  if (now > end) return 'The consultation window has already ended.';
+  return null;
+}
+
+const isFutureAppointment = (apt: Appointment) => apt.date.slice(0, 10) > getManilaDateString();
+
+interface NavItem {
+  key: string;
+  label: string;
+  icon: IoniconName;
+}
+
+const navItems: NavItem[] = [
+  { key: 'dashboard', label: 'Dashboard', icon: 'home-outline' },
+  { key: 'announcements', label: 'Announcements', icon: 'megaphone-outline' },
+  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
+  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
+  { key: 'transactions', label: 'Transactions', icon: 'time-outline' },
+];
+
+const TABS = ['all', 'pending', 'approved', 'completed', 'rejected', 'cancelled'] as const;
+type TabKey = (typeof TABS)[number];
+
+const TAB_ICON_MAP: Record<TabKey, IoniconName> = {
+  all: 'list-outline',
+  pending: 'time-outline',
+  approved: 'checkmark-circle-outline',
+  completed: 'checkmark-circle-outline',
+  rejected: 'close-circle-outline',
+  cancelled: 'close-circle-outline',
+};
+
+const ALL_RANGES = ['today', 'week', 'nextWeek', 'all'] as const;
+type AllRange = (typeof ALL_RANGES)[number];
+
+const ALL_RANGE_LABELS: Record<AllRange, string> = {
+  today: 'Today',
+  week: 'This Week',
+  nextWeek: 'Next Week',
+  all: 'All Time',
+};
+
+const STATUS_TINTS: Record<AppointmentStatus, { bg: string; border: string; color: string }> = {
+  pending: { bg: 'rgba(251, 191, 36, 0.2)', border: 'rgba(251, 191, 36, 0.4)', color: '#fcd34d' },
+  approved: { bg: 'rgba(34, 197, 94, 0.18)', border: 'rgba(34, 197, 94, 0.35)', color: '#86efac' },
+  completed: { bg: 'rgba(16, 185, 129, 0.18)', border: 'rgba(16, 185, 129, 0.35)', color: '#34d399' },
+  rejected: { bg: 'rgba(239, 68, 68, 0.18)', border: 'rgba(239, 68, 68, 0.35)', color: '#fca5a5' },
+  cancelled: { bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.35)', color: '#d1d5db' },
+};
+
+type ActionType = 'approve' | 'reject' | 'complete' | 'cancel';
+
+const STATUS_BY_ACTION: Record<ActionType, AppointmentStatus> = {
+  approve: 'approved',
+  reject: 'rejected',
+  complete: 'completed',
+  cancel: 'cancelled',
+};
+
+const CONFIRM_META: Record<
+  ActionType,
+  (apt: Appointment) => { title: string; message: string; confirmText: string; cancelText: string; icon: IoniconName; accent: string }
+> = {
+  approve: (apt) => ({
+    title: 'Approve Appointment?',
+    message: `Approve the appointment request from ${apt.studentName}?`,
+    confirmText: 'Approve',
+    cancelText: 'Cancel',
+    icon: 'checkmark-circle-outline',
+    accent: '#16a34a',
+  }),
+  reject: (apt) => ({
+    title: 'Reject Appointment?',
+    message: `Reject the appointment request from ${apt.studentName}? This action cannot be undone.`,
+    confirmText: 'Reject',
+    cancelText: 'Cancel',
+    icon: 'close-circle-outline',
+    accent: '#dc2626',
+  }),
+  complete: (apt) => ({
+    title: 'Mark as Completed?',
+    // Actions taken are only editable while approved, so completing without
+    // them locks the appointment with none recorded.
+    message: `Mark the appointment with ${apt.studentName} as completed?${
+      apt.sharedComment?.trim() ? '' : ' No actions taken have been recorded yet. Once completed, they can no longer be added.'
+    }`,
+    confirmText: 'Mark Complete',
+    cancelText: 'Cancel',
+    icon: 'checkmark-circle-outline',
+    accent: '#2563eb',
+  }),
+  cancel: (apt) => ({
+    title: 'Cancel Appointment?',
+    message: `Cancel the appointment with ${apt.studentName}? This action cannot be undone.`,
+    confirmText: 'Cancel Appointment',
+    cancelText: 'Keep Appointment',
+    icon: 'close-circle-outline',
+    accent: '#ef4444',
+  }),
+};
+
+function formatDate(dateStr: string) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+export default function ProfessorAppointmentScreen() {
+  const { isDarkMode, toggleTheme } = useTheme();
+  const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const {
+    isAvailable,
+    unavailableReasonModalOpen,
+    unavailableReasonText,
+    unavailableReasonSubmitting,
+    setUnavailableReasonText,
+    toggleAvailability,
+    confirmMarkUnavailable,
+    cancelUnavailableModal,
+  } = useProfessorAvailability();
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabKey>('all');
+  const [allRange, setAllRange] = useState<AllRange>('today');
+  const [rangeModalOpen, setRangeModalOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{ type: ActionType; apt: Appointment } | null>(null);
+  const [confirmSaving, setConfirmSaving] = useState(false);
+  // Reject is split out from the generic ConfirmActionModal above -- the
+  // server now hard-requires a non-blank reason to reject an appointment
+  // (professorRoutes.js), so it needs its own reason-collecting modal
+  // instead of a bare confirm.
+  const [rejectTarget, setRejectTarget] = useState<Appointment | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
+  // Shared appointment comment -- professor-authored, student-readable (see
+  // PATCH /professor/appointments/:id/comment). Reuses QueueReasonModal with
+  // required={false} so a blank save can clear a previous comment, mirroring
+  // web's prof-appointments.jsx CommentBlock, which reuses the same shared
+  // modal component for the identical reason.
+  const [commentTarget, setCommentTarget] = useState<Appointment | null>(null);
+  const [commentText, setCommentText] = useState('');
+  // Actions Taken starts collapsed on every card (matches web's CommentBlock).
+  const [openComments, setOpenComments] = useState<Set<number>>(new Set());
+  const toggleComment = (id: number) =>
+    setOpenComments((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  // Student Feedback starts collapsed too (matches web StudentFeedbackBlock).
+  const [openFeedback, setOpenFeedback] = useState<Set<number>>(new Set());
+  const toggleFeedback = (id: number) =>
+    setOpenFeedback((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const router = useRouter();
+  const { user, logout, token } = useAuth();
+
+  // Guards against out-of-order responses: mount, the socket events below,
+  // and a direct refetch right after approve/reject/etc. (runConfirmAction)
+  // can all trigger this fetch close together, so a slower-but-earlier
+  // response landing after a newer one could otherwise revert the list to
+  // its pre-mutation state.
+  const requestIdRef = useRef(0);
+
+  const fetchAppointments = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    setLoading(true);
+    try {
+      const { data } = await api.get('/professor/appointments');
+      if (requestId !== requestIdRef.current) return;
+      setAppointments(data ?? []);
+    } catch (err) {
+      if (requestId !== requestIdRef.current) return;
+      console.error('Fetch appointments error:', err);
+      Alert.alert('Error', 'Could not load appointments.');
+    } finally {
+      if (requestId === requestIdRef.current) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAppointments();
+  }, [fetchAppointments]);
+
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+    const refetch = () => fetchAppointments();
+    const events = ['appointment:slot-updated', 'appointment:status-updated', 'appointment:comment-updated'];
+    events.forEach((event) => socket.on(event, refetch));
+
+    const onStatusUpdated = () => {
+      notify('Appointment update', 'An appointment status has changed.');
+    };
+    socket.on('appointment:status-updated', onStatusUpdated);
+
+    return () => {
+      events.forEach((event) => socket.off(event, refetch));
+      socket.off('appointment:status-updated', onStatusUpdated);
+    };
+  }, [user, token, fetchAppointments]);
+
+  const theme = isDarkMode ? darkPalette : lightPalette;
+  const styles = createStyles(theme);
+
+  const comingSoon = () =>
+    Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
+
+  const goToDashboard = () => router.push('/pages/professor/professor_dashboard');
+
+  const handleNavPress = (key: string) => {
+    setMenuOpen(false);
+    if (key === 'appointments') return;
+    if (key === 'dashboard') {
+      goToDashboard();
+      return;
+    }
+    if (key === 'announcements') {
+      router.push('/pages/professor/professor_announcement');
+      return;
+    }
+    if (key === 'documents') {
+      router.push('/pages/professor/professor_documents');
+      return;
+    }
+    if (key === 'transactions') {
+      router.push('/pages/professor/professor_transactions');
+      return;
+    }
+    comingSoon();
+  };
+
+  const handleLogout = () => {
+    setMenuOpen(false);
+    setLogoutModalVisible(true);
+  };
+
+  const confirmLogout = () => {
+    setLogoutModalVisible(false);
+    logout();
+    router.replace('/login');
+  };
+
+  // Governs every tab, not just "All" -- picking a range then switching tabs
+  // should keep showing only that range's appointments for that status.
+  const rangeFiltered = filterByRange(appointments, allRange);
+
+  const tabCounts: Record<TabKey, number> = {
+    all: rangeFiltered.length,
+    pending: rangeFiltered.filter((a) => a.status === 'pending').length,
+    approved: rangeFiltered.filter((a) => a.status === 'approved').length,
+    completed: rangeFiltered.filter((a) => a.status === 'completed').length,
+    rejected: rangeFiltered.filter((a) => a.status === 'rejected').length,
+    cancelled: rangeFiltered.filter((a) => a.status === 'cancelled').length,
+  };
+
+  const visibleAppointments =
+    activeTab === 'all' ? rangeFiltered : rangeFiltered.filter((a) => a.status === activeTab);
+
+  const requestAction = (type: ActionType, apt: Appointment) => {
+    if (type === 'approve') {
+      const blocked = approveBlockedReason(apt);
+      if (blocked) { Alert.alert('Cannot approve yet', blocked); return; }
+    }
+    if (type === 'complete' && isFutureAppointment(apt)) {
+      Alert.alert('Not yet', "This appointment hasn't happened yet.");
+      return;
+    }
+    if (type === 'reject') {
+      setRejectReason('');
+      setRejectTarget(apt);
+      return;
+    }
+    setConfirmAction({ type, apt });
+  };
+
+  const runConfirmAction = async () => {
+    if (!confirmAction) return;
+    const { type, apt } = confirmAction;
+    const status = STATUS_BY_ACTION[type];
+    setConfirmSaving(true);
+    try {
+      await api.patch(`/professor/appointments/${apt.id}/status`, { status });
+      await fetchAppointments();
+    } catch (err: any) {
+      console.error('Update appointment status error:', err);
+      // Surfaces the server's actual reason (e.g. "appointment window
+      // hasn't opened yet") instead of a generic message -- professorRoutes.js
+      // rejects approve/complete outside the scheduled window with a
+      // specific 409 message that was previously discarded here.
+      Alert.alert('Error', err?.response?.data?.error ?? 'Could not update the appointment.');
+    } finally {
+      setConfirmSaving(false);
+      setConfirmAction(null);
+    }
+  };
+
+  const confirmReject = async (reason: string) => {
+    if (!rejectTarget || !reason.trim() || rejectSubmitting) return;
+    setRejectSubmitting(true);
+    try {
+      await api.patch(`/professor/appointments/${rejectTarget.id}/status`, { status: 'rejected', reason: reason.trim() });
+      await fetchAppointments();
+      setRejectTarget(null);
+      setRejectReason('');
+    } catch (err: any) {
+      console.error('Reject appointment error:', err);
+      Alert.alert('Error', err?.response?.data?.error ?? 'Could not reject the appointment.');
+    } finally {
+      setRejectSubmitting(false);
+    }
+  };
+
+  const openCommentModal = (apt: Appointment) => {
+    setCommentText(apt.sharedComment ?? '');
+    setCommentTarget(apt);
+  };
+
+  const saveComment = async (text: string) => {
+    if (!commentTarget || commentSubmitting) return;
+    setCommentSubmitting(true);
+    try {
+      await api.patch(`/professor/appointments/${commentTarget.id}/comment`, { comment: text.trim() });
+      await fetchAppointments();
+      setCommentTarget(null);
+      setCommentText('');
+    } catch (err: any) {
+      console.error('Save comment error:', err);
+      Alert.alert('Error', err?.response?.data?.error ?? 'Failed to save comment.');
+    } finally {
+      setCommentSubmitting(false);
+    }
+  };
+
+  const confirmMeta = confirmAction ? CONFIRM_META[confirmAction.type](confirmAction.apt) : null;
+
+  const selectRange = (r: AllRange) => {
+    setAllRange(r);
+    setActiveTab('all');
+    setRangeModalOpen(false);
+  };
+
+  return (
+    <View style={styles.root}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+
+        <View style={styles.header}>
+          <View style={styles.headerBrand}>
+            <Image source={pncLogo} style={styles.headerPncLogo} resizeMode="contain" />
+            <OamsLogo style={styles.headerOamsLogo} outline={isDarkMode} />
+          </View>
+          <View style={styles.headerActions}>
+            <Pressable style={styles.iconBtn} onPress={toggleTheme} hitSlop={8}>
+              <Image
+                source={isDarkMode ? sunIcon : darkModeIcon}
+                style={styles.iconBtnImg}
+                resizeMode="contain"
+              />
+            </Pressable>
+            <RefreshButton onPress={() => fetchAppointments()} loading={loading} style={styles.iconBtn} color={theme.text} label="Refresh appointments" />
+            <NotificationBell
+              endpointBase="professor"
+              theme={theme}
+              typePaths={PROFESSOR_NOTIFICATION_PATHS}
+              viewAllPath={PROFESSOR_NOTIFICATIONS_VIEW_ALL}
+            />
+            <Pressable style={styles.iconBtn} onPress={() => setMenuOpen(true)} hitSlop={8}>
+              <Ionicons name="menu-outline" size={20} color={theme.text} />
+            </Pressable>
+          </View>
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
+            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <Text style={styles.breadcrumbText}>Home</Text>
+          </Pressable>
+
+          <View style={styles.titleRow}>
+            <LinearGradient colors={['#a855f7', '#9333ea']} style={styles.titleIcon}>
+              <Ionicons name="calendar-outline" size={22} color="#ffffff" />
+            </LinearGradient>
+            <View style={styles.titleTextWrap}>
+              <Text style={styles.pageTitle}>Appointment Manager</Text>
+              <Text style={styles.pageSubtitle}>Review and manage student appointment requests</Text>
+            </View>
+          </View>
+
+          {/* Schedule Manager card */}
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: '/pages/professor/professor_schedule_manager',
+                params: { from: 'appointments' },
+              })
+            }
+          >
+            <LinearGradient
+              colors={['rgba(124, 58, 237, 0.14)', 'rgba(168, 85, 247, 0.08)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.schedCard}
+            >
+              <LinearGradient colors={['#7c3aed', '#a855f7']} style={styles.schedIcon}>
+                <Ionicons name="time-outline" size={20} color="#ffffff" />
+              </LinearGradient>
+              <View style={styles.schedTextWrap}>
+                <Text style={styles.schedTitle}>Schedule Manager</Text>
+                <Text style={styles.schedSubtitle}>
+                  Set your weekly consultation hours so students can book with you
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#a855f7" style={{ opacity: 0.7 }} />
+            </LinearGradient>
+          </Pressable>
+
+          {/* Tabs */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll}>
+            <View style={styles.tabsList}>
+              {TABS.map((tab) => {
+                const active = activeTab === tab;
+                const icon = TAB_ICON_MAP[tab];
+
+                if (tab === 'all') {
+                  return (
+                    <Pressable
+                      key={tab}
+                      style={[styles.tabTrigger, active && styles.tabTriggerActive]}
+                      onPress={() => setActiveTab('all')}
+                    >
+                      <Ionicons name={icon} size={14} color={active ? '#a855f7' : theme.subtext} />
+                      <Pressable style={styles.rangeDropdown} onPress={() => setRangeModalOpen(true)} hitSlop={6}>
+                        <Text style={[styles.tabTriggerText, active && styles.tabTriggerTextActive]}>
+                          {ALL_RANGE_LABELS[allRange]}
+                        </Text>
+                        <Ionicons name="chevron-down" size={12} color={active ? '#a855f7' : theme.subtext} />
+                      </Pressable>
+                      <View style={[styles.tabCount, active && styles.tabCountActive]}>
+                        <Text style={[styles.tabCountText, active && styles.tabCountTextActive]}>
+                          {tabCounts.all}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  );
+                }
+
+                return (
+                  <Pressable
+                    key={tab}
+                    style={[styles.tabTrigger, active && styles.tabTriggerActive]}
+                    onPress={() => setActiveTab(tab)}
+                  >
+                    <Ionicons name={icon} size={14} color={active ? '#a855f7' : theme.subtext} />
+                    <Text style={[styles.tabTriggerText, active && styles.tabTriggerTextActive]}>
+                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    </Text>
+                    <View style={[styles.tabCount, active && styles.tabCountActive]}>
+                      <Text style={[styles.tabCountText, active && styles.tabCountTextActive]}>
+                        {tabCounts[tab]}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </ScrollView>
+
+          {/* List */}
+          {loading ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>Loading appointments…</Text>
+            </View>
+          ) : visibleAppointments.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="calendar-outline" size={32} color={theme.tertiary} />
+              <Text style={styles.emptyTitle}>
+                {activeTab === 'all' ? 'No Appointments' : `No ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Appointments`}
+                {allRange !== 'all' ? ` ${ALL_RANGE_LABELS[allRange]}` : activeTab === 'all' ? ' Yet' : ''}
+              </Text>
+              <Text style={styles.emptyText}>
+                {allRange !== 'all'
+                  ? 'You have no appointments in this range — switch to "All Time" to see everything.'
+                  : activeTab === 'all'
+                    ? 'New appointment requests from students will appear here.'
+                    : `You have no ${activeTab} appointments.`}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.apptList}>
+              {visibleAppointments.map((apt) => {
+                const statusTint = STATUS_TINTS[apt.status];
+                return (
+                  <View key={apt.id} style={styles.apptCard}>
+                    <View style={styles.apptCardHeaderRow}>
+                      <View style={styles.apptIconWrap}>
+                        <Ionicons name="calendar-outline" size={17} color="#a855f7" />
+                      </View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.studentName}>{apt.studentName}</Text>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                          {apt.studentId && (
+                            <View style={styles.studentIdBadge}>
+                              <Text style={styles.studentIdBadgeText}>{apt.studentId}</Text>
+                            </View>
+                          )}
+                          {apt.trackingNumber && (
+                            <View style={styles.trackingBadge}>
+                              <Text style={styles.trackingBadgeText}>{apt.trackingNumber}</Text>
+                            </View>
+                          )}
+                        </View>
+                        {apt.course && <Text style={styles.studentSub}>{apt.course}</Text>}
+                      </View>
+                      <View style={[styles.statusBadge, { backgroundColor: statusTint.bg, borderColor: statusTint.border }]}>
+                        <Text style={[styles.statusBadgeText, { color: statusTint.color }]}>
+                          {apt.status.charAt(0).toUpperCase() + apt.status.slice(1)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {apt.appointmentType && (
+                      <View style={styles.apptTypeRow}>
+                        <Text style={styles.apptTypeLabel}>Type:</Text>
+                        <Text style={styles.apptTypeValue}>{apt.appointmentType}</Text>
+                      </View>
+                    )}
+
+                    <View style={styles.apptInfoGrid}>
+                      <View style={styles.apptInfoField}>
+                        <Text style={styles.apptInfoLabel}>Date</Text>
+                        <Text style={styles.apptInfoValue}>{formatDate(apt.date)}</Text>
+                      </View>
+                      <View style={styles.apptInfoField}>
+                        <Text style={styles.apptInfoLabel}>Time</Text>
+                        <Text style={styles.apptInfoValue}>{apt.time}</Text>
+                      </View>
+                      <View style={[styles.apptInfoField, styles.apptInfoFieldFull]}>
+                        <Text style={styles.apptInfoLabel}>Location</Text>
+                        <Text style={styles.apptInfoValue}>{apt.location}</Text>
+                      </View>
+                      {apt.purpose && (
+                        <View style={[styles.apptInfoField, styles.apptInfoFieldFull]}>
+                          <Text style={styles.apptInfoLabel}>Purpose</Text>
+                          <Text style={styles.apptNotesText}>{apt.purpose}</Text>
+                        </View>
+                      )}
+                      {apt.bookingYearProgram && (
+                        <View style={[styles.apptInfoField, styles.apptInfoFieldFull]}>
+                          <Text style={styles.apptInfoLabel}>Year & Program</Text>
+                          <Text style={styles.apptInfoValue}>{apt.bookingYearProgram}</Text>
+                        </View>
+                      )}
+                      {apt.courseCode && (
+                        <View style={[styles.apptInfoField, styles.apptInfoFieldFull]}>
+                          <Text style={styles.apptInfoLabel}>Course Code</Text>
+                          <Text style={styles.apptInfoValue}>{apt.courseCode}</Text>
+                        </View>
+                      )}
+                      {apt.status === 'cancelled' && apt.cancelledBy === 'student_no_show' && (
+                        <View style={[styles.apptInfoField, styles.apptInfoFieldFull]}>
+                          <Text style={[styles.apptInfoLabel, { color: '#f59e0b' }]}>Reported Not Served</Text>
+                          <Text style={styles.apptNotesText}>
+                            The student reported that you did not serve this appointment.
+                            {apt.cancelReason ? ` Details: ${apt.cancelReason}` : ''}
+                          </Text>
+                        </View>
+                      )}
+                      {apt.status === 'cancelled' && apt.cancelledBy === 'system_not_entertained' && (
+                        <View style={[styles.apptInfoField, styles.apptInfoFieldFull]}>
+                          <Text style={[styles.apptInfoLabel, { color: '#f59e0b' }]}>Automatically Cancelled</Text>
+                          <Text style={styles.apptNotesText}>
+                            No actions taken were recorded before the scheduled time passed.
+                            {apt.cancelReason ? ` Details: ${apt.cancelReason}` : ''}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {apt.status === 'rejected' && (
+                      <View style={styles.rejectedNotice}>
+                        <Ionicons name="close-circle-outline" size={17} color="#ef4444" />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.rejectedNoticeTitle}>
+                            {isAutoRejected(apt) ? 'Automatically rejected — not approved in time.' : 'You rejected this request.'}
+                          </Text>
+                          {apt.rejectionReason ? (
+                            <Text style={styles.rejectedNoticeReason}>Reason: {apt.rejectionReason}</Text>
+                          ) : null}
+                        </View>
+                      </View>
+                    )}
+
+                    <View style={styles.commentSection}>
+                      <View style={styles.commentHeaderRow}>
+                        <Pressable style={styles.commentHeaderTitleRow} onPress={() => toggleComment(apt.id)} hitSlop={8}>
+                          <Ionicons name={openComments.has(apt.id) ? 'chevron-down' : 'chevron-forward'} size={14} color={theme.tertiary} />
+                          <Text style={styles.commentHeaderTitle}>Actions Taken</Text>
+                          {!!apt.sharedComment && <Text style={styles.commentRecordedPill}>Recorded</Text>}
+                        </Pressable>
+                        {apt.status === 'approved' && (
+                          <Pressable onPress={() => openCommentModal(apt)} hitSlop={8}>
+                            <View style={styles.commentEditLinkRow}>
+                              <Ionicons name="pencil" size={12} color="#a855f7" />
+                              <Text style={styles.commentEditLink}>{apt.sharedComment ? 'Edit' : 'Add'}</Text>
+                            </View>
+                          </Pressable>
+                        )}
+                      </View>
+                      {openComments.has(apt.id) && (apt.sharedComment ? (
+                        <>
+                          <Text style={styles.commentText}>{apt.sharedComment}</Text>
+                          {apt.commentUpdatedAt && (
+                            <Text style={styles.commentMeta}>
+                              Last updated by {apt.commentUpdatedBy === 'student' ? 'the student' : 'you'} on{' '}
+                              {formatManilaDate(apt.commentUpdatedAt, { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </Text>
+                          )}
+                        </>
+                      ) : (
+                        <Text style={styles.commentEmpty}>No actions taken recorded yet.</Text>
+                      ))}
+                    </View>
+
+                    {/* Student's one-shot feedback -- read-only, collapsed by default
+                        (mirrors web prof-appointments.jsx StudentFeedbackBlock). */}
+                    {apt.studentFeedback ? (
+                      <View style={styles.commentSection}>
+                        <View style={styles.commentHeaderRow}>
+                          <Pressable style={styles.commentHeaderTitleRow} onPress={() => toggleFeedback(apt.id)} hitSlop={8}>
+                            <Ionicons name={openFeedback.has(apt.id) ? 'chevron-down' : 'chevron-forward'} size={14} color={theme.tertiary} />
+                            <Text style={styles.commentHeaderTitle}>Student Feedback</Text>
+                            {!openFeedback.has(apt.id) && <Text style={styles.commentRecordedPill}>Received</Text>}
+                          </Pressable>
+                        </View>
+                        {openFeedback.has(apt.id) && (
+                          <>
+                            <Text style={styles.commentText}>{apt.studentFeedback.text}</Text>
+                            {apt.studentFeedback.createdAt ? (
+                              <Text style={styles.commentMeta}>
+                                Submitted on{' '}
+                                {formatManilaDate(apt.studentFeedback.createdAt, { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </Text>
+                            ) : null}
+                          </>
+                        )}
+                      </View>
+                    ) : null}
+
+                    <View style={styles.apptFooter}>
+                      {apt.status === 'pending' && (
+                        <View style={styles.apptActionsRow}>
+                          <Pressable style={[styles.apptBtn, styles.apptBtnApprove, !!approveBlockedReason(apt) && { opacity: 0.45 }]} onPress={() => requestAction('approve', apt)}>
+                            <Ionicons name="checkmark-circle-outline" size={14} color="#ffffff" />
+                            <Text style={styles.apptBtnText}>Approve</Text>
+                          </Pressable>
+                          <Pressable style={[styles.apptBtn, styles.apptBtnReject]} onPress={() => requestAction('reject', apt)}>
+                            <Ionicons name="close-circle-outline" size={14} color="#ffffff" />
+                            <Text style={styles.apptBtnText}>Reject</Text>
+                          </Pressable>
+                        </View>
+                      )}
+                      {apt.status === 'approved' && (
+                        <View style={styles.apptActionsRow}>
+                          <Pressable style={[styles.apptBtn, styles.apptBtnComplete, isFutureAppointment(apt) && { opacity: 0.45 }]} onPress={() => requestAction('complete', apt)}>
+                            <Ionicons name="checkmark-circle-outline" size={14} color="#ffffff" />
+                            <Text style={styles.apptBtnText}>Mark Complete</Text>
+                          </Pressable>
+                          <Pressable style={[styles.apptBtn, styles.apptBtnCancel]} onPress={() => requestAction('cancel', apt)}>
+                            <Ionicons name="close-circle-outline" size={14} color={theme.text} />
+                            <Text style={styles.apptBtnCancelText}>Cancel</Text>
+                          </Pressable>
+                        </View>
+                      )}
+                      <View style={styles.timelineMetaGroup}>
+                        <View style={styles.requestedMeta}>
+                          <Text style={styles.requestedLabel}>Requested</Text>
+                          {apt.requestedAtRaw ? (
+                            <>
+                              <View style={styles.requestedRowItem}>
+                                <Ionicons name="calendar-outline" size={11} color={theme.tertiary} />
+                                <Text style={styles.requestedText}>
+                                  {formatManilaDate(apt.requestedAtRaw, {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                  })}
+                                </Text>
+                              </View>
+                              <View style={styles.requestedRowItem}>
+                                <Ionicons name="time-outline" size={11} color={theme.tertiary} />
+                                <Text style={styles.requestedText}>
+                                  {formatManilaTime(apt.requestedAtRaw)}
+                                </Text>
+                              </View>
+                            </>
+                          ) : (
+                            <Text style={styles.requestedText}>{apt.requestedAt}</Text>
+                          )}
+                        </View>
+                        {apt.approvedAtRaw && (
+                          <View style={styles.requestedMeta}>
+                            <Text style={styles.requestedLabel}>Approved</Text>
+                            <View style={styles.requestedRowItem}>
+                              <Ionicons name="calendar-outline" size={11} color={theme.tertiary} />
+                              <Text style={styles.requestedText}>
+                                {formatManilaDate(apt.approvedAtRaw, {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })}
+                              </Text>
+                            </View>
+                            <View style={styles.requestedRowItem}>
+                              <Ionicons name="time-outline" size={11} color={theme.tertiary} />
+                              <Text style={styles.requestedText}>{formatManilaTime(apt.approvedAtRaw)}</Text>
+                            </View>
+                          </View>
+                        )}
+                        {apt.completedAtRaw && (
+                          <View style={styles.requestedMeta}>
+                            <Text style={styles.requestedLabel}>Completed</Text>
+                            <View style={styles.requestedRowItem}>
+                              <Ionicons name="calendar-outline" size={11} color={theme.tertiary} />
+                              <Text style={styles.requestedText}>
+                                {formatManilaDate(apt.completedAtRaw, {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })}
+                              </Text>
+                            </View>
+                            <View style={styles.requestedRowItem}>
+                              <Ionicons name="time-outline" size={11} color={theme.tertiary} />
+                              <Text style={styles.requestedText}>{formatManilaTime(apt.completedAtRaw)}</Text>
+                            </View>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+
+      <RangePickerModal
+        visible={rangeModalOpen}
+        value={allRange}
+        onSelect={selectRange}
+        onClose={() => setRangeModalOpen(false)}
+        styles={styles}
+      />
+
+      <NavDrawer
+        visible={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onNavPress={handleNavPress}
+        onLogout={handleLogout}
+        theme={theme}
+        styles={styles}
+        userName={user?.name ?? 'Faculty'}
+        userDept={user?.departmentName ?? ''}
+        isAvailable={isAvailable}
+        onToggleAvailability={(v) => toggleAvailability(v, () => setMenuOpen(false))}
+      />
+
+      <ConfirmActionModal
+        visible={!!confirmAction}
+        meta={confirmMeta ? { ...confirmMeta, confirmText: confirmSaving ? 'Please wait…' : confirmMeta.confirmText } : null}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={runConfirmAction}
+        styles={styles}
+      />
+
+      <QueueReasonModal
+        visible={!!rejectTarget}
+        title="Reject Appointment?"
+        message={`Reject the appointment request from ${rejectTarget?.studentName ?? 'this student'}? They'll see this reason. This action cannot be undone.`}
+        confirmText={rejectSubmitting ? 'Rejecting…' : 'Reject'}
+        confirmColor="#dc2626"
+        reason={rejectReason}
+        onChangeReason={setRejectReason}
+        onCancel={() => { setRejectTarget(null); setRejectReason(''); }}
+        onConfirm={() => confirmReject(rejectReason)}
+        theme={theme}
+        styles={styles}
+        submitting={rejectSubmitting}
+      />
+
+      <QueueReasonModal
+        visible={!!commentTarget}
+        title="Edit Actions Taken"
+        message={`Describe the actions taken for ${commentTarget?.studentName ?? 'this student'}'s appointment.`}
+        confirmText={commentSubmitting ? 'Saving…' : 'Save Actions Taken'}
+        confirmColor="#a855f7"
+        reason={commentText}
+        onChangeReason={setCommentText}
+        onCancel={() => { setCommentTarget(null); setCommentText(''); }}
+        onConfirm={() => saveComment(commentText)}
+        theme={theme}
+        styles={styles}
+        submitting={commentSubmitting}
+        required={false}
+        placeholder="Describe the actions taken for this appointment…"
+      />
+
+      <QueueReasonModal
+        visible={unavailableReasonModalOpen}
+        title="Mark Yourself Unavailable"
+        message="Let students and admins know why you're unavailable right now. This reason will be shown wherever your schedule is visible."
+        confirmText={unavailableReasonSubmitting ? 'Submitting...' : 'Confirm'}
+        confirmColor="#ef4444"
+        reason={unavailableReasonText}
+        onChangeReason={setUnavailableReasonText}
+        onCancel={cancelUnavailableModal}
+        onConfirm={() => confirmMarkUnavailable(unavailableReasonText)}
+        theme={theme}
+        styles={styles}
+        submitting={unavailableReasonSubmitting}
+      />
+
+      <LogoutModal
+        visible={logoutModalVisible}
+        onCancel={() => setLogoutModalVisible(false)}
+        onConfirm={confirmLogout}
+        styles={styles}
+      />
+    </View>
+  );
+}
+
+// ─────────────────────────── Shared sub-components ───────────────────────────
+
+function RangePickerModal({
+  visible,
+  value,
+  onSelect,
+  onClose,
+  styles,
+}: {
+  visible: boolean;
+  value: AllRange;
+  onSelect: (r: AllRange) => void;
+  onClose: () => void;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.rangeModalCard}>
+          {ALL_RANGES.map((r) => {
+            const selected = value === r;
+            return (
+              <Pressable
+                key={r}
+                style={[styles.rangeOption, selected && styles.rangeOptionActive]}
+                onPress={() => onSelect(r)}
+              >
+                <Text style={[styles.rangeOptionText, selected && styles.rangeOptionTextActive]}>
+                  {ALL_RANGE_LABELS[r]}
+                </Text>
+                {selected && <Ionicons name="checkmark" size={16} color="#a855f7" />}
+              </Pressable>
+            );
+          })}
+          <Pressable style={styles.rangeModalClose} onPress={onClose}>
+            <Text style={styles.rangeModalCloseText}>Close</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function ConfirmActionModal({
+  visible,
+  meta,
+  onCancel,
+  onConfirm,
+  styles,
+}: {
+  visible: boolean;
+  meta: { title: string; message: string; confirmText: string; cancelText: string; icon: IoniconName; accent: string } | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  if (!meta) return null;
+  return (
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onCancel}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.confirmModalCard}>
+          <View style={[styles.confirmIconCircle, { backgroundColor: `${meta.accent}26` }]}>
+            <Ionicons name={meta.icon} size={26} color={meta.accent} />
+          </View>
+          <Text style={styles.confirmTitle}>{meta.title}</Text>
+          <Text style={styles.confirmDescription}>{meta.message}</Text>
+          <View style={styles.confirmActionsRow}>
+            <Pressable style={styles.cancelBtn} onPress={onCancel}>
+              <Text style={styles.cancelBtnText}>{meta.cancelText}</Text>
+            </Pressable>
+            <Pressable style={[styles.confirmActionBtn, { backgroundColor: meta.accent }]} onPress={onConfirm}>
+              <Text style={styles.confirmBtnText}>{meta.confirmText}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function NavDrawer({
+  visible,
+  onClose,
+  onNavPress,
+  onLogout,
+  theme,
+  styles,
+  userName,
+  userDept,
+  isAvailable,
+  onToggleAvailability,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onNavPress: (key: string) => void;
+  onLogout: () => void;
+  theme: ThemePalette;
+  styles: ReturnType<typeof createStyles>;
+  userName: string;
+  userDept: string;
+  isAvailable: boolean;
+  onToggleAvailability: (value: boolean) => void;
+}) {
+  return (
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+      <View style={styles.drawerOverlay}>
+        <SafeAreaView style={styles.drawerPanel} edges={['top', 'bottom']}>
+          <View style={styles.drawerProfile}>
+            <View style={styles.drawerProfileHeader}>
+              <View style={styles.drawerAvatar}>
+                <Ionicons name="person-outline" size={15} color={theme.primary} />
+              </View>
+              <Text style={styles.drawerName}>{userName}</Text>
+            </View>
+            <View style={styles.drawerRoleBadge}>
+              <Text style={styles.drawerRoleBadgeText}>Professor</Text>
+            </View>
+            <Text style={styles.drawerCollege}>{userDept}</Text>
+          </View>
+
+          <ProfessorAvailabilityToggle isAvailable={isAvailable} onToggle={onToggleAvailability} styles={styles} />
+
+          <View style={styles.drawerNav}>
+            {navItems.map((item) => {
+              const active = item.key === 'appointments';
+              return (
+                <Pressable
+                  key={item.key}
+                  style={[styles.drawerNavItem, active && styles.drawerNavItemActive]}
+                  onPress={() => onNavPress(item.key)}
+                >
+                  <Ionicons name={item.icon} size={18} color={active ? '#ffffff' : theme.subtext} />
+                  <Text style={[styles.drawerNavLabel, active && styles.drawerNavLabelActive]}>{item.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Pressable style={styles.drawerLogout} onPress={onLogout}>
+            <Ionicons name="log-out-outline" size={18} color="#ef4444" />
+            <Text style={styles.drawerLogoutText}>Logout</Text>
+          </Pressable>
+        </SafeAreaView>
+        <Pressable style={styles.drawerBackdrop} onPress={onClose} />
+      </View>
+    </Modal>
+  );
+}
+
+function LogoutModal({
+  visible,
+  onCancel,
+  onConfirm,
+  styles,
+}: {
+  visible: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onCancel}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.confirmModalCard}>
+          <View style={[styles.confirmIconCircle, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
+            <Ionicons name="log-out-outline" size={26} color="#ef4444" />
+          </View>
+          <Text style={styles.confirmTitle}>Confirm Logout</Text>
+          <Text style={styles.confirmDescription}>
+            Are you sure you want to log out? Any unsaved changes will be lost.
+          </Text>
+          <View style={styles.confirmActionsRow}>
+            <Pressable style={styles.cancelBtn} onPress={onCancel}>
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </Pressable>
+            <Pressable style={styles.logoutConfirmBtn} onPress={onConfirm}>
+              <Ionicons name="log-out-outline" size={16} color="#ffffff" />
+              <Text style={styles.confirmBtnText}>Log Out</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─────────────────────────── Theme ───────────────────────────
+
+type ThemePalette = {
+  background: string;
+  card: string;
+  border: string;
+  headerBg: string;
+  headerBorder: string;
+  text: string;
+  subtext: string;
+  tertiary: string;
+  primary: string;
+  iconBtnBg: string;
+  iconBtnBorder: string;
+};
+
+const darkPalette: ThemePalette = {
+  background: '#0a0f0a',
+  card: '#111612',
+  border: '#1e3a23',
+  headerBg: 'rgba(17, 22, 18, 0.95)',
+  headerBorder: 'rgba(34, 197, 94, 0.15)',
+  text: '#f0fdf4',
+  subtext: '#94a3b8',
+  tertiary: '#94a3b8',
+  primary: '#16a34a',
+  iconBtnBg: 'rgba(34, 197, 94, 0.1)',
+  iconBtnBorder: 'rgba(34, 197, 94, 0.2)',
+};
+
+const lightPalette: ThemePalette = {
+  background: '#f8fafc',
+  card: '#ffffff',
+  border: '#e2e8f0',
+  headerBg: 'rgba(255, 255, 255, 0.95)',
+  headerBorder: 'rgba(34, 197, 94, 0.15)',
+  text: '#1e293b',
+  subtext: '#64748b',
+  tertiary: '#64748b',
+  primary: '#166534',
+  iconBtnBg: 'rgba(34, 197, 94, 0.08)',
+  iconBtnBorder: 'rgba(34, 197, 94, 0.15)',
+};
+
+function createStyles(theme: ThemePalette) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: theme.background },
+    safeArea: { flex: 1 },
+
+    // Header
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: theme.headerBg,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.headerBorder,
+    },
+    headerBrand: { flexDirection: 'row', alignItems: 'center', gap: 0 },
+    headerPncLogo: { width: 40, height: 40 },
+    headerOamsLogo: { height: 34, width: 96 },
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    iconBtn: {
+      padding: 8,
+      borderRadius: 10,
+      backgroundColor: theme.iconBtnBg,
+      borderWidth: 1,
+      borderColor: theme.iconBtnBorder,
+    },
+    iconBtnImg: { width: 18, height: 18 },
+
+    scrollContent: { padding: 16, gap: 18, paddingBottom: 40 },
+
+    // Breadcrumb
+    breadcrumb: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
+    breadcrumbText: { fontSize: 14, fontWeight: '600', color: theme.subtext },
+
+    // Title
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+    titleIcon: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    titleTextWrap: { flex: 1 },
+    pageTitle: { fontSize: 20, fontWeight: '800', color: theme.text, letterSpacing: -0.3 },
+    pageSubtitle: { fontSize: 12, color: theme.subtext, marginTop: 3 },
+
+    // Schedule Manager card
+    schedCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: 'rgba(168, 85, 247, 0.3)',
+    },
+    schedIcon: { width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    schedTextWrap: { flex: 1, minWidth: 0, gap: 4 },
+    schedTitle: { fontSize: 14, fontWeight: '700', color: '#a855f7' },
+    schedSubtitle: { fontSize: 12, color: theme.subtext, lineHeight: 17 },
+
+    // Tabs
+    tabsScroll: { flexGrow: 0 },
+    tabsList: { flexDirection: 'row', gap: 6, borderBottomWidth: 2, borderBottomColor: theme.border },
+    tabTrigger: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 12, paddingBottom: 12 },
+    tabTriggerActive: { borderBottomWidth: 2, borderBottomColor: '#a855f7', marginBottom: -2 },
+    tabTriggerText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: theme.subtext,
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+    tabTriggerTextActive: { color: '#a855f7' },
+    tabCount: {
+      minWidth: 20,
+      height: 20,
+      paddingHorizontal: 5,
+      borderRadius: 999,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(168, 85, 247, 0.15)',
+    },
+    tabCountActive: { backgroundColor: 'rgba(168, 85, 247, 0.25)' },
+    tabCountText: { fontSize: 10, fontWeight: '700', color: '#a855f7' },
+    tabCountTextActive: { color: '#a855f7' },
+    rangeDropdown: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+
+    // Empty state
+    emptyState: {
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 18,
+      paddingVertical: 40,
+      paddingHorizontal: 20,
+      alignItems: 'center',
+      gap: 8,
+    },
+    emptyTitle: { fontSize: 15, fontWeight: '700', color: theme.text },
+    emptyText: { fontSize: 13, color: theme.tertiary, textAlign: 'center' },
+
+    // Appointment cards
+    apptList: { gap: 14 },
+    apptCard: {
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: 'rgba(168, 85, 247, 0.2)',
+      borderRadius: 16,
+      padding: 14,
+      gap: 11,
+    },
+    apptCardHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    apptIconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      backgroundColor: 'rgba(168, 85, 247, 0.12)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    studentName: { fontSize: 14, fontWeight: '700', color: '#a855f7' },
+    // Appointment tracking number (APT-xxxxx), mirrors web's appt-card-tracking-badge.
+    trackingBadge: {
+      alignSelf: 'flex-start',
+      marginTop: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 999,
+      borderWidth: 1,
+      backgroundColor: 'rgba(168, 85, 247, 0.12)',
+      borderColor: 'rgba(168, 85, 247, 0.3)',
+    },
+    trackingBadgeText: { fontSize: 11, fontWeight: '700', color: '#a855f7', fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }) },
+    studentIdBadge: {
+      alignSelf: 'flex-start',
+      marginTop: 4,
+      borderWidth: 1,
+      borderRadius: 6,
+      paddingVertical: 2,
+      paddingHorizontal: 7,
+      backgroundColor: 'rgba(168, 85, 247, 0.12)',
+      borderColor: 'rgba(168, 85, 247, 0.3)',
+    },
+    studentIdBadgeText: {
+      fontSize: 9.5,
+      fontWeight: '700',
+      color: '#a855f7',
+      letterSpacing: 0.3,
+      textTransform: 'uppercase',
+    },
+    studentSub: { fontSize: 11.5, color: theme.tertiary, marginTop: 2 },
+    apptTypeRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    apptTypeLabel: { fontSize: 11.5, fontWeight: '600', color: theme.tertiary },
+    apptTypeValue: { fontSize: 11.5, fontWeight: '600', color: theme.text },
+    statusBadge: {
+      minWidth: 72,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 3,
+      paddingHorizontal: 9,
+      borderRadius: 10,
+      borderWidth: 1,
+    },
+    statusBadgeText: { fontSize: 10, fontWeight: '700' },
+
+    apptInfoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    apptInfoField: { width: '46%', gap: 3 },
+    apptInfoFieldFull: { width: '100%' },
+    apptInfoLabel: { fontSize: 10, fontWeight: '600', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
+    apptInfoValue: { fontSize: 12.5, fontWeight: '600', color: '#a855f7', lineHeight: 16 },
+    apptNotesText: { fontSize: 12.5, fontWeight: '600', color: theme.text, lineHeight: 16 },
+
+    // Shared appointment comment section (professor-authored, student-readable)
+    commentSection: {
+      marginTop: 10,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      gap: 4,
+    },
+    commentHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    commentHeaderTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    commentHeaderTitle: { fontSize: 11, fontWeight: '700', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
+    commentRecordedPill: { fontSize: 10, fontWeight: '700', color: '#a855f7', backgroundColor: 'rgba(168,85,247,0.15)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
+    commentEditLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    commentEditLink: { fontSize: 12, fontWeight: '700', color: '#a855f7' },
+    rejectedNotice: {
+      flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 10, padding: 10, borderRadius: 10,
+      borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)', backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    },
+    rejectedNoticeTitle: { fontSize: 12.5, fontWeight: '700', color: '#ef4444' },
+    rejectedNoticeReason: { fontSize: 12, color: theme.text, marginTop: 3, lineHeight: 17 },
+    commentText: { fontSize: 12.5, fontWeight: '600', color: theme.text, lineHeight: 17 },
+    commentMeta: { fontSize: 10.5, color: theme.tertiary, marginTop: 2 },
+    commentEmpty: { fontSize: 12, color: theme.tertiary, fontStyle: 'italic' },
+
+    apptFooter: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: 8,
+      paddingTop: 9,
+      borderTopWidth: 1,
+      borderTopColor: 'rgba(168, 85, 247, 0.15)',
+    },
+    apptActionsRow: { flexDirection: 'row', gap: 8 },
+    apptBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingVertical: 7,
+      paddingHorizontal: 14,
+      borderRadius: 8,
+    },
+    apptBtnApprove: { backgroundColor: '#16a34a' },
+    apptBtnReject: { backgroundColor: '#dc2626' },
+    apptBtnComplete: { backgroundColor: '#2563eb' },
+    apptBtnCancel: { borderWidth: 1, borderColor: theme.border },
+    apptBtnText: { fontSize: 11.5, fontWeight: '600', color: '#ffffff' },
+    apptBtnCancelText: { fontSize: 11.5, fontWeight: '600', color: theme.text },
+    requestedMeta: { gap: 3 },
+    requestedLabel: { fontSize: 9, fontWeight: '600', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.3 },
+    requestedRowItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    requestedText: { fontSize: 10.5, color: theme.tertiary },
+    timelineMetaGroup: { flexDirection: 'column', alignItems: 'flex-end', gap: 8, marginLeft: 'auto' },
+
+    // Range picker modal
+    rangeModalCard: {
+      width: '80%',
+      maxWidth: 280,
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 16,
+      padding: 8,
+    },
+    rangeOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      borderRadius: 10,
+    },
+    rangeOptionActive: { backgroundColor: 'rgba(168, 85, 247, 0.1)' },
+    rangeOptionText: { fontSize: 14, fontWeight: '600', color: theme.text },
+    rangeOptionTextActive: { color: '#a855f7' },
+    rangeModalClose: {
+      paddingVertical: 12,
+      alignItems: 'center',
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      marginTop: 4,
+    },
+    rangeModalCloseText: { fontSize: 13, fontWeight: '700', color: theme.subtext },
+
+    // Nav drawer
+    drawerOverlay: { flex: 1, flexDirection: 'row' },
+    drawerPanel: {
+      width: 270,
+      backgroundColor: theme.card,
+      borderRightWidth: 1,
+      borderRightColor: theme.border,
+      padding: 20,
+      justifyContent: 'space-between',
+    },
+    drawerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+    drawerProfile: {
+      width: '100%',
+      alignItems: 'flex-start',
+      gap: 8,
+      backgroundColor: 'rgba(22, 163, 74, 0.12)',
+      borderWidth: 1,
+      borderColor: 'rgba(22, 163, 74, 0.25)',
+      borderRadius: 14,
+      padding: 14,
+    },
+    drawerProfileHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    drawerAvatar: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: 'rgba(22, 163, 74, 0.18)',
+      borderWidth: 1,
+      borderColor: 'rgba(22, 163, 74, 0.3)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    drawerName: { fontSize: 15, fontWeight: '700', color: theme.text },
+    drawerRoleBadge: { backgroundColor: 'rgba(22, 163, 74, 0.18)', borderRadius: 999, paddingVertical: 3, paddingHorizontal: 10 },
+    drawerRoleBadgeText: { fontSize: 11, fontWeight: '700', color: theme.primary },
+    drawerCollege: { fontSize: 12, fontWeight: '500', color: theme.subtext },
+    availabilityRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 14,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+    },
+    availabilityLabel: { fontSize: 14, fontWeight: '700', color: theme.text },
+    drawerNav: { flex: 1, marginTop: 28, gap: 4 },
+    drawerNavItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 12, borderRadius: 10 },
+    drawerNavItemActive: { backgroundColor: theme.primary },
+    drawerNavLabel: { fontSize: 14, fontWeight: '600', color: theme.subtext },
+    drawerNavLabelActive: { color: '#ffffff' },
+    drawerLogout: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: 'rgba(239, 68, 68, 0.3)',
+      backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    },
+    drawerLogoutText: { fontSize: 14, fontWeight: '700', color: '#ef4444' },
+
+    // Shared confirm modal chrome
+    modalOverlay: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      padding: 24,
+    },
+    confirmModalCard: {
+      width: '100%',
+      maxWidth: 340,
+      alignItems: 'center',
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 20,
+      padding: 24,
+    },
+    confirmIconCircle: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+    confirmTitle: { fontSize: 18, fontWeight: '800', color: theme.text, marginBottom: 8, textAlign: 'center' },
+    confirmDescription: { fontSize: 13, color: theme.subtext, textAlign: 'center', lineHeight: 19, marginBottom: 20 },
+    confirmActionsRow: { flexDirection: 'row', gap: 12, width: '100%' },
+    cancelBtn: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+    },
+    cancelBtnText: { fontSize: 14, fontWeight: '700', color: theme.text },
+    confirmBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+    confirmActionBtn: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderRadius: 12,
+    },
+    // Reject reason modal (QueueReasonModal) -- confirmBtn is its own name,
+    // distinct from confirmActionBtn above (this file's generic
+    // ConfirmActionModal), since QueueReasonModal is a shared component with
+    // its own fixed prop-name contract.
+    confirmBtn: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderRadius: 12,
+    },
+    reasonInput: {
+      width: '100%',
+      minHeight: 64,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      padding: 12,
+      fontSize: 13,
+      color: theme.text,
+      backgroundColor: theme.background,
+      textAlignVertical: 'top',
+      marginBottom: 16,
+    },
+    formSubmitBtnDisabled: { opacity: 0.6 },
+    logoutConfirmBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 12,
+      borderRadius: 12,
+      backgroundColor: '#ef4444',
+    },
+  });
+}

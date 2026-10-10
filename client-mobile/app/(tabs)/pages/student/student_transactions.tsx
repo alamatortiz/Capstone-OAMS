@@ -1,0 +1,1407 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import Toast from 'react-native-toast-message';
+import {
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertCircle, Calendar, CheckCircle, ChevronDown, ChevronLeft, Clock, FileText, Home as HomeIcon,
+  Megaphone, Search, Users, ClipboardList,
+} from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import DatePickerSheet from '@/components/DatePickerSheet';
+import { toLocalYMD, fromLocalYMD, getManilaDateString, formatManilaDate, formatManilaTime } from '@/utils/date';
+import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
+import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
+import NotificationBell from '@/components/NotificationBell';
+import RefreshButton from '@/components/RefreshButton';
+import ExportMenu from '@/components/ExportMenu';
+import { exportRowsAsCsv } from '@/utils/csvExport';
+import { exportRowsAsPdf } from '@/utils/pdfExport';
+import { readCache, CACHE_KEYS, fetchAllPages, isOfflineLikeError } from '@/utils/offlineCache';
+import { syncStudentTransactions } from '@/utils/offlineSync';
+import { useIsOnline } from '@/context/NetworkContext';
+import OfflineBanner from '@/components/OfflineBanner';
+import ActionsTakenToggle from '@/components/ActionsTakenToggle';
+import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
+
+type LucideIconType = typeof ClipboardList;
+
+const pncLogo = require('@/assets/Pnc-Logo.png');
+const oamsLogo = require('@/assets/oams_logo.png');
+const darkModeIcon = require('@/assets/darkmode_icon.png');
+const sunIcon = require('@/assets/sun_icon.png');
+
+function OamsLogo({
+  style,
+  outline,
+}: {
+  style: { height: number; width: number };
+  outline: boolean;
+}) {
+  if (!outline) {
+    return <Image source={oamsLogo} style={style} resizeMode="contain" />;
+  }
+  const layerStyle = {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    width: style.width,
+    height: style.height,
+  };
+  return (
+    <View style={[style, { position: 'relative', overflow: 'hidden' }]}>
+      {[
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ].map(([dx, dy]) => (
+        <Image
+          key={`${dx}-${dy}`}
+          source={oamsLogo}
+          resizeMode="contain"
+          style={[
+            layerStyle,
+            { tintColor: '#ffffff', transform: [{ translateX: dx }, { translateY: dy }] },
+          ]}
+        />
+      ))}
+      <Image source={oamsLogo} resizeMode="contain" style={layerStyle} />
+    </View>
+  );
+}
+
+type TxType = 'queue' | 'appointment' | 'document' | 'submission';
+type TxStatus = 'completed' | 'ongoing' | 'cancelled';
+
+interface Transaction {
+  id: string;
+  type: TxType;
+  title: string;
+  college: string;
+  date: string;
+  time: string;
+  status: TxStatus;
+  details: string;
+  approvedAtRaw?: string | null;
+  completedAtRaw?: string | null;
+  cancelledBy?: string | null;
+  cancelReason?: string | null;
+  trackingNumber?: string | null;
+  sharedComment?: string | null;
+  commentUpdatedBy?: string | null;
+  commentUpdatedAt?: string | null;
+}
+
+const TYPE_META: Record<TxType, { label: string; icon: LucideIconType; bg: string; border: string; color: string }> = {
+  queue: { label: 'queue', icon: Users, bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.35)', color: '#3b82f6' },
+  appointment: { label: 'appointment', icon: Calendar, bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.35)', color: '#a855f7' },
+  document: { label: 'document', icon: FileText, bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.35)', color: '#f97316' },
+  // Shares document's visual family -- opposite direction, disambiguated by
+  // the "Document Submission: ..." title text from the server.
+  submission: { label: 'sent document', icon: FileText, bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.35)', color: '#f97316' },
+};
+
+const STATUS_META_DARK: Record<TxStatus, { label: string; bg: string; border: string; color: string }> = {
+  completed: { label: 'completed', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
+  ongoing: { label: 'ongoing', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6' },
+  cancelled: { label: 'cancelled', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', color: '#ef4444' },
+};
+const STATUS_META_LIGHT: Record<TxStatus, { label: string; bg: string; border: string; color: string }> = {
+  completed: { label: 'completed', bg: 'rgba(5, 150, 105, 0.15)', border: 'rgba(5, 150, 105, 0.3)', color: '#059669' },
+  ongoing: { label: 'ongoing', bg: 'rgba(37, 99, 235, 0.15)', border: 'rgba(37, 99, 235, 0.3)', color: '#2563eb' },
+  cancelled: { label: 'cancelled', bg: 'rgba(220, 38, 38, 0.15)', border: 'rgba(220, 38, 38, 0.3)', color: '#dc2626' },
+};
+
+const formatDateShort = (dateString: string) => {
+  const [y, m, d] = dateString.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+interface NavItem {
+  key: string;
+  label: string;
+  icon: LucideIconType;
+}
+
+const navItems: NavItem[] = [
+  { key: 'dashboard', label: 'Home', icon: HomeIcon },
+  { key: 'announcements', label: 'Announcements', icon: Megaphone },
+  { key: 'queue', label: 'Queue', icon: Users },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: ClipboardList },
+];
+
+type TypeFilter = 'all' | TxType;
+type StatusFilter = 'all' | TxStatus;
+type SelectField = 'type' | 'status' | null;
+
+const TYPE_OPTIONS = [
+  { value: 'all', label: 'All Types' },
+  { value: 'queue', label: 'Queue' },
+  { value: 'appointment', label: 'Appointment' },
+  { value: 'document', label: 'Document' },
+  { value: 'submission', label: 'Sent Document' },
+];
+
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'All Statuses' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'ongoing', label: 'Ongoing' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
+
+const PAGE_SIZE = 20;
+
+interface TxFilters {
+  search: string;
+  type: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+}
+
+// Local mirror of GET /student/transactions' filters (title/details search,
+// type, status, Manila-date range), so the cached full history can be
+// searched and filtered while offline exactly like the live list.
+function filterTransactionsLocal(all: Transaction[], f: TxFilters): Transaction[] {
+  const q = f.search.toLowerCase();
+  return all.filter((t) => {
+    if (f.type !== 'all' && t.type !== f.type) return false;
+    if (f.status !== 'all' && t.status !== f.status) return false;
+    if (f.startDate && t.date < f.startDate) return false;
+    if (f.endDate && t.date > f.endDate) return false;
+    if (q && !(t.title ?? '').toLowerCase().includes(q) && !(t.details ?? '').toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+
+function computeTxStats(list: Transaction[]) {
+  const month = getManilaDateString().slice(0, 7);
+  return {
+    total: list.length,
+    completed: list.filter((t) => t.status === 'completed').length,
+    ongoing: list.filter((t) => t.status === 'ongoing').length,
+    thisMonth: list.filter((t) => t.date.startsWith(month)).length,
+  };
+}
+
+export default function StudentTransactionsScreen() {
+  const { isDarkMode, toggleTheme } = useTheme();
+  const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [filterType, setFilterType] = useState<TypeFilter>('all');
+  const [filterStatus, setFilterStatus] = useState<StatusFilter>('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [selectField, setSelectField] = useState<SelectField>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [txLoading, setTxLoading] = useState(true);
+  const [txError, setTxError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [txStats, setTxStats] = useState({ total: 0, completed: 0, ongoing: 0, thisMonth: 0 });
+  const [exporting, setExporting] = useState(false);
+  const [offlineCachedAt, setOfflineCachedAt] = useState<string | null>(null);
+  const router = useRouter();
+  const { user, token, logout } = useAuth();
+  const isOnline = useIsOnline();
+
+  const theme = isDarkMode ? darkPalette : lightPalette;
+  const styles = createStyles(theme);
+
+  // Debounce the search box so every keystroke doesn't trigger a refetch.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 400);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  // Mirrors `transactions` for the catch block below, without making
+  // fetchTransactions depend on (and change identity with) the state itself.
+  const transactionsRef = useRef(transactions);
+  useEffect(() => { transactionsRef.current = transactions; }, [transactions]);
+
+  // Lets background refreshes (below) re-fetch every page the user has
+  // already loaded via "Load More", instead of the closed-over `page` value
+  // from whenever the effect was created.
+  const pageRef = useRef(page);
+  useEffect(() => { pageRef.current = page; }, [page]);
+
+  // Guards against out-of-order responses: e.g. tapping "Load More" and then
+  // changing a filter before that request resolves would otherwise let the
+  // stale "Load More" page land after the fresh filtered list and get
+  // appended onto it. Each call captures the current token; a response is
+  // only applied if its token is still the latest by the time it resolves.
+  const requestIdRef = useRef(0);
+
+  // Search/type/status filtering happens server-side (so it considers the
+  // student's whole history, not just whatever page is currently loaded).
+  // Any change to those filters — including the ones baked into this
+  // callback's identity below — resets back to the first page (mirrors
+  // student_notifications.tsx: pageNum is always an explicit argument, never
+  // read from `page` state, so a filter change re-fires the mount effect
+  // below with pageNum=1 with no extra reset logic needed).
+  // Downloads the whole (unfiltered) history in the background whenever we're
+  // online, throttled to once a minute, so it's there to search offline.
+  const lastSyncRef = useRef(0);
+  const syncFullHistory = useCallback(async () => {
+    if (Date.now() - lastSyncRef.current < 60000) return;
+    lastSyncRef.current = Date.now();
+    try {
+      await syncStudentTransactions();
+    } catch (err) {
+      lastSyncRef.current = 0;
+      console.error('Offline history sync failed:', err);
+    }
+  }, []);
+
+  // Offline path: same search/filters/paging as the server, applied to the
+  // cached full history. Returns false when nothing has been cached yet.
+  const applyOfflineCache = useCallback(async (pageNum: number): Promise<boolean> => {
+    const cached = await readCache<Transaction[]>(CACHE_KEYS.studentTransactionsAll);
+    if (!cached) return false;
+    const filtered = filterTransactionsLocal(cached.data, {
+      search: debouncedSearch,
+      type: filterType,
+      status: filterStatus,
+      startDate,
+      endDate,
+    });
+    setTransactions(filtered.slice(0, pageNum * PAGE_SIZE));
+    setPage(pageNum);
+    setTotalPages(Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)));
+    setTxStats(computeTxStats(filtered));
+    setTxError(null);
+    setOfflineCachedAt(cached.cachedAt);
+    return true;
+  }, [debouncedSearch, filterType, filterStatus, startDate, endDate]);
+
+  const fetchTransactions = useCallback(async (pageNum = 1) => {
+    const requestId = ++requestIdRef.current;
+    try {
+      if (pageNum > 1) setLoadingMore(true);
+      const { data } = await api.get('/student/transactions', {
+        params: {
+          search: debouncedSearch || undefined,
+          type: filterType !== 'all' ? filterType : undefined,
+          status: filterStatus !== 'all' ? filterStatus : undefined,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+          limit: PAGE_SIZE,
+          page: pageNum,
+        },
+      });
+      if (requestId !== requestIdRef.current) return;
+      const newTransactions: Transaction[] = data.transactions ?? [];
+      setTransactions((prev) => (pageNum > 1 ? [...prev, ...newTransactions] : newTransactions));
+      setPage(data.page ?? pageNum);
+      setTotalPages(data.totalPages ?? 1);
+      if (data.stats) setTxStats(data.stats);
+      setTxError(null);
+      setOfflineCachedAt(null);
+      // Keep a full unfiltered copy for offline search/filter/export.
+      if (pageNum === 1) syncFullHistory();
+    } catch (err) {
+      if (requestId !== requestIdRef.current) return;
+      if (isOfflineLikeError(err)) {
+        // Offline: serve the same search/filters/paging from the local copy.
+        if (await applyOfflineCache(pageNum)) return;
+      }
+      console.error('Failed to fetch transactions:', err);
+      if (transactionsRef.current.length === 0) {
+        setTxError('Could not load your transaction history.');
+      } else {
+        Toast.show({ type: 'error', text1: 'Could not refresh your transaction history.' });
+      }
+    } finally {
+      if (requestId === requestIdRef.current) {
+        setTxLoading(false);
+        setLoadingMore(false);
+      }
+    }
+  }, [debouncedSearch, filterType, filterStatus, startDate, endDate, applyOfflineCache, syncFullHistory]);
+
+  // Background refresh (socket/queue-events/poll, below) -- re-fetches every
+  // page currently on screen and replaces the list in one shot, so it
+  // doesn't collapse whatever the user has "Load More"'d down to just page 1
+  // (mirrors fetchTransactions' own request-id staleness guard).
+  const refreshLoadedPages = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    try {
+      const upTo = pageRef.current;
+      const responses = await Promise.all(
+        Array.from({ length: upTo }, (_, i) =>
+          api.get('/student/transactions', {
+            params: {
+              search: debouncedSearch || undefined,
+              type: filterType !== 'all' ? filterType : undefined,
+              status: filterStatus !== 'all' ? filterStatus : undefined,
+              startDate: startDate || undefined,
+              endDate: endDate || undefined,
+              limit: PAGE_SIZE,
+              page: i + 1,
+            },
+          }),
+        ),
+      );
+      if (requestId !== requestIdRef.current) return;
+      const merged = responses.flatMap((res) => res.data.transactions ?? []);
+      setTransactions(merged);
+      const last = responses[responses.length - 1]?.data;
+      setPage(last?.page ?? upTo);
+      setTotalPages(last?.totalPages ?? 1);
+      if (last?.stats) setTxStats(last.stats);
+      setTxError(null);
+      setOfflineCachedAt(null);
+      syncFullHistory();
+    } catch (err) {
+      if (requestId !== requestIdRef.current) return;
+      // A dropped connection mid-refresh is expected -- stay quiet.
+      if (isOfflineLikeError(err)) return;
+      console.error('Failed to refresh transactions:', err);
+      Toast.show({ type: 'error', text1: 'Could not refresh your transaction history.' });
+    }
+  }, [debouncedSearch, filterType, filterStatus, startDate, endDate, syncFullHistory]);
+
+  useEffect(() => {
+    fetchTransactions(1);
+  }, [fetchTransactions]);
+
+  // Coming back online: replace the offline copy with live data.
+  const wasOnlineRef = useRef(isOnline);
+  useEffect(() => {
+    if (isOnline && !wasOnlineRef.current) fetchTransactions(1);
+    wasOnlineRef.current = isOnline;
+  }, [isOnline, fetchTransactions]);
+
+  const handleLoadMore = () => {
+    if (loadingMore || page >= totalPages) return;
+    fetchTransactions(page + 1);
+  };
+
+  // Queue events (and document:cancelled) are broadcast department-wide, not
+  // just to the affected student, so they're checked against this student's
+  // own ID before refetching — otherwise this page would refetch every time
+  // ANY student in the department got called/served/etc.
+  const handleOwnQueueEvent = useCallback(
+    (payload: { studentId?: number | string }) => {
+      if (Number(payload?.studentId) === Number(user?.userId)) {
+        refreshLoadedPages();
+      }
+    },
+    [refreshLoadedPages, user?.userId],
+  );
+
+  // ── Live updates: refetch when a document/appointment status changes, or
+  // one of this student's own queue events fires (mirrors stud-transactions.jsx).
+  // Transactions are a historical log, not worth interrupting the user for --
+  // refetch silently, no notification. ──
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const ownEvents = ['document:status-updated', 'appointment:status-updated'];
+    const deptWideEvents = [
+      'queue:called',
+      'queue:served',
+      'queue:no-show',
+      'queue:student-joined',
+      'queue:student-left',
+      'document:cancelled',
+    ];
+
+    ownEvents.forEach((event) => socket.on(event, refreshLoadedPages));
+    deptWideEvents.forEach((event) => socket.on(event, handleOwnQueueEvent));
+
+    return () => {
+      ownEvents.forEach((event) => socket.off(event, refreshLoadedPages));
+      deptWideEvents.forEach((event) => socket.off(event, handleOwnQueueEvent));
+    };
+  }, [user, token, refreshLoadedPages, handleOwnQueueEvent]);
+
+  // ── Fallback poll (safety net only — sockets drive live updates) ──────────
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refreshLoadedPages();
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [refreshLoadedPages]);
+
+  const goToDashboard = () => router.push('/pages/student/student_dashboard');
+
+  const handleNavPress = (key: string) => {
+    setMenuOpen(false);
+    if (key === 'transactions') return;
+    if (key === 'dashboard') { goToDashboard(); return; }
+    if (key === 'queue') { router.push('/pages/student/student_queue'); return; }
+    if (key === 'announcements') { router.push('/pages/student/student_announcement'); return; }
+    if (key === 'appointments') { router.push('/pages/student/student_appointments'); return; }
+    if (key === 'documents') { router.push('/pages/student/student_documents'); return; }
+  };
+
+  const handleLogout = () => { setMenuOpen(false); setLogoutModalVisible(true); };
+  const confirmLogout = () => { setLogoutModalVisible(false); logout(); router.replace('/login'); };
+
+  // Export needs the student's whole (filtered) history, not just whatever
+  // page is currently loaded on-screen -- mirrors stud-transactions.jsx's
+  // own fetchExportRows(), a separate one-shot fetch capped at 100 rows.
+  const fetchExportRows = async () => {
+    // Page through everything (100/page) -- a single request silently
+    // truncated histories over 100 rows.
+    let all: Transaction[];
+    try {
+      all = await fetchAllPages<Transaction>(async (p) => {
+        const { data } = await api.get('/student/transactions', {
+          params: {
+            search: debouncedSearch || undefined,
+            type: filterType !== 'all' ? filterType : undefined,
+            status: filterStatus !== 'all' ? filterStatus : undefined,
+            startDate: startDate || undefined,
+            endDate: endDate || undefined,
+            limit: 100,
+            page: p,
+          },
+        });
+        return { items: data.transactions ?? [], totalPages: data.totalPages ?? 1 };
+      }, 100);
+    } catch (err) {
+      // Offline: export from the locally saved history with the same filters.
+      if (!isOfflineLikeError(err)) throw err;
+      const cached = await readCache<Transaction[]>(CACHE_KEYS.studentTransactionsAll);
+      if (!cached) throw err;
+      all = filterTransactionsLocal(cached.data, {
+        search: debouncedSearch, type: filterType, status: filterStatus, startDate, endDate,
+      });
+      Toast.show({ type: 'info', text1: 'Offline: exporting your saved history.' });
+    }
+    // Mirrors web: Tracking # on every row (appointments now have APT-xxxxx
+    // numbers too); the Comment column only appears when exporting appointments.
+    const withComment = filterType === 'appointment';
+    const cap = (v: string) => (v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, ' ') : '');
+    const header = ['Type', 'Title', 'Details', 'Status', 'College', 'Tracking #', ...(withComment ? ['Comment'] : []), 'Date', 'Time'];
+    const rows = all.map((t) => [
+      cap(t.type === 'submission' ? 'document submission' : t.type === 'document' ? 'document request' : t.type),
+      t.title, t.details, cap(t.status), t.college, t.trackingNumber ?? '',
+      ...(withComment ? [t.sharedComment ?? ''] : []),
+      t.date, t.time,
+    ]);
+    return { header, rows };
+  };
+
+  const handleExportCsv = async () => {
+    if (transactions.length === 0 || exporting) return;
+    setExporting(true);
+    try {
+      const { header, rows } = await fetchExportRows();
+      const csvRows = rows.map((row: string[]) => Object.fromEntries(header.map((h, i) => [h, row[i]])));
+      const fileName = `transactions-${new Date().toISOString().slice(0, 10)}.csv`;
+      await exportRowsAsCsv(csvRows, fileName);
+    } catch (err) {
+      console.error('Export transactions error:', err);
+      Toast.show({ type: 'error', text1: 'Could not export your transaction history.' });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportPdf = async () => {
+    if (transactions.length === 0 || exporting) return;
+    setExporting(true);
+    try {
+      const { header, rows } = await fetchExportRows();
+      const fileName = `transactions-${new Date().toISOString().slice(0, 10)}.pdf`;
+      await exportRowsAsPdf({
+        title: 'Transaction History',
+        subtitle: `${user?.name ?? 'Student'} — ${dateRangeLabel}`,
+        columns: header,
+        rows,
+        filename: fileName,
+      });
+    } catch (err) {
+      console.error('Export transactions error:', err);
+      Toast.show({ type: 'error', text1: 'Could not export your transaction history.' });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // Search/type/status filtering already happened server-side, so `transactions`
+  // is the page to render as-is.
+  const stats: { key: string; label: string; value: number; icon: LucideIconType; color: string; bg: string; border: string }[] = [
+    { key: 'total', label: 'Total', value: txStats.total, icon: ClipboardList, color: theme.blue, bg: 'rgba(59, 130, 246, 0.2)', border: 'rgba(59, 130, 246, 0.2)' },
+    { key: 'completed', label: 'Completed', value: txStats.completed, icon: CheckCircle, color: theme.success, bg: 'rgba(16, 185, 129, 0.2)', border: 'rgba(16, 185, 129, 0.2)' },
+    { key: 'ongoing', label: 'Ongoing', value: txStats.ongoing, icon: Clock, color: theme.orange, bg: 'rgba(249, 115, 22, 0.2)', border: 'rgba(249, 115, 22, 0.2)' },
+    { key: 'month', label: 'This Month', value: txStats.thisMonth, icon: Calendar, color: theme.success, bg: 'rgba(34, 197, 94, 0.2)', border: 'rgba(34, 197, 94, 0.2)' },
+  ];
+
+  const selectOptions = selectField === 'type' ? TYPE_OPTIONS : STATUS_OPTIONS;
+  const selectTitle = selectField === 'type' ? 'Select Type' : 'Select Status';
+  const selectCurrentValue = selectField === 'type' ? filterType : filterStatus;
+  const typeLabel = TYPE_OPTIONS.find((o) => o.value === filterType)?.label ?? 'All Types';
+  const statusLabel = STATUS_OPTIONS.find((o) => o.value === filterStatus)?.label ?? 'All Statuses';
+  const dateRangeLabel = startDate || endDate ? `${startDate || '…'} to ${endDate || '…'}` : 'All Time';
+
+  const chooseOption = (value: string) => {
+    if (selectField === 'type') setFilterType(value as TypeFilter);
+    else if (selectField === 'status') setFilterStatus(value as StatusFilter);
+    setSelectField(null);
+  };
+
+  return (
+    <View style={styles.root}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerBrand}>
+            <Image source={pncLogo} style={styles.headerPncLogo} resizeMode="contain" />
+            <OamsLogo style={styles.headerOamsLogo} outline={isDarkMode} />
+          </View>
+          <View style={styles.headerActions}>
+            <Pressable style={styles.iconBtn} onPress={toggleTheme} hitSlop={8}>
+              <Image source={isDarkMode ? sunIcon : darkModeIcon} style={styles.iconBtnImg} resizeMode="contain" />
+            </Pressable>
+            <RefreshButton onPress={() => fetchTransactions(1)} loading={txLoading} style={styles.iconBtn} color={theme.text} label="Refresh transactions" />
+            <NotificationBell
+              endpointBase="student"
+              theme={theme}
+              typePaths={STUDENT_NOTIFICATION_PATHS}
+              viewAllPath={STUDENT_NOTIFICATIONS_VIEW_ALL}
+            />
+            <Pressable style={styles.iconBtn} onPress={() => setMenuOpen(true)} hitSlop={8}>
+              <Ionicons name="menu-outline" size={20} color={theme.text} />
+            </Pressable>
+          </View>
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Breadcrumb */}
+          <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
+            <ChevronLeft size={18} color={theme.subtext} />
+            <Text style={styles.breadcrumbText}>Home</Text>
+          </Pressable>
+
+          {/* Title */}
+          <View style={styles.titleRow}>
+            <LinearGradient colors={['#22c55e', '#16a34a']} style={styles.titleIcon}>
+              <ClipboardList size={22} color="#ffffff" />
+            </LinearGradient>
+            <View style={styles.titleTextWrap}>
+              <Text style={styles.pageTitle}>Transaction History</Text>
+              <Text style={styles.pageSubtitle}>View all your activities and transactions.</Text>
+            </View>
+          </View>
+
+          {/* Stats Grid */}
+          <View style={styles.statsGrid}>
+            {stats.map((stat) => (
+              <View key={stat.key} style={styles.statCard}>
+                <View style={[styles.statIcon, { backgroundColor: stat.bg, borderColor: stat.border }]}>
+                  <stat.icon size={18} color={stat.color} />
+                </View>
+                <Text style={[styles.statValue, { color: stat.color }]}>{stat.value}</Text>
+                <Text style={styles.statLabel}>{stat.label}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Filters */}
+          <View style={styles.filtersCard}>
+            <View style={styles.filtersHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.filtersTitle}>Transaction Filter</Text>
+                <Text style={styles.filtersDescription}>Search and filter your transactions.</Text>
+              </View>
+              <ExportMenu
+                theme={theme}
+                triggerStyle={[styles.exportBtn, transactions.length === 0 && styles.exportBtnDisabled]}
+                triggerTextStyle={styles.exportBtnText}
+                disabled={transactions.length === 0 || exporting}
+                busy={exporting}
+                onExportCsv={handleExportCsv}
+                onExportPdf={handleExportPdf}
+              />
+            </View>
+
+            <View style={styles.filterField}>
+              <Text style={styles.filterLabel}>Search</Text>
+              <View style={styles.searchWrapper}>
+                <Search size={16} color={theme.tertiary} style={styles.searchIcon} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search transactions..."
+                  placeholderTextColor={theme.tertiary}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+              </View>
+            </View>
+
+            <View style={styles.filterField}>
+              <Text style={styles.filterLabel}>Type</Text>
+              <Pressable style={styles.filterSelect} onPress={() => setSelectField('type')}>
+                <Text style={styles.filterSelectText} numberOfLines={1}>{typeLabel}</Text>
+                <ChevronDown size={16} color={theme.primary} />
+              </Pressable>
+            </View>
+
+            <View style={styles.filterField}>
+              <Text style={styles.filterLabel}>Status</Text>
+              <Pressable style={styles.filterSelect} onPress={() => setSelectField('status')}>
+                <Text style={styles.filterSelectText} numberOfLines={1}>{statusLabel}</Text>
+                <ChevronDown size={16} color={theme.primary} />
+              </Pressable>
+            </View>
+
+            <View style={[styles.filterField, styles.dateSection]}>
+              <Text style={styles.filterLabel}>Date Range</Text>
+              <View style={styles.filterRow}>
+                <Pressable style={[styles.filterSelect, styles.filterSelectHalf]} onPress={() => setShowStartPicker(true)}>
+                  <Text style={startDate ? styles.filterSelectText : styles.filterSelectPlaceholder} numberOfLines={1}>
+                    {startDate || 'From'}
+                  </Text>
+                  <Calendar size={16} color={theme.primary} />
+                </Pressable>
+                <Pressable style={[styles.filterSelect, styles.filterSelectHalf]} onPress={() => setShowEndPicker(true)}>
+                  <Text style={endDate ? styles.filterSelectText : styles.filterSelectPlaceholder} numberOfLines={1}>
+                    {endDate || 'To'}
+                  </Text>
+                  <Calendar size={16} color={theme.primary} />
+                </Pressable>
+                {(startDate || endDate) && (
+                  <Pressable
+                    style={styles.dateClearBtn}
+                    onPress={() => { setStartDate(''); setEndDate(''); }}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="close" size={16} color={theme.tertiary} />
+                  </Pressable>
+                )}
+              </View>
+              {showStartPicker && (
+                <DatePickerSheet
+                  value={startDate ? fromLocalYMD(startDate) : new Date()}
+                  maximumDate={fromLocalYMD(getManilaDateString())}
+                  onChange={(event, selectedDate) => {
+                    setShowStartPicker(false);
+                    if (event.type === 'set' && selectedDate) setStartDate(toLocalYMD(selectedDate));
+                  }}
+                />
+              )}
+              {showEndPicker && (
+                <DatePickerSheet
+                  value={endDate ? fromLocalYMD(endDate) : new Date()}
+                  minimumDate={startDate ? fromLocalYMD(startDate) : undefined}
+                  maximumDate={fromLocalYMD(getManilaDateString())}
+                  onChange={(event, selectedDate) => {
+                    setShowEndPicker(false);
+                    if (event.type === 'set' && selectedDate) setEndDate(toLocalYMD(selectedDate));
+                  }}
+                />
+              )}
+            </View>
+          </View>
+
+          {offlineCachedAt && <OfflineBanner cachedAt={offlineCachedAt} theme={theme} />}
+
+          {/* Transaction List */}
+          {txLoading ? (
+            <View style={styles.emptyCard}>
+              <Search size={32} color={theme.tertiary} />
+              <Text style={styles.emptyTitle}>Loading transactions…</Text>
+            </View>
+          ) : txError ? (
+            <View style={styles.emptyCard}>
+              <AlertCircle size={32} color={theme.tertiary} />
+              <Text style={styles.emptyTitle}>Could not load transactions</Text>
+              <Text style={styles.emptyDescription}>{txError}</Text>
+            </View>
+          ) : transactions.length > 0 ? (
+            <View style={styles.txList}>
+              {transactions.map((t) => {
+                const typeMeta = TYPE_META[t.type];
+                const statusMeta = isDarkMode ? STATUS_META_DARK[t.status] : STATUS_META_LIGHT[t.status];
+                return (
+                  <View key={t.id} style={[styles.txCard, { borderColor: typeMeta.border }]}>
+                    <View style={styles.txHeaderRow}>
+                      <View style={[styles.txIconWrap, { backgroundColor: typeMeta.color }]}>
+                        <typeMeta.icon size={15} color="#ffffff" />
+                      </View>
+                      <View style={styles.txTitleSection}>
+                        <Text style={styles.txTitle}>{t.title}</Text>
+                        <View style={styles.txBadgesRow}>
+                          <View style={[styles.txBadge, { backgroundColor: typeMeta.bg }]}>
+                            <Text style={[styles.txBadgeText, { color: typeMeta.color }]}>{typeMeta.label}</Text>
+                          </View>
+                          <View style={[styles.txBadge, { backgroundColor: statusMeta.bg }]}>
+                            <Text style={[styles.txBadgeText, { color: statusMeta.color }]}>{statusMeta.label}</Text>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+
+                    <Text style={styles.txCollege}>{t.college}</Text>
+                    <Text style={styles.txDetails}>{t.details}</Text>
+
+                    {t.type === 'appointment' && t.cancelledBy === 'student_no_show' && (
+                      <Text style={styles.txDetails}>
+                        Reported not served{t.cancelReason ? `: ${t.cancelReason}` : ''}
+                      </Text>
+                    )}
+
+                    {/* Rejected and cancelled share one bucket in this feed, and older
+                        rows with this value were cancelled -- hence neutral wording. */}
+                    {t.type === 'appointment' && t.cancelledBy === 'system_expired' && (
+                      <Text style={styles.txDetails}>
+                        Closed automatically — not approved before its scheduled time ended
+                      </Text>
+                    )}
+
+                    {t.type === 'appointment' && t.cancelledBy === 'system_not_entertained' && (
+                      <Text style={styles.txDetails}>
+                        Automatically cancelled — not marked as served in time{t.cancelReason ? `: ${t.cancelReason}` : ''}
+                      </Text>
+                    )}
+
+                    {t.type === 'appointment' && t.sharedComment && (
+                      <ActionsTakenToggle
+                        text={t.sharedComment}
+                        meta={t.commentUpdatedAt
+                          ? `— last updated by ${t.commentUpdatedBy === 'student' ? 'you' : 'faculty'} on ${formatManilaDate(t.commentUpdatedAt)}`
+                          : null}
+                        boxStyle={styles.txComment}
+                        textStyle={styles.txCommentText}
+                        metaStyle={styles.txCommentMeta}
+                      />
+                    )}
+
+                    {t.type === 'appointment' && (t.approvedAtRaw || t.completedAtRaw) && (
+                      <View style={styles.txTimelineRow}>
+                        {t.approvedAtRaw && (
+                          <View style={styles.txMetaItem}>
+                            <CheckCircle size={13} color={theme.tertiary} />
+                            <Text style={styles.txMetaText}>
+                              Approved {formatManilaDate(t.approvedAtRaw, { month: 'short', day: 'numeric', year: 'numeric' })} · {formatManilaTime(t.approvedAtRaw)}
+                            </Text>
+                          </View>
+                        )}
+                        {t.completedAtRaw && (
+                          <View style={styles.txMetaItem}>
+                            <CheckCircle size={13} color={theme.tertiary} />
+                            <Text style={styles.txMetaText}>
+                              Completed {formatManilaDate(t.completedAtRaw, { month: 'short', day: 'numeric', year: 'numeric' })} · {formatManilaTime(t.completedAtRaw)}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
+
+                    <View style={styles.txMetaRow}>
+                      <View style={styles.txMetaItem}>
+                        <Calendar size={13} color={theme.tertiary} />
+                        <Text style={styles.txMetaText}>{formatDateShort(t.date)}</Text>
+                      </View>
+                      <View style={styles.txMetaItem}>
+                        <Clock size={13} color={theme.tertiary} />
+                        <Text style={styles.txMetaText}>{t.time}</Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={styles.emptyCard}>
+              <ClipboardList size={32} color={theme.tertiary} />
+              <Text style={styles.emptyTitle}>No Transactions Found</Text>
+              <Text style={styles.emptyDescription}>You have no transaction records yet.</Text>
+            </View>
+          )}
+
+          {!txLoading && !txError && page < totalPages && (
+            <Pressable style={styles.loadMoreBtn} onPress={handleLoadMore} disabled={loadingMore}>
+              <Text style={styles.loadMoreBtnText}>{loadingMore ? 'Loading…' : 'Load More'}</Text>
+            </Pressable>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+
+      {/* Nav Drawer */}
+      <Modal visible={menuOpen} animationType="fade" transparent onRequestClose={() => setMenuOpen(false)}>
+        <View style={styles.drawerOverlay}>
+          <SafeAreaView style={styles.drawerPanel} edges={['top', 'bottom']}>
+            <View style={styles.drawerProfile}>
+              <View style={styles.drawerProfileHeader}>
+                <View style={styles.drawerAvatar}>
+                  <Ionicons name="person-outline" size={15} color={theme.primary} />
+                </View>
+                <Text style={styles.drawerName}>{user?.name ?? 'Student'}</Text>
+              </View>
+              <View style={styles.drawerRoleBadge}>
+                <Text style={styles.drawerRoleBadgeText}>Student</Text>
+              </View>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''} ({user?.departmentAbbrev ?? ''})</Text>
+            </View>
+
+            <View style={styles.drawerNav}>
+              {navItems.map((item) => {
+                const active = item.key === 'transactions';
+                return (
+                  <Pressable
+                    key={item.key}
+                    style={[styles.drawerNavItem, active && styles.drawerNavItemActive]}
+                    onPress={() => handleNavPress(item.key)}
+                  >
+                    <item.icon size={18} color={active ? '#ffffff' : theme.subtext} />
+                    <Text style={[styles.drawerNavLabel, active && styles.drawerNavLabelActive]}>
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Pressable style={styles.drawerLogout} onPress={handleLogout}>
+              <Ionicons name="log-out-outline" size={18} color="#ef4444" />
+              <Text style={styles.drawerLogoutText}>Logout</Text>
+            </Pressable>
+          </SafeAreaView>
+          <Pressable style={styles.drawerBackdrop} onPress={() => setMenuOpen(false)} />
+        </View>
+      </Modal>
+
+      {/* Filter Options Modal (Type / Status) */}
+      <Modal visible={selectField !== null} animationType="fade" transparent onRequestClose={() => setSelectField(null)}>
+        <View style={styles.logoutOverlay}>
+          <View style={styles.filterModalCard}>
+            <Text style={styles.logoutModalTitle}>{selectTitle}</Text>
+            <ScrollView style={styles.filterOptionsList}>
+              {selectOptions.map((opt) => {
+                const selected = opt.value === selectCurrentValue;
+                return (
+                  <Pressable
+                    key={opt.value}
+                    style={[styles.filterOptionRow, selected && styles.filterOptionRowActive]}
+                    onPress={() => chooseOption(opt.value)}
+                  >
+                    <Text style={[styles.filterOptionText, selected && styles.filterOptionTextActive]} numberOfLines={2}>
+                      {opt.label}
+                    </Text>
+                    {selected && <Ionicons name="checkmark" size={16} color={theme.primary} />}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            <Pressable style={styles.filterModalClose} onPress={() => setSelectField(null)}>
+              <Text style={styles.filterModalCloseText}>Close</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Confirm Logout Modal */}
+      <Modal visible={logoutModalVisible} animationType="fade" transparent onRequestClose={() => setLogoutModalVisible(false)}>
+        <View style={styles.logoutOverlay}>
+          <View style={styles.logoutModalCard}>
+            <View style={styles.logoutIconCircle}>
+              <Ionicons name="log-out-outline" size={26} color="#ef4444" />
+            </View>
+            <Text style={styles.logoutModalTitle}>Confirm Logout</Text>
+            <Text style={styles.logoutModalDescription}>
+              Are you sure you want to log out? Any unsaved changes will be lost.
+            </Text>
+            <View style={styles.logoutModalActions}>
+              <Pressable style={styles.logoutCancelBtn} onPress={() => setLogoutModalVisible(false)}>
+                <Text style={styles.logoutCancelBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.logoutConfirmBtn} onPress={confirmLogout}>
+                <Ionicons name="log-out-outline" size={16} color="#ffffff" />
+                <Text style={styles.logoutConfirmBtnText}>Log Out</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+type ThemePalette = {
+  background: string;
+  card: string;
+  cardAlt: string;
+  cardAltBorder: string;
+  border: string;
+  headerBg: string;
+  headerBorder: string;
+  text: string;
+  subtext: string;
+  tertiary: string;
+  primary: string;
+  primaryDark: string;
+  success: string;
+  blue: string;
+  purple: string;
+  orange: string;
+  amber: string;
+  iconBtnBg: string;
+  iconBtnBorder: string;
+};
+
+const darkPalette: ThemePalette = {
+  background: '#0a0f0a',
+  card: '#111612',
+  cardAlt: 'rgba(17, 22, 18, 0.6)',
+  cardAltBorder: 'rgba(34, 197, 94, 0.2)',
+  border: '#1e3a23',
+  headerBg: 'rgba(17, 22, 18, 0.95)',
+  headerBorder: 'rgba(34, 197, 94, 0.15)',
+  text: '#f0fdf4',
+  subtext: '#94a3b8',
+  tertiary: '#94a3b8',
+  primary: '#16a34a',
+  primaryDark: '#15803d',
+  success: '#10b981',
+  blue: '#3b82f6',
+  purple: '#a855f7',
+  orange: '#f97316',
+  amber: '#f59e0b',
+  iconBtnBg: 'rgba(34, 197, 94, 0.1)',
+  iconBtnBorder: 'rgba(34, 197, 94, 0.2)',
+};
+
+const lightPalette: ThemePalette = {
+  background: '#f8fafc',
+  card: '#ffffff',
+  cardAlt: 'rgba(248, 250, 252, 0.9)',
+  cardAltBorder: '#e2e8f0',
+  border: '#e2e8f0',
+  headerBg: 'rgba(255, 255, 255, 0.95)',
+  headerBorder: 'rgba(34, 197, 94, 0.15)',
+  text: '#1e293b',
+  subtext: '#64748b',
+  tertiary: '#64748b',
+  primary: '#166534',
+  primaryDark: '#14532d',
+  success: '#059669',
+  blue: '#2563eb',
+  purple: '#9333ea',
+  orange: '#ea580c',
+  amber: '#d97706',
+  iconBtnBg: 'rgba(34, 197, 94, 0.08)',
+  iconBtnBorder: 'rgba(34, 197, 94, 0.15)',
+};
+
+function createStyles(theme: ThemePalette) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: theme.background },
+    safeArea: { flex: 1 },
+
+    // Header
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: theme.headerBg,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.headerBorder,
+    },
+    headerBrand: { flexDirection: 'row', alignItems: 'center', gap: 0 },
+    headerPncLogo: { width: 40, height: 40 },
+    headerOamsLogo: { height: 34, width: 96 },
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    iconBtn: {
+      padding: 8,
+      borderRadius: 10,
+      backgroundColor: theme.iconBtnBg,
+      borderWidth: 1,
+      borderColor: theme.iconBtnBorder,
+    },
+    iconBtnImg: { width: 18, height: 18 },
+
+    scrollContent: { padding: 16, gap: 20, paddingBottom: 40 },
+
+    // Breadcrumb
+    breadcrumb: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
+    breadcrumbText: { fontSize: 14, fontWeight: '600', color: theme.subtext },
+
+    // Title
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+    titleIcon: {
+      width: 56,
+      height: 56,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    titleTextWrap: { flex: 1 },
+    pageTitle: { fontSize: 22, fontWeight: '800', color: theme.text, letterSpacing: -0.3 },
+    pageSubtitle: { fontSize: 12, color: theme.subtext, marginTop: 3 },
+
+    // Stats
+    statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    statCard: {
+      width: '47%',
+      alignItems: 'flex-start',
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: 'rgba(34, 197, 94, 0.2)',
+      borderRadius: 16,
+      padding: 14,
+    },
+    statIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 10,
+    },
+    statValue: { fontSize: 24, fontWeight: '800' },
+    statLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: theme.tertiary,
+      marginTop: 2,
+    },
+
+    // Filters card
+    filtersCard: {
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: 'rgba(34, 197, 94, 0.15)',
+      borderRadius: 18,
+      padding: 18,
+      gap: 14,
+    },
+    filtersTitle: { fontSize: 17, fontWeight: '800', color: theme.text, textAlign: 'center' },
+    filtersDescription: { fontSize: 12, color: theme.tertiary, textAlign: 'center', marginTop: -8 },
+    filtersHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 4 },
+    exportBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+      flexShrink: 0,
+    },
+    exportBtnText: { fontSize: 12, fontWeight: '700', color: theme.text },
+    exportBtnDisabled: { opacity: 0.5 },
+    filterField: { gap: 6 },
+    filterLabel: { fontSize: 12, fontWeight: '700', color: theme.text },
+    searchWrapper: {
+      position: 'relative',
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    searchIcon: { position: 'absolute', left: 14, zIndex: 1 },
+    searchInput: {
+      flex: 1,
+      paddingVertical: 12,
+      paddingLeft: 40,
+      paddingRight: 14,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.background,
+      color: theme.text,
+      fontSize: 13,
+    },
+    filterSelect: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.background,
+    },
+    filterSelectText: { fontSize: 13, color: theme.text, flex: 1, marginRight: 8 },
+    filterSelectPlaceholder: { fontSize: 13, color: theme.tertiary, flex: 1, marginRight: 8 },
+    filterRow: { flexDirection: 'row', gap: 10 },
+    filterSelectHalf: { flex: 1 },
+    dateClearBtn: {
+      width: 38,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.background,
+    },
+    dateSection: {
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      marginTop: 4,
+      paddingTop: 14,
+    },
+
+    loadMoreBtn: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 13,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.card,
+    },
+    loadMoreBtnText: { fontSize: 13, fontWeight: '700', color: theme.primary },
+
+    // Transaction list
+    txList: { gap: 10 },
+    txCard: {
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderRadius: 16,
+      padding: 11,
+      gap: 7,
+    },
+    txHeaderRow: { flexDirection: 'row', gap: 9, alignItems: 'flex-start' },
+    txIconWrap: {
+      width: 33,
+      height: 33,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    txTitleSection: { flex: 1, gap: 6 },
+    txTitle: { fontSize: 13.5, fontWeight: '700', color: theme.text },
+    txBadgesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    txBadge: {
+      borderRadius: 6,
+      paddingVertical: 3,
+      paddingHorizontal: 8,
+    },
+    txBadgeText: {
+      fontSize: 9,
+      fontWeight: '700',
+      textTransform: 'capitalize',
+    },
+    txCollege: { fontSize: 11, color: theme.tertiary },
+    txDetails: { fontSize: 12, color: theme.subtext, lineHeight: 16 },
+    txComment: {
+      backgroundColor: 'rgba(168, 85, 247, 0.08)',
+      borderWidth: 1,
+      borderColor: 'rgba(168, 85, 247, 0.25)',
+      borderRadius: 10,
+      padding: 10,
+      gap: 4,
+    },
+    txCommentText: { fontSize: 12, fontWeight: '600', color: '#a855f7', lineHeight: 16 },
+    txCommentMeta: { fontSize: 10.5, color: theme.tertiary },
+    txMetaRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 4,
+      paddingTop: 8,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+    },
+    txMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    txMetaText: { fontSize: 10.5, color: theme.tertiary, fontWeight: '600' },
+    txTimelineRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 },
+
+    // Empty state
+    emptyCard: {
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 18,
+      paddingVertical: 32,
+      paddingHorizontal: 20,
+      alignItems: 'center',
+      gap: 8,
+    },
+    emptyTitle: { fontSize: 15, fontWeight: '700', color: theme.text },
+    emptyDescription: { fontSize: 12, color: theme.tertiary, textAlign: 'center', lineHeight: 18 },
+
+    // Nav drawer
+    drawerOverlay: { flex: 1, flexDirection: 'row' },
+    drawerPanel: {
+      width: 270,
+      backgroundColor: theme.card,
+      borderRightWidth: 1,
+      borderRightColor: theme.border,
+      padding: 20,
+      justifyContent: 'space-between',
+    },
+    drawerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+    drawerProfile: {
+      width: '100%',
+      alignItems: 'flex-start',
+      gap: 8,
+      backgroundColor: 'rgba(22, 163, 74, 0.12)',
+      borderWidth: 1,
+      borderColor: 'rgba(22, 163, 74, 0.25)',
+      borderRadius: 14,
+      padding: 14,
+    },
+    drawerProfileHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    drawerAvatar: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: 'rgba(22, 163, 74, 0.18)',
+      borderWidth: 1,
+      borderColor: 'rgba(22, 163, 74, 0.3)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    drawerName: { fontSize: 15, fontWeight: '700', color: theme.text },
+    drawerRoleBadge: {
+      backgroundColor: 'rgba(22, 163, 74, 0.18)',
+      borderRadius: 999,
+      paddingVertical: 3,
+      paddingHorizontal: 10,
+    },
+    drawerRoleBadgeText: { fontSize: 11, fontWeight: '700', color: theme.primary },
+    drawerCollege: { fontSize: 12, fontWeight: '500', color: theme.subtext },
+    drawerNav: { flex: 1, marginTop: 28, gap: 4 },
+    drawerNavItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 11,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+    },
+    drawerNavItemActive: { backgroundColor: theme.primary },
+    drawerNavLabel: { fontSize: 14, fontWeight: '600', color: theme.subtext },
+    drawerNavLabelActive: { color: '#ffffff' },
+    drawerLogout: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: 'rgba(239, 68, 68, 0.3)',
+      backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    },
+    drawerLogoutText: { fontSize: 14, fontWeight: '700', color: '#ef4444' },
+
+    // Confirm / filter modals (shared card look)
+    logoutOverlay: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      padding: 24,
+    },
+    logoutModalCard: {
+      width: '100%',
+      maxWidth: 340,
+      alignItems: 'center',
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 20,
+      padding: 24,
+    },
+    logoutIconCircle: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(239, 68, 68, 0.15)',
+      marginBottom: 16,
+    },
+    logoutModalTitle: { fontSize: 18, fontWeight: '800', color: theme.text, marginBottom: 8 },
+    logoutModalDescription: {
+      fontSize: 13,
+      color: theme.subtext,
+      textAlign: 'center',
+      lineHeight: 19,
+      marginBottom: 20,
+    },
+    logoutModalActions: { flexDirection: 'row', gap: 12, width: '100%' },
+    logoutCancelBtn: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+    },
+    logoutCancelBtnText: { fontSize: 14, fontWeight: '700', color: theme.text },
+    logoutConfirmBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 12,
+      borderRadius: 12,
+      backgroundColor: '#ef4444',
+      paddingHorizontal: 10,
+    },
+    logoutConfirmBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff', flexShrink: 1, textAlign: 'center' },
+
+    // Filter options modal
+    filterModalCard: {
+      width: '100%',
+      maxWidth: 340,
+      maxHeight: '70%',
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 20,
+      padding: 20,
+      alignItems: 'stretch',
+      gap: 12,
+    },
+    filterOptionsList: { maxHeight: 320 },
+    filterOptionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      marginBottom: 2,
+    },
+    filterOptionRowActive: { backgroundColor: 'rgba(22, 163, 74, 0.12)' },
+    filterOptionText: { fontSize: 13, color: theme.text, flex: 1, paddingRight: 8 },
+    filterOptionTextActive: { color: theme.primary, fontWeight: '700' },
+    filterModalClose: {
+      paddingVertical: 12, alignItems: 'center', borderTopWidth: 1, borderTopColor: theme.border, marginTop: 4,
+    },
+    filterModalCloseText: { fontSize: 13, fontWeight: '700', color: theme.subtext },
+  });
+}

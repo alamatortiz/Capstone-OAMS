@@ -1,0 +1,1534 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Alert,
+  Animated,
+  Easing,
+  Image,
+  ImageSourcePropType,
+  Linking,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertCircle, Calendar, CheckCircle, ChevronLeft, ChevronRight, Clock, FileText, GraduationCap,
+  Home as HomeIcon, LayoutList, Loader2, Megaphone, MessageSquare, Users, XCircle, ClipboardList,
+} from 'lucide-react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
+import NotificationBell from '@/components/NotificationBell';
+import RefreshButton from '@/components/RefreshButton';
+import QueueReasonModal from '@/components/QueueReasonModal';
+import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
+import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
+import { notify } from '@/utils/notifications';
+import { formatManilaDate, formatManilaTime, getManilaDateString } from '@/utils/date';
+import { filterByRange } from '@/utils/dateRange';
+import { canStudentCancel, isAutoRejected } from '@/utils/appointmentActions';
+
+// Mirrors web's CSS `spin 1s linear infinite` on Loader2 for loading states.
+function SpinningLoader({ size, color }: { size: number; color: string }) {
+  const spin = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.timing(spin, { toValue: 1, duration: 1000, easing: Easing.linear, useNativeDriver: true }),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [spin]);
+  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  return (
+    <Animated.View style={{ transform: [{ rotate }] }}>
+      <Loader2 size={size} color={color} />
+    </Animated.View>
+  );
+}
+
+const pncLogo = require('@/assets/Pnc-Logo.png');
+const oamsLogo = require('@/assets/oams_logo.png');
+const darkModeIcon = require('@/assets/darkmode_icon.png');
+const sunIcon = require('@/assets/sun_icon.png');
+const ccsLogo = require('@/assets/CCS.png');
+const cbaaLogo = require('@/assets/CBAA.png');
+const coedLogo = require('@/assets/COED.png');
+const coeLogo = require('@/assets/COE.png');
+const casLogo = require('@/assets/CAS.png');
+const chasLogo = require('@/assets/CHAS.png');
+
+type LucideIconType = typeof Calendar;
+
+const collegeLogos: Record<string, ImageSourcePropType> = {
+  CCS: ccsLogo,
+  CBAA: cbaaLogo,
+  COED: coedLogo,
+  COE: coeLogo,
+  CAS: casLogo,
+  CHAS: chasLogo,
+};
+
+function OamsLogo({
+  style,
+  outline,
+}: {
+  style: { height: number; width: number };
+  outline: boolean;
+}) {
+  if (!outline) {
+    return <Image source={oamsLogo} style={style} resizeMode="contain" />;
+  }
+  const layerStyle = {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    width: style.width,
+    height: style.height,
+  };
+  return (
+    <View style={[style, { position: 'relative', overflow: 'hidden' }]}>
+      {[
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ].map(([dx, dy]) => (
+        <Image
+          key={`${dx}-${dy}`}
+          source={oamsLogo}
+          resizeMode="contain"
+          style={[
+            layerStyle,
+            { tintColor: '#ffffff', transform: [{ translateX: dx }, { translateY: dy }] },
+          ]}
+        />
+      ))}
+      <Image source={oamsLogo} resizeMode="contain" style={layerStyle} />
+    </View>
+  );
+}
+
+type BookingStatus = 'pending' | 'approved' | 'completed' | 'rejected' | 'cancelled';
+
+interface Appointment {
+  id: string;
+  trackingNumber?: string | null;
+  person: string;
+  college: string;
+  collegeAbbrev?: string;
+  date: string;
+  windowStart: string;
+  windowEnd: string;
+  location: string;
+  purpose: string;
+  status: BookingStatus;
+  createdAt: string;
+  appointmentType?: string;
+  rejectionReason?: string;
+  bookingYearProgram?: string | null;
+  courseCode?: string | null;
+  slotNote?: string | null;
+  sharedComment?: string | null;
+  commentUpdatedBy?: 'student' | 'faculty' | null;
+  commentUpdatedAt?: string | null;
+  approvedAtRaw?: string | null;
+  completedAtRaw?: string | null;
+  cancelledBy?: 'student' | 'faculty' | 'system' | 'system_expired' | 'student_no_show' | 'system_not_entertained' | null;
+  cancelReason?: string | null;
+}
+
+const STATUS_LABELS: Record<BookingStatus, string> = {
+  pending: 'Pending', approved: 'Approved', completed: 'Completed', rejected: 'Rejected', cancelled: 'Cancelled',
+};
+
+type StatusStyle = { bg: string; border: string; color: string };
+
+// Mirrors AppointmentListItem.css's .apst-badge-* (dark) and
+// [data-theme="light"] .apst-badge-* (light) values exactly -- the same
+// shared badge classes student_appointments.tsx's booking cards use.
+const STATUS_STYLES_DARK: Record<BookingStatus, StatusStyle> = {
+  pending: { bg: 'rgba(251, 191, 36, 0.2)', border: 'rgba(251, 191, 36, 0.4)', color: '#fcd34d' },
+  approved: { bg: 'rgba(34, 197, 94, 0.18)', border: 'rgba(34, 197, 94, 0.35)', color: '#86efac' },
+  completed: { bg: 'rgba(16, 185, 129, 0.18)', border: 'rgba(16, 185, 129, 0.35)', color: '#34d399' },
+  rejected: { bg: 'rgba(239, 68, 68, 0.18)', border: 'rgba(239, 68, 68, 0.35)', color: '#fca5a5' },
+  cancelled: { bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.35)', color: '#d1d5db' },
+};
+
+const STATUS_STYLES_LIGHT: Record<BookingStatus, StatusStyle> = {
+  pending: { bg: 'rgba(217, 119, 6, 0.1)', border: 'rgba(217, 119, 6, 0.3)', color: '#92400e' },
+  approved: { bg: 'rgba(5, 150, 105, 0.1)', border: 'rgba(5, 150, 105, 0.25)', color: '#065f46' },
+  completed: { bg: 'rgba(5, 150, 105, 0.1)', border: 'rgba(5, 150, 105, 0.25)', color: '#065f46' },
+  rejected: { bg: 'rgba(220, 38, 38, 0.08)', border: 'rgba(220, 38, 38, 0.2)', color: '#991b1b' },
+  cancelled: { bg: 'rgba(107, 114, 128, 0.08)', border: 'rgba(107, 114, 128, 0.2)', color: '#374151' },
+};
+
+interface NavItem {
+  key: string;
+  label: string;
+  icon: LucideIconType;
+}
+
+const navItems: NavItem[] = [
+  { key: 'dashboard', label: 'Home', icon: HomeIcon },
+  { key: 'announcements', label: 'Announcements', icon: Megaphone },
+  { key: 'queue', label: 'Queue', icon: Users },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: ClipboardList },
+];
+
+type TabKey = 'all' | BookingStatus;
+type RangeKey = 'today' | 'week' | 'nextWeek' | 'all';
+
+const RANGE_LABELS: Record<RangeKey, string> = {
+  today: 'Today',
+  week: 'This Week',
+  nextWeek: 'Next Week',
+  all: 'All Time',
+};
+
+const TABS: { key: TabKey; label: string; icon: LucideIconType }[] = [
+  { key: 'all', label: 'All', icon: LayoutList },
+  { key: 'pending', label: 'Pending', icon: Clock },
+  { key: 'approved', label: 'Approved', icon: CheckCircle },
+  { key: 'completed', label: 'Completed', icon: CheckCircle },
+  { key: 'rejected', label: 'Rejected', icon: XCircle },
+  { key: 'cancelled', label: 'Cancelled', icon: XCircle },
+];
+
+const formatDate = (dateString: string) => {
+  const [y, m, d] = dateString.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+  });
+};
+
+const formatDateShort = (dateString: string) => {
+  const [y, m, d] = dateString.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+};
+
+const formatTime = (time: string) => {
+  // GET /student/appointments already sends "2:17 PM" -- re-formatting it
+  // produced "2:17 PM AM". Only raw "HH:MM:SS" values need converting.
+  if (/\s?[AP]M$/i.test(time.trim())) return time.trim();
+  const [hours, minutes] = time.split(':');
+  const hour = parseInt(hours, 10);
+  return `${hour % 12 || 12}:${minutes} ${hour >= 12 ? 'PM' : 'AM'}`;
+};
+
+// The student's own one-shot feedback on a finished appointment -- mirrors
+// web stud-appointment-status.jsx's FeedbackCard. Renders nothing until the
+// appointment is completed and we know whether they've already spoken; the
+// DB's PK on appointment_id is what enforces "exactly once".
+function FeedbackCard({
+  appointmentId,
+  theme,
+  styles,
+  onSubmitted,
+}: {
+  appointmentId: string;
+  theme: ThemePalette;
+  styles: ReturnType<typeof createStyles>;
+  onSubmitted: () => void;
+}) {
+  const [state, setState] = useState<{ canSubmit: boolean; feedback: { text: string; createdAt: string } | null } | null>(null);
+  const [text, setText] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .get(`/student/appointments/${appointmentId}/feedback`)
+      .then(({ data }) => { if (active) setState(data); })
+      .catch(() => { if (active) setState({ canSubmit: false, feedback: null }); });
+    return () => { active = false; };
+  }, [appointmentId]);
+
+  const submit = async () => {
+    const trimmed = text.trim();
+    if (!trimmed || saving) return;
+    setSaving(true);
+    try {
+      await api.post(`/student/appointments/${appointmentId}/feedback`, { feedback: trimmed });
+      setState({ canSubmit: false, feedback: { text: trimmed, createdAt: new Date().toISOString() } });
+      Alert.alert('Thank you', 'Thanks for your feedback.');
+      onSubmitted();
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.error ?? "Couldn't send your feedback. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!state || (!state.canSubmit && !state.feedback)) return null;
+
+  return (
+    <View style={styles.infoCard}>
+      <View style={styles.infoCardHeader}>
+        <MessageSquare size={18} color={theme.purple} />
+        <Text style={styles.infoCardTitle}>Your Feedback</Text>
+      </View>
+      <View style={styles.infoCardBody}>
+        {state.feedback ? (
+          <>
+            <Text style={styles.feedbackText}>{state.feedback.text}</Text>
+            <Text style={styles.feedbackMeta}>
+              Submitted on {formatManilaDate(state.feedback.createdAt, { month: 'short', day: 'numeric', year: 'numeric' })} — thanks for sharing.
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.feedbackMeta}>Optional, and you can only send it once.</Text>
+            <TextInput
+              style={styles.feedbackInput}
+              placeholder="How's the appointment/service?"
+              placeholderTextColor={theme.tertiary}
+              selectionColor={theme.purple}
+              value={text}
+              onChangeText={setText}
+              maxLength={2000}
+              multiline
+              numberOfLines={4}
+            />
+            <View style={styles.feedbackActions}>
+              <Text style={styles.feedbackMeta}>{text.length}/2000</Text>
+              <Pressable onPress={submit} disabled={!text.trim() || saving}>
+                <LinearGradient
+                  colors={['#a855f7', '#9333ea']}
+                  style={[styles.feedbackSendBtn, (!text.trim() || saving) && { opacity: 0.6 }]}
+                >
+                  <Text style={styles.feedbackSendText}>{saving ? 'Sending…' : 'Send Feedback'}</Text>
+                </LinearGradient>
+              </Pressable>
+            </View>
+          </>
+        )}
+      </View>
+    </View>
+  );
+}
+
+export default function StudentAppointmentStatusScreen() {
+  const { isDarkMode, toggleTheme } = useTheme();
+  const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const params = useLocalSearchParams<{ appointmentId?: string; fromBookings?: string }>();
+  const [selectedId, setSelectedId] = useState<string | null>(params.appointmentId ?? null);
+  const [activeTab, setActiveTab] = useState<TabKey>('all');
+  const [allRange, setAllRange] = useState<RangeKey>('today');
+  const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState<string | null>(null);
+  const [completeConfirmId, setCompleteConfirmId] = useState<string | null>(null);
+  const [completing, setCompleting] = useState<string | null>(null);
+  const [reportConfirmId, setReportConfirmId] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reporting, setReporting] = useState<string | null>(null);
+  const router = useRouter();
+  const { user, token, logout } = useAuth();
+
+  const theme = isDarkMode ? darkPalette : lightPalette;
+  const statusStyles = isDarkMode ? STATUS_STYLES_DARK : STATUS_STYLES_LIGHT;
+  const styles = createStyles(theme);
+
+  // Guards against out-of-order responses: mount and the status-change
+  // socket event below can both trigger this fetch close together, so a
+  // slower-but-earlier response landing after a newer one could otherwise
+  // overwrite fresh state with stale data.
+  const requestIdRef = useRef(0);
+
+  const fetchAppointments = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    setLoading(true);
+    try {
+      const { data } = await api.get('/student/appointments');
+      if (requestId !== requestIdRef.current) return;
+      setAppointments(
+        (data.appointments ?? []).map((a: any) => ({
+          id: String(a.id),
+          trackingNumber: a.trackingNumber ?? null,
+          person: a.person,
+          college: a.collegeAbbrev || a.college,
+          collegeAbbrev: a.collegeAbbrev,
+          date: a.date,
+          windowStart: a.windowStart ?? '',
+          windowEnd: a.windowEnd ?? '',
+          location: a.location,
+          purpose: a.purpose ?? '',
+          status: a.status,
+          createdAt: a.createdAt,
+          appointmentType: a.appointmentType ?? undefined,
+          rejectionReason: a.rejectionReason ?? undefined,
+          bookingYearProgram: a.bookingYearProgram ?? null,
+          courseCode: a.courseCode ?? null,
+          slotNote: a.slotNote ?? null,
+          sharedComment: a.sharedComment ?? null,
+          commentUpdatedBy: a.commentUpdatedBy ?? null,
+          commentUpdatedAt: a.commentUpdatedAt ?? null,
+          approvedAtRaw: a.approvedAtRaw ?? null,
+          completedAtRaw: a.completedAtRaw ?? null,
+          cancelledBy: a.cancelledBy ?? null,
+          cancelReason: a.cancelReason ?? null,
+        })),
+      );
+      setError(null);
+    } catch (err) {
+      if (requestId !== requestIdRef.current) return;
+      console.error('Failed to fetch appointments:', err);
+      setError('Could not load your appointments. Please try again.');
+    } finally {
+      if (requestId === requestIdRef.current) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAppointments();
+  }, [fetchAppointments]);
+
+  // ── Live updates: refetch + notify when an appointment's status changes
+  // (mirrors stud-appointment-status.jsx's "appointment:status-updated").
+  // This is the tracking/detail screen, so it owns the notification; the
+  // browse/book screen (student_appointments.tsx) refetches silently. ──
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const onAppointmentStatusUpdated = () => {
+      fetchAppointments();
+      notify('Appointment status updated', 'One of your appointments has a new status.');
+    };
+    socket.on('appointment:status-updated', onAppointmentStatusUpdated);
+
+    // A professor's comment is otherwise only picked up by the next manual
+    // refresh -- this makes it show up immediately while this screen is open.
+    const onAppointmentCommentUpdated = () => {
+      fetchAppointments();
+      notify('Actions taken added', 'Your professor added actions taken for an appointment.');
+    };
+    socket.on('appointment:comment-updated', onAppointmentCommentUpdated);
+
+    return () => {
+      socket.off('appointment:status-updated', onAppointmentStatusUpdated);
+      socket.off('appointment:comment-updated', onAppointmentCommentUpdated);
+    };
+  }, [user, token, fetchAppointments]);
+
+  const comingSoon = () => Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
+  const goToDashboard = () => router.push('/pages/student/student_dashboard');
+  const goToBooking = () => router.push('/pages/student/student_appointments');
+
+  const handleNavPress = (key: string) => {
+    setMenuOpen(false);
+    if (key === 'appointments') { router.push('/pages/student/student_appointments'); return; }
+    if (key === 'dashboard') { goToDashboard(); return; }
+    if (key === 'queue') { router.push('/pages/student/student_queue'); return; }
+    if (key === 'announcements') { router.push('/pages/student/student_announcement'); return; }
+    if (key === 'documents') { router.push('/pages/student/student_documents'); return; }
+    if (key === 'transactions') { router.push('/pages/student/student_transactions'); return; }
+    comingSoon();
+  };
+
+  const handleLogout = () => { setMenuOpen(false); setLogoutModalVisible(true); };
+  const confirmLogout = () => { setLogoutModalVisible(false); logout(); router.replace('/login'); };
+
+  // Defaults to "Today" across every tab — the range control lets a
+  // student switch to "This Week"/"Next Week"/"All Time" to see everything
+  // else.
+  const rangeFilteredAppointments = filterByRange(appointments, allRange);
+  const byStatus = (status: BookingStatus) => rangeFilteredAppointments.filter((a) => a.status === status);
+  const tabLists: Record<TabKey, Appointment[]> = {
+    all: rangeFilteredAppointments,
+    pending: byStatus('pending'),
+    approved: byStatus('approved'),
+    completed: byStatus('completed'),
+    rejected: byStatus('rejected'),
+    cancelled: byStatus('cancelled'),
+  };
+
+  const selectedAppt = appointments.find((a) => a.id === selectedId) ?? null;
+
+  const doCancel = async () => {
+    const id = cancelConfirmId;
+    setCancelConfirmId(null);
+    if (!id || cancelling) return;
+    setCancelling(id);
+    try {
+      await api.delete(`/student/appointments/${id}`);
+      setSelectedId(null);
+      await fetchAppointments();
+    } catch (err: any) {
+      console.error('Failed to cancel appointment:', err);
+      Alert.alert('Error', err?.response?.data?.error ?? 'Failed to cancel the appointment.');
+    } finally {
+      setCancelling(null);
+    }
+  };
+
+  const doComplete = async () => {
+    const id = completeConfirmId;
+    setCompleteConfirmId(null);
+    if (!id || completing) return;
+    setCompleting(id);
+    try {
+      await api.patch(`/student/appointments/${id}/complete`);
+      await fetchAppointments();
+    } catch (err: any) {
+      console.error('Failed to complete appointment:', err);
+      Alert.alert('Error', err?.response?.data?.error ?? 'Failed to mark the appointment as completed.');
+    } finally {
+      setCompleting(null);
+    }
+  };
+
+  const doReportNotServed = async () => {
+    const id = reportConfirmId;
+    if (!id || reporting) return;
+    setReporting(id);
+    try {
+      await api.patch(`/student/appointments/${id}/report-not-served`, reportReason.trim() ? { reason: reportReason.trim() } : {});
+      setReportConfirmId(null);
+      setReportReason('');
+      await fetchAppointments();
+    } catch (err: any) {
+      console.error('Failed to report appointment as not served:', err);
+      Alert.alert('Error', err?.response?.data?.error ?? 'Failed to report the appointment as not served.');
+    } finally {
+      setReporting(null);
+    }
+  };
+
+  const collegeLogoFor = (abbrev: string) => collegeLogos[abbrev] ?? ccsLogo;
+
+  return (
+    <View style={styles.root}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerBrand}>
+            <Image source={pncLogo} style={styles.headerPncLogo} resizeMode="contain" />
+            <OamsLogo style={styles.headerOamsLogo} outline={isDarkMode} />
+          </View>
+          <View style={styles.headerActions}>
+            <Pressable style={styles.iconBtn} onPress={toggleTheme} hitSlop={8}>
+              <Image source={isDarkMode ? sunIcon : darkModeIcon} style={styles.iconBtnImg} resizeMode="contain" />
+            </Pressable>
+            <RefreshButton onPress={() => fetchAppointments()} loading={loading} style={styles.iconBtn} color={theme.text} label="Refresh appointments" />
+            <NotificationBell
+              endpointBase="student"
+              theme={theme}
+              typePaths={STUDENT_NOTIFICATION_PATHS}
+              viewAllPath={STUDENT_NOTIFICATIONS_VIEW_ALL}
+            />
+            <Pressable style={styles.iconBtn} onPress={() => setMenuOpen(true)} hitSlop={8}>
+              <Ionicons name="menu-outline" size={20} color={theme.text} />
+            </Pressable>
+          </View>
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {selectedAppt ? (
+            // ─── Detail View ───
+            <>
+              <Pressable
+                style={styles.breadcrumb}
+                onPress={() =>
+                  params.fromBookings === 'true'
+                    ? router.push({ pathname: '/pages/student/student_appointments', params: { activeTab: 'bookings' } })
+                    : setSelectedId(null)
+                }
+                hitSlop={8}
+              >
+                <ChevronLeft size={18} color={theme.subtext} />
+                <Text style={styles.breadcrumbText}>{params.fromBookings === 'true' ? 'Appointments' : 'My Appointments'}</Text>
+              </Pressable>
+
+              <View style={styles.titleRow}>
+                <LinearGradient colors={['#a855f7', '#9333ea']} style={styles.titleIcon}>
+                  <Calendar size={22} color="#ffffff" />
+                </LinearGradient>
+                <View style={styles.titleTextWrap}>
+                  <Text style={styles.pageTitle}>Appointment Details</Text>
+                  <Text style={styles.pageSubtitle}>Your appointment details and status.</Text>
+                </View>
+              </View>
+
+              {/* Hero */}
+              <LinearGradient colors={['#a855f7', '#9333ea']} style={styles.heroCard}>
+                <View style={styles.heroContent}>
+                  <View style={styles.heroLogoWrap}>
+                    <Image source={collegeLogoFor(selectedAppt.college)} style={styles.heroLogoImg} resizeMode="contain" />
+                  </View>
+                  <View style={styles.heroTextWrap}>
+                    <Text style={styles.heroServiceName}>{selectedAppt.person}</Text>
+                    <Text style={styles.heroCollegeText}>{selectedAppt.college}</Text>
+                  </View>
+                  {selectedAppt.trackingNumber ? (
+                    <View style={styles.heroTrackingBadge}>
+                      <Text style={styles.heroTrackingBadgeText}>{selectedAppt.trackingNumber}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </LinearGradient>
+
+              {/* Appointment Information */}
+              <View style={styles.infoCard}>
+                <View style={styles.infoCardHeader}>
+                  <Calendar size={18} color={theme.purple} />
+                  <Text style={styles.infoCardTitle}>Appointment Details</Text>
+                </View>
+                <View style={styles.infoCardBody}>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Professor</Text>
+                    <Text style={styles.detailValue}>{selectedAppt.person}</Text>
+                  </View>
+                  {selectedAppt.appointmentType ? (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Appointment Type</Text>
+                      <Text style={styles.detailValue}>{selectedAppt.appointmentType}</Text>
+                    </View>
+                  ) : null}
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>College / Department</Text>
+                    <Text style={styles.detailValue}>{selectedAppt.college}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Date</Text>
+                    <Text style={styles.detailValue}>{formatDate(selectedAppt.date)}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Time Slot</Text>
+                    <Text style={styles.detailValue}>
+                      {selectedAppt.windowStart && selectedAppt.windowEnd
+                        ? `${formatTime(selectedAppt.windowStart)} – ${formatTime(selectedAppt.windowEnd)}` : '—'}
+                    </Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Location</Text>
+                    <Text style={styles.detailValue}>{selectedAppt.location}</Text>
+                  </View>
+                  {selectedAppt.bookingYearProgram ? (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Year &amp; Program</Text>
+                      <Text style={styles.detailValue}>{selectedAppt.bookingYearProgram}</Text>
+                    </View>
+                  ) : null}
+                  {selectedAppt.courseCode ? (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Course Code</Text>
+                      <Text style={styles.detailValue}>{selectedAppt.courseCode}</Text>
+                    </View>
+                  ) : null}
+                  {selectedAppt.purpose ? (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Purpose</Text>
+                      <Text style={styles.detailValue}>{selectedAppt.purpose}</Text>
+                    </View>
+                  ) : null}
+                  {selectedAppt.createdAt ? (
+                    <View style={[styles.detailRow, (!selectedAppt.approvedAtRaw && !selectedAppt.completedAtRaw) ? styles.detailRowLast : null]}>
+                      <Text style={styles.detailLabel}>Booked On</Text>
+                      <Text style={styles.detailValue}>{formatDateShort(selectedAppt.createdAt)}</Text>
+                    </View>
+                  ) : null}
+                  {selectedAppt.approvedAtRaw ? (
+                    <View style={[styles.detailRow, !selectedAppt.completedAtRaw ? styles.detailRowLast : null]}>
+                      <Text style={styles.detailLabel}>Approved On</Text>
+                      <Text style={styles.detailValue}>
+                        {formatManilaDate(selectedAppt.approvedAtRaw, { month: 'short', day: 'numeric', year: 'numeric' })} at {formatManilaTime(selectedAppt.approvedAtRaw)}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {selectedAppt.completedAtRaw ? (
+                    <View style={[styles.detailRow, styles.detailRowLast]}>
+                      <Text style={styles.detailLabel}>Completed On</Text>
+                      <Text style={styles.detailValue}>
+                        {formatManilaDate(selectedAppt.completedAtRaw, { month: 'short', day: 'numeric', year: 'numeric' })} at {formatManilaTime(selectedAppt.completedAtRaw)}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+
+              {/* Status */}
+              <View style={styles.infoCard}>
+                <View style={styles.infoCardHeader}>
+                  <AlertCircle size={18} color={theme.purple} />
+                  <Text style={styles.infoCardTitle}>Status</Text>
+                  <View style={{ flex: 1 }} />
+                  <View style={[styles.statusBadge, {
+                    backgroundColor: statusStyles[selectedAppt.status].bg,
+                    borderColor: statusStyles[selectedAppt.status].border,
+                  }]}>
+                    <Text style={[styles.statusBadgeText, { color: statusStyles[selectedAppt.status].color }]}>
+                      {STATUS_LABELS[selectedAppt.status]}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Rejected notice (web shows this on the detail view too) */}
+              {selectedAppt.status === 'rejected' && selectedAppt.rejectionReason ? (
+                <View style={styles.infoCard}>
+                  <View style={styles.infoCardBody}>
+                    <View style={styles.rejectNotice}>
+                      <XCircle size={20} color="#ef4444" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.rejectNoticeTitle}>
+                          {isAutoRejected(selectedAppt)
+                            ? 'This appointment request was automatically rejected.'
+                            : 'This appointment request was rejected.'}
+                        </Text>
+                        <Text style={styles.rejectNoticeReason}>Reason: {selectedAppt.rejectionReason}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              ) : null}
+
+              {/* Feedback -- placed high so the keyboard doesn't cover it */}
+              {selectedAppt.status === 'completed' && (
+                <FeedbackCard
+                  key={selectedAppt.id}
+                  appointmentId={selectedAppt.id}
+                  theme={theme}
+                  styles={styles}
+                  onSubmitted={fetchAppointments}
+                />
+              )}
+
+              {/* Not Served notice */}
+              {selectedAppt.status === 'cancelled' && selectedAppt.cancelledBy === 'student_no_show' && (
+                <View style={styles.infoCard}>
+                  <View style={styles.infoCardBody}>
+                    <View style={styles.rejectNotice}>
+                      <XCircle size={20} color="#ef4444" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.rejectNoticeTitle}>You reported that this appointment was not served.</Text>
+                        {selectedAppt.cancelReason ? (
+                          <Text style={styles.rejectNoticeReason}>Details: {selectedAppt.cancelReason}</Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Auto-cancelled notice */}
+              {selectedAppt.status === 'cancelled' && selectedAppt.cancelledBy === 'system_not_entertained' && (
+                <View style={styles.infoCard}>
+                  <View style={styles.infoCardBody}>
+                    <View style={styles.rejectNotice}>
+                      <XCircle size={20} color="#ef4444" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.rejectNoticeTitle}>This appointment was automatically cancelled because it wasn&apos;t marked as served in time.</Text>
+                        {selectedAppt.cancelReason ? (
+                          <Text style={styles.rejectNoticeReason}>Details: {selectedAppt.cancelReason}</Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Cancel */}
+              {canStudentCancel(selectedAppt) && (
+                <View style={[styles.infoCard, styles.cancelCard]}>
+                  <View style={[styles.infoCardHeader, styles.cancelCardHeader]}>
+                    <XCircle size={18} color="#ef4444" />
+                    <Text style={[styles.infoCardTitle, { color: '#ef4444' }]}>Cancel Appointment</Text>
+                  </View>
+                  <View style={styles.infoCardBody}>
+                    <Text style={styles.cancelDesc}>
+                      Cancelling will permanently remove this appointment. You will need to book a new one if you change your mind.
+                    </Text>
+                    <Pressable style={styles.cancelBtn} onPress={() => setCancelConfirmId(selectedAppt.id)}>
+                      <XCircle size={16} color="#ef4444" />
+                      <Text style={styles.cancelBtnText}>Cancel Appointment</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+
+              {/* Mark as Completed */}
+              {selectedAppt.status === 'approved' && (
+                <View style={[styles.infoCard, styles.completeCard]}>
+                  <View style={[styles.infoCardHeader, styles.completeCardHeader]}>
+                    <CheckCircle size={18} color="#22c55e" />
+                    <Text style={[styles.infoCardTitle, { color: '#22c55e' }]}>Mark as Completed</Text>
+                  </View>
+                  <View style={styles.infoCardBody}>
+                    <Text style={styles.cancelDesc}>
+                      If your concern has already been addressed and the professor hasn&apos;t closed
+                      this out yet, you can mark it completed yourself.
+                    </Text>
+                    <Pressable style={styles.completeBtn} onPress={() => setCompleteConfirmId(selectedAppt.id)}>
+                      <CheckCircle size={16} color="#22c55e" />
+                      <Text style={styles.completeBtnText}>Mark Appointment as Completed</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+
+              {/* Report as Not Served */}
+              {selectedAppt.status === 'approved' && !selectedAppt.sharedComment && selectedAppt.date.slice(0, 10) <= getManilaDateString() && (
+                <View style={[styles.infoCard, styles.reportCard]}>
+                  <View style={[styles.infoCardHeader, styles.reportCardHeader]}>
+                    <AlertCircle size={18} color="#f59e0b" />
+                    <Text style={[styles.infoCardTitle, { color: '#f59e0b' }]}>Report as Not Served</Text>
+                  </View>
+                  <View style={styles.infoCardBody}>
+                    <Text style={styles.cancelDesc}>
+                      If the professor never actually saw you for this appointment, let them know. This cancels the appointment and notifies the professor.
+                    </Text>
+                    <Pressable style={styles.reportBtn} onPress={() => { setReportReason(''); setReportConfirmId(selectedAppt.id); }}>
+                      <AlertCircle size={16} color="#f59e0b" />
+                      <Text style={styles.reportBtnText}>Report as Not Served</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+            </>
+          ) : (
+            // ─── List View ───
+            <>
+              <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
+                <ChevronLeft size={18} color={theme.subtext} />
+                <Text style={styles.breadcrumbText}>Home</Text>
+              </Pressable>
+
+              <View style={styles.titleRow}>
+                <LinearGradient colors={['#a855f7', '#9333ea']} style={styles.titleIcon}>
+                  <Calendar size={22} color="#ffffff" />
+                </LinearGradient>
+                <View style={styles.titleTextWrap}>
+                  <Text style={styles.pageTitle}>My Appointments</Text>
+                  <Text style={styles.pageSubtitle}>Track all of your appointments.</Text>
+                </View>
+              </View>
+
+              {/* Professor Schedules quick link */}
+              <Pressable
+                style={styles.profSchedCard}
+                onPress={() =>
+                  router.push({
+                    pathname: '/pages/student/student_professor_schedules',
+                    params: { from: 'appointment-status' },
+                  })
+                }
+              >
+                <LinearGradient colors={['#7c3aed', '#a855f7']} style={styles.profSchedIcon}>
+                  <GraduationCap size={22} color="#ffffff" />
+                </LinearGradient>
+                <View style={styles.profSchedText}>
+                  <Text style={styles.profSchedTitle}>Professor Schedules</Text>
+                  <Text style={styles.profSchedSubtitle}>Check professor consultation hours and availability across all departments.</Text>
+                </View>
+                <ChevronRight size={18} color={theme.purple} opacity={0.7} />
+              </Pressable>
+
+              {error && (
+                <View style={styles.emptyCard}>
+                  <AlertCircle size={32} color="#ef4444" />
+                  <Text style={styles.emptyDescription}>{error}</Text>
+                </View>
+              )}
+
+              {loading && !error && (
+                <View style={styles.emptyCard}>
+                  <SpinningLoader size={28} color={theme.tertiary} />
+                  <Text style={styles.emptyDescription}>Loading your appointments…</Text>
+                </View>
+              )}
+
+              {!loading && !error && (
+              <>
+              {/* Tabs */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll}>
+                <View style={styles.tabsRow}>
+                  {TABS.map((tab) => {
+                    const active = activeTab === tab.key;
+                    return (
+                      <Pressable key={tab.key} style={[styles.tab, active && styles.tabActive]} onPress={() => setActiveTab(tab.key)}>
+                        <tab.icon size={14} color={active ? theme.purple : theme.subtext} />
+                        <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
+                        <View style={styles.tabCountPill}><Text style={styles.tabCountText}>{tabLists[tab.key].length}</Text></View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+
+              {/* Date range — governs every tab, defaults to Today */}
+              <View style={styles.rangeRow}>
+                {(Object.keys(RANGE_LABELS) as RangeKey[]).map((key) => {
+                  const active = allRange === key;
+                  return (
+                    <Pressable
+                      key={key}
+                      style={[styles.rangeChip, active && styles.rangeChipActive]}
+                      onPress={() => setAllRange(key)}
+                    >
+                      <Text style={[styles.rangeChipText, active && styles.rangeChipTextActive]}>
+                        {RANGE_LABELS[key]}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {/* List */}
+              {tabLists[activeTab].length > 0 ? (
+                <View style={styles.listContainer}>
+                  {tabLists[activeTab].map((appt) => {
+                    const isDim = appt.status === 'completed' || appt.status === 'rejected' || appt.status === 'cancelled';
+                    const s = statusStyles[appt.status];
+                    return (
+                      <Pressable
+                        key={appt.id}
+                        style={[styles.listItem, isDim && styles.listItemDim]}
+                        onPress={() => setSelectedId(appt.id)}
+                      >
+                        <View style={styles.listItemHeaderRow}>
+                          <View style={[styles.listIconWrap, isDim && styles.listIconWrapDim]}>
+                            <Calendar size={22} color={isDim ? theme.tertiary : theme.purple} />
+                          </View>
+                          <View style={styles.listItemTitleWrap}>
+                            <Text style={[styles.listItemName, isDim && styles.listItemNameDim]}>{appt.person}</Text>
+                            <Text style={styles.listItemCollege}>{appt.college}</Text>
+                          </View>
+                          <View style={styles.listHeaderRight}>
+                            {appt.trackingNumber ? (
+                              <View style={styles.trackingPill}>
+                                <Text style={styles.trackingPillText}>{appt.trackingNumber}</Text>
+                              </View>
+                            ) : null}
+                            <View style={[styles.statusBadge, { backgroundColor: s.bg, borderColor: s.border }]}>
+                              <Text style={[styles.statusBadgeText, { color: s.color }]}>{STATUS_LABELS[appt.status]}</Text>
+                            </View>
+                          </View>
+                        </View>
+                        <View style={styles.listItemGrid}>
+                          <View style={styles.listItemField}>
+                            <Text style={styles.listItemFieldLabel}>Date</Text>
+                            <Text style={styles.listItemFieldValue}>{formatDateShort(appt.date)}</Text>
+                          </View>
+                          <View style={styles.listItemField}>
+                            <Text style={styles.listItemFieldLabel}>Time Slot</Text>
+                            <Text style={styles.listItemFieldValue}>
+                              {appt.windowStart && appt.windowEnd ? `${formatTime(appt.windowStart)} – ${formatTime(appt.windowEnd)}` : '—'}
+                            </Text>
+                          </View>
+                          {appt.appointmentType && (
+                            <View style={styles.listItemFieldFull}>
+                              <Text style={styles.listItemFieldLabel}>Appointment Type</Text>
+                              <Text style={styles.listItemFieldValue}>{appt.appointmentType}</Text>
+                            </View>
+                          )}
+                          <View style={styles.listItemFieldFull}>
+                            <Text style={styles.listItemFieldLabel}>Location</Text>
+                            <Text style={styles.listItemFieldValue}>{appt.location}</Text>
+                          </View>
+                          {appt.bookingYearProgram ? (
+                            <View style={styles.listItemFieldFull}>
+                              <Text style={styles.listItemFieldLabel}>Year &amp; Program</Text>
+                              <Text style={styles.listItemFieldValue}>{appt.bookingYearProgram}</Text>
+                            </View>
+                          ) : null}
+                          {appt.courseCode ? (
+                            <View style={styles.listItemFieldFull}>
+                              <Text style={styles.listItemFieldLabel}>Course Code</Text>
+                              <Text style={styles.listItemFieldValue}>{appt.courseCode}</Text>
+                            </View>
+                          ) : null}
+                          {appt.purpose ? (
+                            <View style={styles.listItemFieldFull}>
+                              <Text style={styles.listItemFieldLabel}>Purpose</Text>
+                              <Text style={styles.listItemFieldValueMuted}>{appt.purpose}</Text>
+                            </View>
+                          ) : null}
+                          {appt.slotNote ? (
+                            <View style={styles.listItemFieldFull}>
+                              <Text style={styles.listItemFieldLabel}>Meeting Note</Text>
+                              {/^https?:\/\/\S+$/i.test(appt.slotNote.trim()) ? (
+                                <Pressable onPress={(e) => { e.stopPropagation(); Linking.openURL(appt.slotNote!.trim()); }}>
+                                  <Text style={[styles.listItemFieldValueMuted, { color: '#3b82f6', textDecorationLine: 'underline' }]}>
+                                    {appt.slotNote}
+                                  </Text>
+                                </Pressable>
+                              ) : (
+                                <Text style={styles.listItemFieldValueMuted}>{appt.slotNote}</Text>
+                              )}
+                            </View>
+                          ) : null}
+                        </View>
+                        {appt.status === 'rejected' && appt.rejectionReason && (
+                          <View style={styles.rejectNotice}>
+                            <XCircle size={20} color="#ef4444" />
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.rejectNoticeTitle}>
+                                {isAutoRejected(appt)
+                                  ? 'This appointment request was automatically rejected.'
+                                  : 'This appointment request was rejected.'}
+                              </Text>
+                              <Text style={styles.rejectNoticeReason}>Reason: {appt.rejectionReason}</Text>
+                            </View>
+                          </View>
+                        )}
+                        <View style={styles.commentSection}>
+                          <View style={styles.commentHeaderRow}>
+                            <Ionicons name="chatbubble-outline" size={14} color={theme.tertiary} />
+                            <Text style={styles.commentHeaderTitle}>Actions Taken</Text>
+                          </View>
+                          {appt.sharedComment ? (
+                            <>
+                              <Text style={styles.commentText}>{appt.sharedComment}</Text>
+                              {appt.commentUpdatedAt && (
+                                <Text style={styles.commentMeta}>
+                                  Last updated by {appt.commentUpdatedBy === 'faculty' ? 'the professor' : 'you'} on{' '}
+                                  {formatManilaDate(appt.commentUpdatedAt, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </Text>
+                              )}
+                            </>
+                          ) : (
+                            <Text style={styles.commentEmpty}>No actions taken recorded yet.</Text>
+                          )}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : (
+                <View style={styles.emptyCard}>
+                  <Calendar size={32} color={theme.tertiary} />
+                  <Text style={styles.emptyTitle}>
+                    {activeTab === 'all' ? 'No Appointments Booked' : `No ${TABS.find((t) => t.key === activeTab)?.label} Appointments`}
+                    {allRange !== 'all' ? ` ${RANGE_LABELS[allRange]}` : ''}
+                  </Text>
+                  <Text style={styles.emptyDescription}>
+                    {allRange !== 'all'
+                      ? 'Nothing in this range — switch to "All Time" to see all your appointments.'
+                      : activeTab === 'all'
+                        ? 'You have no active appointments yet.'
+                        : activeTab === 'pending'
+                          ? 'You have no records of pending appointments.'
+                          : `You have no records of ${activeTab} appointments.`}
+                  </Text>
+                  {(activeTab === 'all' || activeTab === 'pending') && (
+                    <Pressable onPress={goToBooking}>
+                      <LinearGradient colors={['#a855f7', '#9333ea']} style={styles.bookCtaBtn}>
+                        <Text style={styles.bookCtaBtnText}>Book an Appointment</Text>
+                      </LinearGradient>
+                    </Pressable>
+                  )}
+                </View>
+              )}
+              </>
+              )}
+            </>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+
+      {/* Nav Drawer */}
+      <Modal visible={menuOpen} animationType="fade" transparent onRequestClose={() => setMenuOpen(false)}>
+        <View style={styles.drawerOverlay}>
+          <SafeAreaView style={styles.drawerPanel} edges={['top', 'bottom']}>
+            <View style={styles.drawerProfile}>
+              <View style={styles.drawerProfileHeader}>
+                <View style={styles.drawerAvatar}>
+                  <Ionicons name="person-outline" size={15} color={theme.primary} />
+                </View>
+                <Text style={styles.drawerName}>{user?.name ?? 'Student'}</Text>
+              </View>
+              <View style={styles.drawerRoleBadge}>
+                <Text style={styles.drawerRoleBadgeText}>Student</Text>
+              </View>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''} ({user?.departmentAbbrev ?? ''})</Text>
+            </View>
+
+            <View style={styles.drawerNav}>
+              {navItems.map((item) => {
+                const active = false;
+                return (
+                  <Pressable
+                    key={item.key}
+                    style={[styles.drawerNavItem, active && styles.drawerNavItemActive]}
+                    onPress={() => handleNavPress(item.key)}
+                  >
+                    <item.icon size={18} color={active ? '#ffffff' : theme.subtext} />
+                    <Text style={[styles.drawerNavLabel, active && styles.drawerNavLabelActive]}>{item.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Pressable style={styles.drawerLogout} onPress={handleLogout}>
+              <Ionicons name="log-out-outline" size={18} color="#ef4444" />
+              <Text style={styles.drawerLogoutText}>Logout</Text>
+            </Pressable>
+          </SafeAreaView>
+          <Pressable style={styles.drawerBackdrop} onPress={() => setMenuOpen(false)} />
+        </View>
+      </Modal>
+
+      {/* Cancel Appointment Confirm Modal */}
+      <Modal visible={cancelConfirmId !== null} animationType="fade" transparent onRequestClose={() => setCancelConfirmId(null)}>
+        <View style={styles.logoutOverlay}>
+          <View style={styles.logoutModalCard}>
+            <View style={styles.logoutIconCircle}>
+              <XCircle size={26} color="#ef4444" />
+            </View>
+            <Text style={styles.logoutModalTitle}>Cancel Appointment?</Text>
+            <Text style={styles.logoutModalDescription}>
+              {selectedAppt
+                ? `You are about to cancel your appointment with ${selectedAppt.person} on ${formatDate(selectedAppt.date)}. This will permanently remove it — you'll need to book a new one if you change your mind.`
+                : 'Are you sure you want to cancel this appointment? This action cannot be undone.'}
+            </Text>
+            <View style={styles.logoutModalActions}>
+              <Pressable style={styles.logoutCancelBtn} onPress={() => setCancelConfirmId(null)}>
+                <Text style={styles.logoutCancelBtnText}>Keep Appointment</Text>
+              </Pressable>
+              <Pressable style={styles.logoutConfirmBtn} onPress={doCancel} disabled={cancelling === cancelConfirmId}>
+                <Text style={styles.logoutConfirmBtnText}>{cancelling === cancelConfirmId ? 'Cancelling…' : 'Cancel Appointment'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Mark as Completed Confirm Modal */}
+      <Modal visible={completeConfirmId !== null} animationType="fade" transparent onRequestClose={() => setCompleteConfirmId(null)}>
+        <View style={styles.logoutOverlay}>
+          <View style={styles.logoutModalCard}>
+            <View style={[styles.logoutIconCircle, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
+              <CheckCircle size={26} color="#22c55e" />
+            </View>
+            <Text style={styles.logoutModalTitle}>Mark Appointment as Completed?</Text>
+            <Text style={styles.logoutModalDescription}>
+              {selectedAppt
+                ? `Mark your appointment with ${selectedAppt.person} on ${formatDate(selectedAppt.date)} as completed? Use this only if your concern has already been addressed.`
+                : 'Mark this appointment as completed?'}
+            </Text>
+            <View style={styles.logoutModalActions}>
+              <Pressable style={styles.logoutCancelBtn} onPress={() => setCompleteConfirmId(null)}>
+                <Text style={styles.logoutCancelBtnText}>Not Yet</Text>
+              </Pressable>
+              <Pressable style={[styles.logoutConfirmBtn, { backgroundColor: '#22c55e' }]} onPress={doComplete} disabled={completing === completeConfirmId}>
+                <Text style={styles.logoutConfirmBtnText}>{completing === completeConfirmId ? 'Marking…' : 'Mark as Completed'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Report as Not Served Reason Modal */}
+      <QueueReasonModal
+        visible={reportConfirmId !== null}
+        title="Report as Not Served?"
+        message={
+          selectedAppt
+            ? `Report that ${selectedAppt.person} did not serve you for your appointment on ${formatDate(selectedAppt.date)}? This will cancel the appointment and notify the professor.`
+            : 'Report this appointment as not served?'
+        }
+        confirmText={reporting === reportConfirmId ? 'Please wait…' : 'Report as Not Served'}
+        confirmColor="#f59e0b"
+        reason={reportReason}
+        onChangeReason={setReportReason}
+        onCancel={() => { setReportConfirmId(null); setReportReason(''); }}
+        onConfirm={doReportNotServed}
+        theme={theme}
+        required={false}
+        placeholder="Add details (optional)..."
+        styles={{
+          modalOverlay: styles.logoutOverlay,
+          confirmModalCard: styles.logoutModalCard,
+          confirmIconCircle: styles.logoutIconCircle,
+          confirmTitle: styles.logoutModalTitle,
+          confirmDescription: styles.logoutModalDescription,
+          reasonInput: styles.reasonInput,
+          confirmActionsRow: styles.logoutModalActions,
+          cancelBtn: styles.logoutCancelBtn,
+          cancelBtnText: styles.logoutCancelBtnText,
+          confirmBtn: styles.logoutConfirmBtn,
+          confirmBtnText: styles.logoutConfirmBtnText,
+          formSubmitBtnDisabled: styles.formSubmitBtnDisabled,
+        }}
+        submitting={reporting === reportConfirmId}
+      />
+
+      {/* Confirm Logout Modal */}
+      <Modal visible={logoutModalVisible} animationType="fade" transparent onRequestClose={() => setLogoutModalVisible(false)}>
+        <View style={styles.logoutOverlay}>
+          <View style={styles.logoutModalCard}>
+            <View style={styles.logoutIconCircle}>
+              <Ionicons name="log-out-outline" size={26} color="#ef4444" />
+            </View>
+            <Text style={styles.logoutModalTitle}>Confirm Logout</Text>
+            <Text style={styles.logoutModalDescription}>
+              Are you sure you want to log out? Any unsaved changes will be lost.
+            </Text>
+            <View style={styles.logoutModalActions}>
+              <Pressable style={styles.logoutCancelBtn} onPress={() => setLogoutModalVisible(false)}>
+                <Text style={styles.logoutCancelBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.logoutConfirmBtn} onPress={confirmLogout}>
+                <Ionicons name="log-out-outline" size={16} color="#ffffff" />
+                <Text style={styles.logoutConfirmBtnText}>Log Out</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+type ThemePalette = {
+  background: string;
+  card: string;
+  border: string;
+  headerBg: string;
+  headerBorder: string;
+  text: string;
+  subtext: string;
+  tertiary: string;
+  primary: string;
+  purple: string;
+  iconBtnBg: string;
+  iconBtnBorder: string;
+};
+
+const darkPalette: ThemePalette = {
+  background: '#0a0f0a',
+  card: '#111612',
+  border: '#1e3a23',
+  headerBg: 'rgba(17, 22, 18, 0.95)',
+  headerBorder: 'rgba(34, 197, 94, 0.15)',
+  text: '#f0fdf4',
+  subtext: '#94a3b8',
+  tertiary: '#94a3b8',
+  primary: '#16a34a',
+  purple: '#a855f7',
+  iconBtnBg: 'rgba(34, 197, 94, 0.1)',
+  iconBtnBorder: 'rgba(34, 197, 94, 0.2)',
+};
+
+const lightPalette: ThemePalette = {
+  background: '#f8fafc',
+  card: '#ffffff',
+  border: '#e2e8f0',
+  headerBg: 'rgba(255, 255, 255, 0.95)',
+  headerBorder: 'rgba(34, 197, 94, 0.15)',
+  text: '#1e293b',
+  subtext: '#64748b',
+  tertiary: '#64748b',
+  primary: '#166534',
+  purple: '#9333ea',
+  iconBtnBg: 'rgba(34, 197, 94, 0.08)',
+  iconBtnBorder: 'rgba(34, 197, 94, 0.15)',
+};
+
+function createStyles(theme: ThemePalette) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: theme.background },
+    safeArea: { flex: 1 },
+
+    // Header
+    header: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 16, paddingVertical: 12,
+      backgroundColor: theme.headerBg, borderBottomWidth: 1, borderBottomColor: theme.headerBorder,
+    },
+    headerBrand: { flexDirection: 'row', alignItems: 'center', gap: 0 },
+    headerPncLogo: { width: 40, height: 40 },
+    headerOamsLogo: { height: 34, width: 96 },
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    iconBtn: { padding: 8, borderRadius: 10, backgroundColor: theme.iconBtnBg, borderWidth: 1, borderColor: theme.iconBtnBorder },
+    iconBtnImg: { width: 18, height: 18 },
+
+    scrollContent: { padding: 16, gap: 18, paddingBottom: 40 },
+
+    // Breadcrumb
+    breadcrumb: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
+    breadcrumbText: { fontSize: 14, fontWeight: '600', color: theme.subtext },
+
+    // Title
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+    titleIcon: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    titleTextWrap: { flex: 1 },
+    pageTitle: { fontSize: 22, fontWeight: '800', color: theme.text, letterSpacing: -0.3 },
+    pageSubtitle: { fontSize: 12, color: theme.subtext, marginTop: 3 },
+
+    // Professor schedules card
+    profSchedCard: {
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      backgroundColor: 'rgba(168, 85, 247, 0.06)', borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.3)',
+      borderRadius: 16, padding: 14,
+    },
+    profSchedIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    profSchedText: { flex: 1, gap: 2 },
+    profSchedTitle: { fontSize: 14, fontWeight: '700', color: theme.purple },
+    profSchedSubtitle: { fontSize: 11, color: theme.tertiary, lineHeight: 15 },
+
+    // Hero
+    heroCard: { borderRadius: 22, padding: 20 },
+    heroContent: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+    heroLogoWrap: {
+      width: 72, height: 72, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.15)',
+      borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', padding: 8,
+    },
+    heroLogoImg: { width: '100%', height: '100%' },
+    heroTextWrap: { flex: 1, gap: 4 },
+    heroServiceName: { fontSize: 18, fontWeight: '800', color: '#ffffff' },
+    heroTrackingBadge: {
+      alignSelf: 'flex-start',
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 999,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.35)',
+    },
+    heroTrackingBadgeText: { fontSize: 12, fontWeight: '800', color: '#ffffff', fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }) },
+    // Tracking pill stacked above the status badge -- purple twin of the
+    // documents' orange tracking pill (web .apt-list-tracking-pill).
+    listHeaderRight: { alignItems: 'flex-end', gap: 5, flexShrink: 0 },
+    trackingPill: { backgroundColor: theme.purple, borderRadius: 8, paddingVertical: 3, paddingHorizontal: 8 },
+    trackingPillText: { fontSize: 10.5, fontWeight: '700', color: '#ffffff', textTransform: 'uppercase', letterSpacing: 0.3 },
+    // "Your Feedback" card (detail view).
+    feedbackText: { fontSize: 13, color: theme.text, lineHeight: 19 },
+    feedbackMeta: { fontSize: 11.5, color: theme.tertiary },
+    feedbackInput: {
+      backgroundColor: theme.background, borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.3)', borderRadius: 12,
+      padding: 12, color: theme.text, fontSize: 13, minHeight: 90, textAlignVertical: 'top', marginTop: 8,
+    },
+    feedbackActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
+    feedbackSendBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12 },
+    feedbackSendText: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
+    heroCollegeText: { fontSize: 13, color: 'rgba(255,255,255,0.85)' },
+
+    // Tabs
+    tabsScroll: { flexGrow: 0 },
+    tabsRow: { flexDirection: 'row', gap: 8, borderBottomWidth: 2, borderBottomColor: theme.border, paddingBottom: 0 },
+    tab: {
+      flexDirection: 'row', alignItems: 'center', gap: 6,
+      paddingVertical: 10, paddingHorizontal: 10, borderBottomWidth: 2, borderBottomColor: 'transparent', marginBottom: -2,
+    },
+    tabActive: { borderBottomColor: theme.purple },
+    tabText: { fontSize: 12, fontWeight: '700', color: theme.subtext, textTransform: 'uppercase', letterSpacing: 0.3 },
+    tabTextActive: { color: theme.purple },
+    tabCountPill: {
+      minWidth: 20, height: 20, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
+      paddingHorizontal: 5, backgroundColor: 'rgba(168, 85, 247, 0.15)',
+    },
+    tabCountText: { fontSize: 10, fontWeight: '700', color: theme.purple },
+
+    // Date range chips
+    rangeRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+    rangeChip: {
+      paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999,
+      borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
+    },
+    rangeChipActive: { backgroundColor: 'rgba(168, 85, 247, 0.15)', borderColor: theme.purple },
+    rangeChipText: { fontSize: 12, fontWeight: '600', color: theme.subtext },
+    rangeChipTextActive: { color: theme.purple },
+
+    // Empty state
+    emptyCard: {
+      backgroundColor: theme.card, borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.2)', borderRadius: 18,
+      paddingVertical: 32, paddingHorizontal: 20, alignItems: 'center', gap: 8,
+    },
+    emptyTitle: { fontSize: 15, fontWeight: '700', color: theme.text, textAlign: 'center' },
+    emptyDescription: { fontSize: 12, color: theme.tertiary, textAlign: 'center', lineHeight: 18 },
+    bookCtaBtn: { marginTop: 6, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 22 },
+    bookCtaBtnText: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
+
+    // List
+    listContainer: { gap: 14 },
+    listItem: {
+      backgroundColor: theme.card, borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.2)',
+      borderRadius: 16, padding: 16, gap: 14,
+    },
+    listItemDim: { opacity: 0.72, borderColor: 'rgba(107, 114, 128, 0.25)' },
+    listItemHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+    listIconWrap: {
+      width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+      backgroundColor: 'rgba(168, 85, 247, 0.12)', flexShrink: 0,
+    },
+    listIconWrapDim: { backgroundColor: 'rgba(107, 114, 128, 0.1)' },
+    listItemTitleWrap: { flex: 1, gap: 2 },
+    listItemName: { fontSize: 15, fontWeight: '700', color: theme.purple },
+    listItemNameDim: { color: theme.tertiary },
+    listItemCollege: { fontSize: 12, color: theme.tertiary },
+
+    statusBadge: { borderWidth: 1, borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10, alignSelf: 'flex-start' },
+    statusBadgeText: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
+
+    listItemGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    listItemField: { width: '47%', gap: 3 },
+    listItemFieldFull: { width: '100%', gap: 3 },
+    listItemFieldLabel: { fontSize: 10, fontWeight: '700', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
+    listItemFieldValue: { fontSize: 13, fontWeight: '600', color: theme.purple, lineHeight: 18 },
+    listItemFieldValueMuted: { fontSize: 13, fontWeight: '500', color: theme.text, lineHeight: 18 },
+
+    // Rejection reason callout -- mirrors web's .apst-reject-notice
+    rejectNotice: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+      marginTop: 12,
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(239, 68, 68, 0.35)',
+      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    },
+    rejectNoticeTitle: { fontSize: 13, fontWeight: '700', color: '#ef4444' },
+    rejectNoticeReason: { fontSize: 12.5, color: theme.text, marginTop: 4, lineHeight: 18 },
+
+    // Shared appointment comment -- read-only here, professor-authored only
+    commentSection: {
+      marginTop: 12,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      gap: 4,
+    },
+    commentHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    commentHeaderTitle: { fontSize: 11, fontWeight: '700', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
+    commentText: { fontSize: 12.5, fontWeight: '600', color: theme.text, lineHeight: 17 },
+    commentMeta: { fontSize: 10.5, color: theme.tertiary, marginTop: 2 },
+    commentEmpty: { fontSize: 12, color: theme.tertiary, fontStyle: 'italic' },
+
+    // Detail info card
+    infoCard: {
+      backgroundColor: theme.card, borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.2)', borderRadius: 18, overflow: 'hidden',
+    },
+    infoCardHeader: {
+      flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16,
+      borderBottomWidth: 1, borderBottomColor: 'rgba(168, 85, 247, 0.1)',
+    },
+    infoCardTitle: { fontSize: 14, fontWeight: '700', color: theme.text },
+    infoCardBody: { padding: 16, gap: 4 },
+    detailRow: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(168, 85, 247, 0.1)', gap: 3 },
+    detailRowLast: { borderBottomWidth: 0, paddingBottom: 0 },
+    detailLabel: { fontSize: 11, fontWeight: '700', color: theme.purple, textTransform: 'uppercase', letterSpacing: 0.4 },
+    detailValue: { fontSize: 14, color: theme.text, lineHeight: 20 },
+
+    // Cancel card
+    cancelCard: { borderColor: 'rgba(239, 68, 68, 0.25)', backgroundColor: 'rgba(239, 68, 68, 0.04)' },
+    cancelCardHeader: { borderBottomColor: 'rgba(239, 68, 68, 0.15)' },
+    cancelDesc: { fontSize: 12, color: theme.tertiary, lineHeight: 18, marginBottom: 12 },
+    cancelBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+      paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: 'rgba(239, 68, 68, 0.35)',
+      backgroundColor: 'rgba(239, 68, 68, 0.05)',
+      paddingHorizontal: 10,
+    },
+    cancelBtnText: { fontSize: 13, fontWeight: '700', color: '#ef4444', flexShrink: 1, textAlign: 'center' },
+    completeCard: { borderColor: 'rgba(34, 197, 94, 0.25)', backgroundColor: 'rgba(34, 197, 94, 0.04)' },
+    completeCardHeader: { borderBottomColor: 'rgba(34, 197, 94, 0.15)' },
+    completeBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+      paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: 'rgba(34, 197, 94, 0.35)',
+      backgroundColor: 'rgba(34, 197, 94, 0.05)',
+      paddingHorizontal: 10,
+    },
+    completeBtnText: { fontSize: 13, fontWeight: '700', color: '#22c55e', flexShrink: 1, textAlign: 'center' },
+    reportCard: { borderColor: 'rgba(245, 158, 11, 0.25)', backgroundColor: 'rgba(245, 158, 11, 0.04)' },
+    reportCardHeader: { borderBottomColor: 'rgba(245, 158, 11, 0.15)' },
+    reportBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+      paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: 'rgba(245, 158, 11, 0.35)',
+      backgroundColor: 'rgba(245, 158, 11, 0.05)',
+      paddingHorizontal: 10,
+    },
+    reportBtnText: { fontSize: 13, fontWeight: '700', color: '#f59e0b', flexShrink: 1, textAlign: 'center' },
+    // Adapter styles for QueueReasonModal's fixed style-key contract, reusing
+    // the same visual chrome as the existing logout*/cancel*/complete*
+    // confirm modals rather than duplicating a whole second modal-chrome
+    // style set.
+    reasonInput: {
+      width: '100%', minHeight: 64, borderWidth: 1, borderColor: theme.border, borderRadius: 12,
+      padding: 12, fontSize: 13, color: theme.text, backgroundColor: theme.background,
+      textAlignVertical: 'top', marginBottom: 16,
+    },
+    formSubmitBtnDisabled: { opacity: 0.6 },
+
+    // Nav drawer
+    drawerOverlay: { flex: 1, flexDirection: 'row' },
+    drawerPanel: {
+      width: 270, backgroundColor: theme.card, borderRightWidth: 1, borderRightColor: theme.border,
+      padding: 20, justifyContent: 'space-between',
+    },
+    drawerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+    drawerProfile: {
+      width: '100%', alignItems: 'flex-start', gap: 8,
+      backgroundColor: 'rgba(22, 163, 74, 0.12)', borderWidth: 1, borderColor: 'rgba(22, 163, 74, 0.25)',
+      borderRadius: 14, padding: 14,
+    },
+    drawerProfileHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    drawerAvatar: {
+      width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(22, 163, 74, 0.18)',
+      borderWidth: 1, borderColor: 'rgba(22, 163, 74, 0.3)', alignItems: 'center', justifyContent: 'center',
+    },
+    drawerName: { fontSize: 15, fontWeight: '700', color: theme.text },
+    drawerRoleBadge: { backgroundColor: 'rgba(22, 163, 74, 0.18)', borderRadius: 999, paddingVertical: 3, paddingHorizontal: 10 },
+    drawerRoleBadgeText: { fontSize: 11, fontWeight: '700', color: theme.primary },
+    drawerCollege: { fontSize: 12, fontWeight: '500', color: theme.subtext },
+    drawerNav: { flex: 1, marginTop: 28, gap: 4 },
+    drawerNavItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 12, borderRadius: 10 },
+    drawerNavItemActive: { backgroundColor: theme.primary },
+    drawerNavLabel: { fontSize: 14, fontWeight: '600', color: theme.subtext },
+    drawerNavLabelActive: { color: '#ffffff' },
+    drawerLogout: {
+      flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 12,
+      borderRadius: 10, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)', backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    },
+    drawerLogoutText: { fontSize: 14, fontWeight: '700', color: '#ef4444' },
+
+    // Confirm modals (shared card look)
+    logoutOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: 24 },
+    logoutModalCard: {
+      width: '100%', maxWidth: 340, alignItems: 'center', backgroundColor: theme.card,
+      borderWidth: 1, borderColor: theme.border, borderRadius: 20, padding: 24,
+    },
+    logoutIconCircle: {
+      width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center',
+      backgroundColor: 'rgba(239, 68, 68, 0.15)', marginBottom: 16,
+    },
+    logoutModalTitle: { fontSize: 18, fontWeight: '800', color: theme.text, marginBottom: 8 },
+    logoutModalDescription: { fontSize: 13, color: theme.subtext, textAlign: 'center', lineHeight: 19, marginBottom: 20 },
+    logoutModalActions: { flexDirection: 'row', gap: 12, width: '100%' },
+    logoutCancelBtn: {
+      flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
+      borderWidth: 1, borderColor: theme.border, borderRadius: 12,
+    },
+    logoutCancelBtnText: { fontSize: 14, fontWeight: '700', color: theme.text },
+    logoutConfirmBtn: {
+      flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+      paddingVertical: 12, borderRadius: 12, backgroundColor: '#ef4444',
+      paddingHorizontal: 10,
+    },
+    logoutConfirmBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff', flexShrink: 1, textAlign: 'center' },
+  });
+}

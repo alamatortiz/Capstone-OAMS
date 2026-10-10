@@ -12,8 +12,11 @@ client/node_modules/
 
 # builds
 dist/ 
-build/ 
+build/  
 web-build/
+
+# uploaded user content (announcement attachments, etc.), never committed
+server/uploads/
 
 # expo
 .expo/
@@ -30,7 +33,25 @@ ios/
 # AI assistant
 .claude/
 AGENTS.md
-CLAUDE.md
+
+# thesis documents
+*.docx
+
+# db certs (host-specific, kept local / uploaded as host secret files instead)
+*.pem
+
+# machine-specific docker port remaps etc. (e.g. a local port 3306 conflict)
+docker-compose.override.yml
+
+# firebase service account keys (uploaded to EAS credentials, never committed)
+*firebase-adminsdk*.json
+
+# internal ops reference doc, kept local only
+docs/aiven-schema-sync.md
+docs/backup-restore.md
+
+# db backups (full data dumps -- PII-adjacent, same sensitivity as ca.pem/aiven doc)
+server/backups/
 
 # OS file
 .DS_Store
@@ -40,3 +61,5 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.aider*
+.aiderignore

@@ -1,0 +1,4470 @@
+const express = require("express");
+const router = express.Router();
+const pool = require("../db");
+const {
+  authenticateToken,
+  authorizeRoles,
+} = require("../middleware/authMiddleware");
+const { emitToSlot, emitToDept, emitToUser } = require("../sockets");
+const {
+  getManilaDateString,
+  getManilaTimeString,
+  formatTime12h,
+  formatRelativeTime,
+  manilaDayStartUTC,
+  manilaDayEndExclusiveUTC,
+} = require("../utils/dateTime");
+const { settleSlotAfterEntryChange } = require("../utils/queueSlotSettlement");
+const { getTxConnection } = require("../utils/txConnection");
+const {
+  getQueueDisplayInfo,
+  queueOrderBy,
+  queueAtOrBeforePredicate,
+  queueLanePredicate,
+} = require("../utils/queueDisplay");
+const { resolveSlotToken } = require("../utils/queueJoinToken");
+const { getStrikeState, getBlockRejection } = require("../utils/queueStrikes");
+const { claimPriorityCredit, consumePriorityCredit } = require("../utils/queuePriorityCredits");
+const { notifyAlmostUp } = require("../utils/queuePositionNudge");
+const {
+  STATUS_LABEL_MAP,
+  cancelOwnDocumentRequest,
+  selfClaimDocument,
+  buildDocumentServiceSnapshot,
+} = require("../utils/documentStatus");
+// const { createNotification } = require("../utils/notifications");
+const {
+  createNotification,
+  notifyDepartmentAdmins,
+} = require("../utils/notifications");
+const notificationsController = require("../controllers/notificationsController");
+const {
+  getAttachmentsMap,
+  serveAnnouncementAttachment,
+} = require("../utils/announcementAttachments");
+const { documentSubmissionUpload, MAX_FILES } = require("../middleware/upload");
+const { nextTrackingNumber } = require("../utils/trackingNumber");
+const { isValidTransition } = require("../utils/appointmentStatus");
+const {
+  getFilesMap,
+  getFiles,
+  insertFiles,
+  validateBudget,
+  deleteFiles,
+  serveStudentDocumentSubmissionFile,
+} = require("../utils/documentSubmissionAttachments");
+const {
+  getFilesMap: getRequestFilesMap,
+  serveRequestFile,
+} = require("../utils/documentRequestAttachments");
+
+// Logs the real error server-side but only ever sends a generic, safe
+// message to the client under the `error` key -- every student-facing
+// catch block reads `err.response.data.error`, so raw internal error text
+// (e.g. SQL details) must never reach the browser.
+function sendServerError(res, error, label) {
+  console.error(`${label}:`, error);
+  res.status(500).json({ error: "Something went wrong. Please try again." });
+}
+
+// GET /api/student/dashboard-stats
+router.get(
+  "/dashboard-stats",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+
+    try {
+      const [activeQueues] = await pool.query(
+        `SELECT
+           q.queue_id,
+           q.queue_number,
+           q.slot_id,
+           q.status,
+           q.created_at,
+           q.arrived_at,
+           q.assigned_faculty_id,
+           q.assigned_at,
+           CONCAT(fa.first_name, ' ', fa.last_name) AS assigned_faculty_name,
+           s.service_name,
+           q.service_label_snapshot,
+           d.department_name,
+           d.department_abbreviation,
+           qs.max_capacity,
+           -- Position/waiting are counted within the ticket's own line: the
+           -- office's line, or the professor it was passed to (whose line
+           -- can span several office queues) -- see queueLanePredicate.
+           (
+             SELECT COUNT(*)
+             FROM queues q2
+             WHERE q2.status = 'waiting'
+               AND ${queueLanePredicate("q2", "q")}
+               AND ${queueAtOrBeforePredicate("q2", "q")}
+           ) AS position,
+           (
+             SELECT COUNT(*)
+             FROM queues q3
+             WHERE q3.status = 'waiting'
+               AND ${queueLanePredicate("q3", "q")}
+           ) AS total_waiting,
+           (
+             SELECT COUNT(*)
+             FROM queues q4
+             WHERE q4.slot_id = q.slot_id
+               AND q4.status IN ('waiting', 'serving', 'completed')
+           ) AS total_in_queue,
+           (
+             SELECT COUNT(*)
+             FROM queues q5
+             WHERE q5.slot_id = q.slot_id
+               AND q5.status = 'completed'
+           ) AS serviced_count,
+           qs.service_time_minutes AS avg_service_minutes
+         FROM queues q
+         JOIN queue_slots qs ON q.slot_id = qs.slot_id
+         JOIN services s ON q.service_id = s.service_id
+         JOIN departments d ON s.department_id = d.department_id
+         LEFT JOIN faculty fa ON fa.faculty_id = q.assigned_faculty_id
+         WHERE q.student_id = ? AND q.status IN ('waiting', 'serving')
+         ORDER BY (q.status = 'serving') DESC, position ASC, q.queue_id ASC`,
+        [studentId],
+      );
+
+      const [[apptRow]] = await pool.query(
+        `SELECT
+           SUM(CASE WHEN status = 'pending'  AND appointment_date >= ? THEN 1 ELSE 0 END) AS pending_count,
+           SUM(CASE WHEN status = 'approved' AND appointment_date >= ? THEN 1 ELSE 0 END) AS approved_count,
+           SUM(CASE WHEN status IN ('pending', 'approved') AND appointment_date >= ? THEN 1 ELSE 0 END) AS active_count
+         FROM appointments
+         WHERE student_id = ?`,
+        [
+          getManilaDateString(),
+          getManilaDateString(),
+          getManilaDateString(),
+          studentId,
+        ],
+      );
+
+      const [[docRow]] = await pool.query(
+        `SELECT
+           SUM(CASE WHEN status = 'pending'    THEN 1 ELSE 0 END) AS pending_only_count,
+           SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) AS processing_count,
+           SUM(CASE WHEN status = 'ready'      THEN 1 ELSE 0 END) AS ready_count
+         FROM document_requests
+         WHERE student_id = ?`,
+        [studentId],
+      );
+
+      // document_submissions now share the Pending -> Processing -> Ready ->
+      // Claimed lifeline, so pending/processing/ready all fold into the
+      // combined documents stat below.
+      const [[subRow]] = await pool.query(
+        `SELECT
+           SUM(CASE WHEN status = 'pending'    THEN 1 ELSE 0 END) AS pending_only_count,
+           SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) AS processing_count,
+           SUM(CASE WHEN status = 'ready'      THEN 1 ELSE 0 END) AS ready_count
+         FROM document_submissions
+         WHERE student_id = ?`,
+        [studentId],
+      );
+
+      const [[completedRow]] = await pool.query(
+        `SELECT
+           (
+             SELECT COUNT(*) FROM queues
+             WHERE student_id = ? AND status = 'completed'
+           ) +
+           (
+             SELECT COUNT(*) FROM appointments
+             WHERE student_id = ? AND status = 'completed'
+           ) +
+           (
+             SELECT COUNT(*) FROM document_requests
+             WHERE student_id = ? AND status = 'claimed'
+           ) +
+           (
+             SELECT COUNT(*) FROM document_submissions
+             WHERE student_id = ? AND status = 'claimed'
+           ) AS total_completed`,
+        [studentId, studentId, studentId, studentId],
+      );
+
+      const [[facultyRow]] = await pool.query(
+        `SELECT COUNT(*) AS total_faculty
+         FROM faculty f
+         JOIN students s ON s.department_id = f.department_id
+         WHERE s.student_id = ?`,
+        [studentId],
+      );
+
+      // Ordered by updated_at (the latest change), not created_at -- titles
+      // describe the CURRENT status, so an item completed/rejected today must
+      // surface as recent even if it was created last week. Same column the
+      // transactions feed sorts by.
+      const [recentActivity] = await pool.query(
+        `(
+           SELECT 'queue' AS type, COALESCE(q.service_label_snapshot, s.service_name) AS service_name, NULL AS professor_name, NULL AS request_type,
+                  d.department_name AS college, q.status, q.admin_reason, NULL AS cancelled_by,
+                  q.updated_at AS event_time
+           FROM queues q
+           JOIN services s ON q.service_id = s.service_id
+           JOIN departments d ON s.department_id = d.department_id
+           WHERE q.student_id = ?
+         )
+         UNION ALL
+         (
+           SELECT 'appointment' AS type, NULL AS service_name, CONCAT(f.first_name, ' ', f.last_name) AS professor_name,
+                  NULL AS request_type, d.department_name AS college, a.status, NULL AS admin_reason, a.cancelled_by,
+                  a.updated_at AS event_time
+           FROM appointments a
+           JOIN faculty f ON a.faculty_id = f.faculty_id
+           JOIN departments d ON f.department_id = d.department_id
+           WHERE a.student_id = ?
+         )
+         UNION ALL
+         (
+           SELECT 'document' AS type, NULL AS service_name, NULL AS professor_name, dr.request_type,
+                  d.department_name AS college, dr.status, NULL AS admin_reason, NULL AS cancelled_by,
+                  dr.updated_at AS event_time
+           FROM document_requests dr
+           JOIN document_services s ON dr.service_id = s.service_id
+           JOIN departments d ON s.department_id = d.department_id
+           WHERE dr.student_id = ?
+         )
+         UNION ALL
+         (
+           SELECT 'submission' AS type, NULL AS service_name, NULL AS professor_name, ds.title AS request_type,
+                  d.department_name AS college, ds.status, NULL AS admin_reason, NULL AS cancelled_by,
+                  ds.updated_at AS event_time
+           FROM document_submissions ds
+           JOIN departments d ON ds.department_id = d.department_id
+           WHERE ds.student_id = ?
+         )
+         ORDER BY event_time DESC
+         LIMIT 5`,
+        [studentId, studentId, studentId, studentId],
+      );
+
+      // Pick the queue with the lowest position (closest to being served)
+      const closestQueue = activeQueues.length > 0 ? activeQueues[0] : null;
+
+      const maxCapacity = closestQueue?.max_capacity || 0;
+      const totalInQueue = closestQueue?.total_in_queue || 0;
+      const servicedCount = closestQueue?.serviced_count || 0;
+      const queueOccupancyPercent =
+        maxCapacity > 0
+          ? Math.min(100, Math.round((totalInQueue / maxCapacity) * 100))
+          : 0;
+      const servicedPercent =
+        totalInQueue > 0
+          ? Math.min(100, Math.round((servicedCount / totalInQueue) * 100))
+          : 0;
+
+      // Build the queue number badge for the closest queue
+      const closestQueueNumberBadge = closestQueue
+        ? (() => {
+            const deptAbbrev = closestQueue.department_abbreviation;
+            const serviceCode = closestQueue.service_name
+              .split(" ")[0]
+              .substring(0, 3)
+              .toUpperCase();
+            return `${deptAbbrev}-${serviceCode}-${String(closestQueue.queue_number).padStart(3, "0")}`;
+          })()
+        : null;
+
+      const closestQueueDisplay = closestQueue
+        ? getQueueDisplayInfo({
+            status: closestQueue.status,
+            rawPosition: closestQueue.position,
+            arrivedAt: closestQueue.arrived_at,
+            avgServiceMinutes: closestQueue.avg_service_minutes,
+          })
+        : null;
+
+      res.json({
+        stats: {
+          queuePosition: closestQueueDisplay ? closestQueueDisplay.position : 0,
+          queueNumberBadge: closestQueueNumberBadge,
+          activeQueueCount: activeQueues.length,
+          appointments: {
+            upcoming:
+              Number(apptRow.pending_count || 0) +
+              Number(apptRow.approved_count || 0),
+            pending: Number(apptRow.pending_count || 0),
+            approved: Number(apptRow.approved_count || 0),
+            active: Number(apptRow.active_count || 0),
+          },
+          documents: (() => {
+            const pendingOnly =
+              Number(docRow.pending_only_count || 0) +
+              Number(subRow.pending_only_count || 0);
+            const processing =
+              Number(docRow.processing_count || 0) +
+              Number(subRow.processing_count || 0);
+            const ready =
+              Number(docRow.ready_count || 0) +
+              Number(subRow.ready_count || 0);
+            const total = pendingOnly + processing + ready;
+            return {
+              total,
+              pending: total,
+              pendingOnly,
+              processing,
+              ready,
+            };
+          })(),
+          completed: completedRow.total_completed || 0,
+          totalFacultyCount: facultyRow.total_faculty || 0,
+        },
+        activeQueue: closestQueue
+          ? {
+              queueId: closestQueue.queue_id,
+              queueNumber: closestQueue.queue_number,
+              queueNumberBadge: closestQueueNumberBadge,
+              service: closestQueue.service_label_snapshot || closestQueue.service_name,
+              college: closestQueue.department_name,
+              collegeAbbrev: closestQueue.department_abbreviation,
+              status: closestQueue.status,
+              arrivedAt: closestQueue.arrived_at,
+              position: closestQueueDisplay.position,
+              totalWaiting: closestQueue.total_waiting,
+              maxCapacity,
+              totalInQueue,
+              servicedCount,
+              queueOccupancyPercent,
+              servicedPercent,
+              estimatedWaitTime: closestQueueDisplay.estimatedWait,
+              passedTo: closestQueue.assigned_faculty_id
+                ? { facultyId: closestQueue.assigned_faculty_id, name: closestQueue.assigned_faculty_name }
+                : null,
+            }
+          : null,
+        recentActivity: recentActivity.map((row, i) => ({
+          id: i + 1,
+          type: row.type,
+          title:
+            row.type === "queue"
+              ? buildQueueActivityTitle(row)
+              : row.type === "appointment"
+                ? buildAppointmentActivityTitle(row)
+                : row.type === "submission"
+                  ? buildSubmissionActivityTitle(row)
+                  : buildDocumentActivityTitle(row),
+          college: row.college,
+          status: row.status,
+          time: formatRelativeTime(new Date(row.event_time)),
+        })),
+      });
+    } catch (error) {
+      sendServerError(res, error, "Dashboard stats error");
+    }
+  },
+);
+
+// Status-aware Recent Activity titles, mirroring professorRoutes.js's own
+// buildActivityTitle/buildDocumentActivityTitle pattern (that file's comment
+// notes it was written to match a student-side counterpart -- this is that
+// counterpart, from the student's own point of view).
+function buildQueueActivityTitle(row) {
+  if (row.status === "cancelled") {
+    // "Queue Stopped" matches the exact wording the student /transactions
+    // endpoint already uses for the same admin_reason-not-null signal.
+    return row.admin_reason
+      ? "Queue Stopped"
+      : `You left the queue at ${row.service_name}`;
+  }
+  const map = {
+    waiting: `Joined queue at ${row.service_name}`,
+    serving: `Now being served at ${row.service_name}`,
+    completed: `Queue completed at ${row.service_name}`,
+    no_show: `Missed your turn at ${row.service_name}`,
+  };
+  return map[row.status] ?? `Queue update at ${row.service_name}`;
+}
+
+function buildAppointmentActivityTitle(row) {
+  if (row.status === "cancelled") {
+    if (row.cancelled_by === "system")
+      return `Appointment with ${row.professor_name} auto-cancelled — schedule changed`;
+    if (row.cancelled_by === "system_expired")
+      return `Appointment with ${row.professor_name} auto-cancelled — expired without a response`;
+    if (row.cancelled_by === "system_not_entertained")
+      return `Appointment with ${row.professor_name} auto-cancelled — you were not entertained in time`;
+    if (row.cancelled_by === "faculty")
+      return `Appointment cancelled by ${row.professor_name}`;
+    if (row.cancelled_by === "student_no_show")
+      return `You reported that ${row.professor_name} did not serve you`;
+    return `You cancelled the appointment with ${row.professor_name}`;
+  }
+  // cancelled_by on a REJECTED row marks a system auto-rejection (see
+  // utils/appointmentAutoResolution.js) -- don't attribute it to the professor.
+  if (row.status === "rejected" && row.cancelled_by === "system_expired")
+    return `Appointment request to ${row.professor_name} auto-rejected — not approved in time`;
+  const map = {
+    pending: `Appointment request sent to ${row.professor_name}`,
+    approved: `Appointment confirmed with ${row.professor_name}`,
+    completed: `Appointment completed with ${row.professor_name}`,
+    rejected: `Appointment rejected by ${row.professor_name}`,
+  };
+  return map[row.status] ?? `Appointment update with ${row.professor_name}`;
+}
+
+function buildDocumentActivityTitle(row) {
+  const map = {
+    pending: `Document request submitted: ${row.request_type}`,
+    processing: `Document request being processed: ${row.request_type}`,
+    ready: `Document ready for pickup: ${row.request_type}`,
+    claimed: `Document claimed: ${row.request_type}`,
+    rejected: `Document request rejected: ${row.request_type}`,
+    cancelled: `You cancelled the document request: ${row.request_type}`,
+  };
+  return map[row.status] ?? `Document request update: ${row.request_type}`;
+}
+
+// row.request_type carries document_submissions.title here (same UNION
+// column position as buildDocumentActivityTitle's request_type).
+function buildSubmissionActivityTitle(row) {
+  const map = {
+    pending: `Document sent: ${row.request_type}`,
+    processing: `Sent document being processed: ${row.request_type}`,
+    ready: `Sent document processed and ready: ${row.request_type}`,
+    claimed: `Sent document completed: ${row.request_type}`,
+    rejected: `Sent document rejected: ${row.request_type}`,
+    cancelled: `You cancelled the sent document: ${row.request_type}`,
+  };
+  return map[row.status] ?? `Sent document update: ${row.request_type}`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// ANNOUNCEMENTS ENDPOINT
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/student/announcements
+// Returns only the student's own department's announcements.
+//
+// `category` is optional and toggles between two distinct call shapes:
+//  - omitted: full, unpaginated department history (all categories) -- the
+//    shape the dashboard's "Pinned Announcements" widget relies on, since it
+//    needs the complete pinned set to preview/count correctly, not one page
+//    of one category. { announcements }
+//  - provided ("pinned" | "all" | important/event/reminder/general): paged,
+//    category-scoped result for the dedicated Announcements screen's
+//    tabs + Load More. { announcements, page, totalPages }
+const ANNOUNCEMENT_CATEGORIES = ["important", "event", "reminder", "general"];
+const ANNOUNCEMENTS_PAGE_SIZE = 10;
+
+router.get(
+  "/announcements",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const { category } = req.query;
+    try {
+      const [[stu]] = await pool.query(
+        `SELECT department_id FROM students WHERE student_id = ?`,
+        [studentId],
+      );
+      const studentDeptId = stu?.department_id ?? null;
+
+      const filterClauses = [
+        "a.department_id = ?",
+        "a.status = 'active'",
+        "a.audience = 'students'",
+      ];
+      const filterParams = [studentDeptId];
+      if (category === "pinned") {
+        filterClauses.push("a.is_pinned = 1");
+      } else if (ANNOUNCEMENT_CATEGORIES.includes(category)) {
+        filterClauses.push("a.type = ?");
+        filterParams.push(category);
+      }
+      const whereClause = `WHERE ${filterClauses.join(" AND ")}`;
+
+      const baseSelect = `
+        SELECT
+           a.announcement_id,
+           a.title,
+           a.content,
+           a.type,
+           a.is_pinned,
+           a.created_at,
+           a.updated_at,
+           d.department_id,
+           d.department_name,
+           d.department_abbreviation
+         FROM announcements a
+         JOIN departments d ON a.department_id = d.department_id
+         ${whereClause}
+         ORDER BY a.is_pinned DESC, a.updated_at DESC`;
+
+      let rows;
+      let page;
+      let totalPages;
+      if (category) {
+        page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const offset = (page - 1) * ANNOUNCEMENTS_PAGE_SIZE;
+        const [[{ total }]] = await pool.query(
+          `SELECT COUNT(*) AS total FROM announcements a ${whereClause}`,
+          filterParams,
+        );
+        totalPages = Math.max(1, Math.ceil(total / ANNOUNCEMENTS_PAGE_SIZE));
+        [rows] = await pool.query(`${baseSelect} LIMIT ? OFFSET ?`, [
+          ...filterParams,
+          ANNOUNCEMENTS_PAGE_SIZE,
+          offset,
+        ]);
+      } else {
+        [rows] = await pool.query(baseSelect, filterParams);
+      }
+
+      const attachmentsMap = await getAttachmentsMap(
+        rows.map((row) => row.announcement_id),
+      );
+
+      const announcements = rows.map((row) => ({
+        id: String(row.announcement_id),
+        title: row.title,
+        description: row.content,
+        category: row.type,
+        isPinned: !!row.is_pinned,
+        date: row.updated_at,
+        isReposted:
+          new Date(row.updated_at).getTime() !==
+          new Date(row.created_at).getTime(),
+        departmentId: row.department_id,
+        departmentName: row.department_name,
+        departmentAbbrev: row.department_abbreviation,
+        college: `${row.department_name} (${row.department_abbreviation})`,
+        attachments: attachmentsMap[row.announcement_id] || [],
+      }));
+
+      res.json(
+        category ? { announcements, page, totalPages } : { announcements },
+      );
+    } catch (error) {
+      sendServerError(res, error, "Fetch announcements error");
+    }
+  },
+);
+
+// GET /api/student/announcements/:id/attachments/:attachmentId
+// Serves one specific attachment inline (image/PDF/etc.), visibility-scoped
+// exactly like the list route above (own department only).
+router.get(
+  "/announcements/:id/attachments/:attachmentId",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const announcementId = parseInt(req.params.id, 10);
+    const attachmentId = parseInt(req.params.attachmentId, 10);
+    if (isNaN(announcementId) || isNaN(attachmentId)) {
+      return res
+        .status(400)
+        .json({ error: "Invalid announcement or attachment id" });
+    }
+    try {
+      const [[stu]] = await pool.query(
+        `SELECT department_id FROM students WHERE student_id = ?`,
+        [studentId],
+      );
+      await serveAnnouncementAttachment(res, {
+        announcementId,
+        attachmentId,
+        callerDeptId: stu?.department_id ?? null,
+        expectedAudience: "students",
+        forbiddenMessage: "Cannot view this attachment",
+      });
+    } catch (error) {
+      sendServerError(res, error, "Announcement attachment fetch error");
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
+// FAQS ENDPOINT
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/student/faqs
+// Returns only the student's own department's FAQs, in stable insertion order.
+router.get(
+  "/faqs",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    try {
+      const [[stu]] = await pool.query(
+        `SELECT department_id FROM students WHERE student_id = ?`,
+        [studentId],
+      );
+      const studentDeptId = stu?.department_id ?? null;
+
+      const [rows] = await pool.query(
+        `SELECT faq_id, question, answer, created_at, updated_at
+         FROM faqs
+         WHERE department_id = ?
+         ORDER BY created_at ASC, faq_id ASC`,
+        [studentDeptId],
+      );
+
+      res.json({
+        faqs: rows.map((r) => ({
+          id: r.faq_id,
+          question: r.question,
+          answer: r.answer,
+          createdAt: r.created_at,
+          updatedAt: r.updated_at,
+        })),
+      });
+    } catch (error) {
+      sendServerError(res, error, "Fetch FAQs error");
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
+// DOCUMENT REQUEST ENDPOINTS
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/student/documents
+// Merges document_requests ("Request a Document") and document_submissions
+// ("Send a Document") into one list, since both screens' claimed/rejected/
+// cancelled tabs render them identically. `id` is prefixed ("req-12"/
+// "sub-7") because the two tables' auto-increment ids would otherwise
+// collide once merged -- same trick GET /transactions already uses.
+router.get(
+  "/documents",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+
+    try {
+      const [rows] = await pool.query(
+        `SELECT * FROM (
+           (
+             SELECT
+               'request' AS kind,
+               dr.request_id AS id,
+               dr.tracking_number,
+               dr.request_type AS title,
+               dr.purpose,
+               dr.copies,
+               dr.status,
+               dr.estimated_completion,
+               dr.needed_by,
+               dr.claim_by,
+               dr.released_at,
+               dr.claimed_at,
+               dr.notes,
+               dr.created_at,
+               dr.updated_at,
+               dr.is_digital_delivery,
+               dr.service_snapshot,
+               gf.qr_code AS delivery_code,
+               d.department_name AS college
+             FROM document_requests dr
+             JOIN document_services s ON dr.service_id = s.service_id
+             JOIN departments d ON s.department_id = d.department_id
+             LEFT JOIN generated_files gf ON gf.request_id = dr.request_id
+             WHERE dr.student_id = ?
+           )
+           UNION ALL
+           (
+             SELECT
+               'submission' AS kind,
+               ds.submission_id AS id,
+               ds.tracking_number,
+               ds.title AS title,
+               ds.purpose,
+               NULL AS copies,
+               ds.status,
+               NULL AS estimated_completion,
+               ds.needed_by,
+               ds.claim_by,
+               NULL AS released_at,
+               ds.claimed_at,
+               ds.notes,
+               ds.created_at,
+               ds.updated_at,
+               NULL AS is_digital_delivery,
+               NULL AS service_snapshot,
+               NULL AS delivery_code,
+               d.department_name AS college
+             FROM document_submissions ds
+             JOIN departments d ON ds.department_id = d.department_id
+             WHERE ds.student_id = ?
+           )
+         ) AS combined
+         ORDER BY created_at DESC`,
+        [studentId, studentId],
+      );
+
+      const submissionIds = rows
+        .filter((d) => d.kind === "submission")
+        .map((d) => d.id);
+      const requestIds = rows
+        .filter((d) => d.kind === "request")
+        .map((d) => d.id);
+      const [studentFilesMap, adminFilesMap, requestFilesMap] = await Promise.all([
+        getFilesMap(submissionIds, "student_upload"),
+        getFilesMap(submissionIds, "admin_return"),
+        getRequestFilesMap(requestIds, { faculty: false }),
+      ]);
+
+      const documents = rows.map((d) => {
+        const doc = {
+          id: `${d.kind === "submission" ? "sub" : "req"}-${d.id}`,
+          kind: d.kind,
+          type: d.title,
+          college: d.college,
+          requestDate: d.created_at,
+          updatedAt: d.updated_at,
+          purpose: d.purpose,
+          copies: d.copies,
+          status: STATUS_LABEL_MAP[d.status] ?? d.status,
+          trackingNumber: d.tracking_number,
+          notes: d.notes || undefined,
+          estimatedCompletion: d.estimated_completion || undefined,
+          neededBy: d.needed_by || undefined,
+          claimBy: d.claim_by || undefined,
+          releasedDate: d.released_at || undefined,
+          claimedDate: d.claimed_at || undefined,
+          isDigitalDelivery: !!d.is_digital_delivery,
+          deliveryCode: d.delivery_code || undefined,
+          // Frozen catalogue copy captured at submit -- the detail view renders
+          // requirements/processing-time/description from this so a later edit
+          // to the type can't retro-change a finished request. mysql2 returns
+          // JSON columns already parsed.
+          serviceSnapshot: d.service_snapshot ?? null,
+        };
+        if (d.kind === "submission") {
+          doc.studentFiles = studentFilesMap[d.id] || [];
+          doc.adminFiles = adminFilesMap[d.id] || [];
+        } else {
+          // Soft-copy files the office attached to this request.
+          doc.adminFiles = requestFilesMap[d.id] || [];
+        }
+        return doc;
+      });
+
+      res.json({ documents });
+    } catch (error) {
+      sendServerError(res, error, "Get documents error");
+    }
+  },
+);
+
+// POST /api/student/documents
+// Body: { type, college, purpose, copies }
+router.post(
+  "/documents",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const { type, college, purpose, copies, neededBy } = req.body;
+
+    if (!type || !college || !purpose) {
+      return res
+        .status(400)
+        .json({ error: "type, college, and purpose are required" });
+    }
+    if (purpose.length > 255) {
+      return res
+        .status(400)
+        .json({ error: "Purpose must be 255 characters or fewer" });
+    }
+
+    const copyCount = copies === undefined ? 1 : Number(copies);
+    if (!Number.isInteger(copyCount) || copyCount < 1 || copyCount > 20) {
+      return res.status(400).json({
+        error: "Number of copies must be a whole number between 1 and 20",
+      });
+    }
+
+    const tomorrow = getManilaDateString(
+      new Date(Date.now() + 24 * 60 * 60 * 1000),
+    );
+    if (neededBy && neededBy < tomorrow) {
+      return res
+        .status(400)
+        .json({ error: "Needed-by date must be at least tomorrow" });
+    }
+
+    // Strip an "(ABBR)" suffix, e.g. "College of Computing Studies (CCS)"
+    const collegeName = college.replace(/\s*\([^)]*\)\s*$/, "").trim();
+
+    try {
+      const [[stu]] = await pool.query(
+        `SELECT department_id FROM students WHERE student_id = ?`,
+        [studentId],
+      );
+      const ownDeptId = stu?.department_id ?? null;
+
+      // 1. Try to find a service matching both the document type and college
+      let serviceId = null;
+
+      const [exactMatch] = await pool.query(
+        `SELECT s.service_id
+         FROM document_services s
+         JOIN departments d ON s.department_id = d.department_id
+         WHERE s.service_name = ? AND d.department_name = ?
+         LIMIT 1`,
+        [type, collegeName],
+      );
+      if (exactMatch.length) serviceId = exactMatch[0].service_id;
+
+      // 2. Fall back to any document service under that college
+      if (!serviceId) {
+        const [deptMatch] = await pool.query(
+          `SELECT s.service_id
+           FROM document_services s
+           JOIN departments d ON s.department_id = d.department_id
+           WHERE d.department_name = ?
+           LIMIT 1`,
+          [collegeName],
+        );
+        if (deptMatch.length) serviceId = deptMatch[0].service_id;
+      }
+
+      // 3. Fall back to any document service under the student's own department
+      if (!serviceId && ownDeptId) {
+        const [deptDefault] = await pool.query(
+          `SELECT service_id FROM document_services WHERE department_id = ? LIMIT 1`,
+          [ownDeptId],
+        );
+        if (deptDefault.length) serviceId = deptDefault[0].service_id;
+      }
+
+      if (!serviceId) {
+        return res.status(404).json({
+          error:
+            "No matching service configuration found for the selected college",
+        });
+      }
+
+      const estimatedCompletion = getManilaDateString(
+        new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+      );
+
+      const conn = await pool.getConnection();
+      let result;
+      try {
+        await conn.beginTransaction();
+
+        // Lock the resolved service row so a concurrent PUT /deactivate can't
+        // slip its auto-reject sweep in around this new submission. Re-check
+        // scope + active status under the lock -- tiers 1-2 above resolved by
+        // whatever college name the client sent, and the form may be stale.
+        const [[svc]] = await conn.query(
+          `SELECT department_id, is_cross_college, status
+           FROM document_services WHERE service_id = ? FOR UPDATE`,
+          [serviceId],
+        );
+        if (!svc || (svc.department_id !== ownDeptId && !svc.is_cross_college)) {
+          await conn.rollback();
+          return res.status(403).json({
+            error: "This service isn't available to your department",
+          });
+        }
+        if (svc.status !== "active") {
+          await conn.rollback();
+          return res.status(409).json({
+            error: "This document type is no longer offered.",
+          });
+        }
+
+        // Guard against a double-click/double-tap firing this twice before the
+        // client's own disabled-button state catches up to the first request.
+        const [[recentDup]] = await conn.query(
+          `SELECT request_id FROM document_requests
+           WHERE student_id = ? AND service_id = ? AND purpose = ?
+             AND status != 'cancelled'
+             AND created_at >= NOW() - INTERVAL 10 SECOND
+           LIMIT 1`,
+          [studentId, serviceId, purpose],
+        );
+        if (recentDup) {
+          await conn.rollback();
+          return res.status(409).json({
+            error: "This request was already submitted a moment ago",
+          });
+        }
+
+        const serviceSnapshot = await buildDocumentServiceSnapshot(conn, serviceId);
+        const trackingNumber = await nextTrackingNumber(conn, "REQ");
+        [result] = await conn.query(
+          `INSERT INTO document_requests
+             (tracking_number, student_id, service_id, request_type, purpose, copies, status, estimated_completion, needed_by, service_snapshot, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, NOW())`,
+          [
+            trackingNumber,
+            studentId,
+            serviceId,
+            type,
+            purpose,
+            copyCount,
+            estimatedCompletion,
+            neededBy || null,
+            JSON.stringify(serviceSnapshot),
+          ],
+        );
+
+        await conn.commit();
+      } catch (txErr) {
+        await conn.rollback();
+        throw txErr;
+      } finally {
+        conn.release();
+      }
+
+      const [[newDoc]] = await pool.query(
+        `SELECT
+           dr.request_id, dr.tracking_number, dr.request_type, dr.purpose, dr.copies,
+           dr.status, dr.estimated_completion, dr.needed_by, dr.claim_by, dr.notes, dr.created_at,
+           d.department_name AS college, s.department_id
+         FROM document_requests dr
+         JOIN document_services s ON dr.service_id = s.service_id
+         JOIN departments d ON s.department_id = d.department_id
+         WHERE dr.request_id = ?`,
+        [result.insertId],
+      );
+
+      // Awaited before the socket emit -- otherwise a client's live-refetch
+      // (triggered the instant it receives the event) can beat this INSERT
+      // to the table and render a stale, one-behind notification list.
+      await notifyDepartmentAdmins(
+        newDoc.department_id,
+        `New document request: ${newDoc.request_type} (${newDoc.tracking_number})`,
+        "document",
+      );
+      emitToDept(newDoc.department_id, "document:new-request", {
+        requestId: newDoc.request_id,
+      });
+      res.status(201).json({
+        message: "Document request submitted successfully",
+        document: {
+          id: `req-${newDoc.request_id}`,
+          kind: "request",
+          type: newDoc.request_type,
+          college: newDoc.college,
+          requestDate: newDoc.created_at,
+          purpose: newDoc.purpose,
+          copies: newDoc.copies,
+          status: newDoc.status,
+          trackingNumber: newDoc.tracking_number,
+          notes: newDoc.notes || undefined,
+          estimatedCompletion: newDoc.estimated_completion || undefined,
+          neededBy: newDoc.needed_by || undefined,
+          claimBy: newDoc.claim_by || undefined,
+        },
+      });
+    } catch (error) {
+      sendServerError(res, error, "Create document request error");
+    }
+  },
+);
+
+// POST /api/student/document-submissions ("Send a Document")
+// Body (multipart/form-data): title, purpose, neededBy, attachments[] (max
+// MAX_FILES, 10MB each). No document type/college/copies -- the student can
+// only send to their own department, resolved server-side from
+// students.department_id, never trusted from the client.
+router.post(
+  "/document-submissions",
+  authenticateToken,
+  authorizeRoles("student"),
+  documentSubmissionUpload.upload.array("attachments", MAX_FILES),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const { title, purpose, neededBy } = req.body;
+
+    if (!title || !purpose) {
+      deleteFiles(req.files);
+      return res.status(400).json({ error: "title and purpose are required" });
+    }
+    if (title.length > 255) {
+      deleteFiles(req.files);
+      return res
+        .status(400)
+        .json({ error: "Title must be 255 characters or fewer" });
+    }
+    if (purpose.length > 255) {
+      deleteFiles(req.files);
+      return res
+        .status(400)
+        .json({ error: "Purpose must be 255 characters or fewer" });
+    }
+
+    const tomorrow = getManilaDateString(
+      new Date(Date.now() + 24 * 60 * 60 * 1000),
+    );
+    if (neededBy && neededBy < tomorrow) {
+      deleteFiles(req.files);
+      return res
+        .status(400)
+        .json({ error: "Needed-by date must be at least tomorrow" });
+    }
+
+    const budgetError = validateBudget(req.files || []);
+    if (budgetError) {
+      deleteFiles(req.files);
+      return res.status(400).json({ error: budgetError });
+    }
+
+    let committed = false;
+    try {
+      const [[stu]] = await pool.query(
+        `SELECT department_id FROM students WHERE student_id = ?`,
+        [studentId],
+      );
+      if (!stu) {
+        deleteFiles(req.files);
+        return res.status(404).json({ error: "Student not found" });
+      }
+      const departmentId = stu.department_id;
+
+      // Guard against a double-click/double-tap firing this twice before the
+      // client's own disabled-button state catches up to the first request.
+      const [[recentDup]] = await pool.query(
+        `SELECT submission_id FROM document_submissions
+         WHERE student_id = ? AND title = ? AND purpose = ?
+           AND status != 'cancelled'
+           AND created_at >= NOW() - INTERVAL 10 SECOND
+         LIMIT 1`,
+        [studentId, title, purpose],
+      );
+      if (recentDup) {
+        deleteFiles(req.files);
+        return res
+          .status(409)
+          .json({ error: "This document was already sent a moment ago" });
+      }
+
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+
+        const submissionTrackingNumber = await nextTrackingNumber(conn, "SUB");
+        const [result] = await conn.query(
+          `INSERT INTO document_submissions (tracking_number, student_id, department_id, title, purpose, needed_by, status, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW())`,
+          [submissionTrackingNumber, studentId, departmentId, title, purpose, neededBy || null],
+        );
+
+        await insertFiles(
+          result.insertId,
+          "student_upload",
+          req.files,
+          studentId,
+          conn,
+        );
+        await conn.commit();
+        committed = true;
+
+        const [[newSub]] = await pool.query(
+          `SELECT ds.submission_id, ds.tracking_number, ds.title, ds.purpose, ds.status,
+                  ds.needed_by, ds.claim_by, ds.notes, ds.created_at, d.department_name AS college
+           FROM document_submissions ds
+           JOIN departments d ON ds.department_id = d.department_id
+           WHERE ds.submission_id = ?`,
+          [result.insertId],
+        );
+        const studentFiles = await getFiles(
+          newSub.submission_id,
+          "student_upload",
+        );
+
+        // Awaited before the socket emit -- see the identical comment on the
+        // document-request path above.
+        await notifyDepartmentAdmins(
+          departmentId,
+          `New document sent: ${newSub.title} (${newSub.tracking_number})`,
+          "document",
+        );
+        emitToDept(departmentId, "document:new-request", {
+          requestId: newSub.submission_id,
+        });
+
+        res.status(201).json({
+          message: "Document sent successfully",
+          document: {
+            id: `sub-${newSub.submission_id}`,
+            kind: "submission",
+            type: newSub.title,
+            college: newSub.college,
+            requestDate: newSub.created_at,
+            purpose: newSub.purpose,
+            copies: null,
+            status: newSub.status,
+            trackingNumber: newSub.tracking_number,
+            notes: newSub.notes || undefined,
+            neededBy: newSub.needed_by || undefined,
+            claimBy: newSub.claim_by || undefined,
+            studentFiles,
+            adminFiles: [],
+          },
+        });
+      } catch (error) {
+        if (!committed) {
+          await conn.rollback();
+          deleteFiles(req.files);
+        }
+        sendServerError(res, error, "Create document submission error");
+      } finally {
+        conn.release();
+      }
+    } catch (error) {
+      if (!committed) deleteFiles(req.files);
+      sendServerError(res, error, "Create document submission error");
+    }
+  },
+);
+
+// GET /api/student/document-submissions/:submissionId/files/:fileId
+// Serves one file (either the student's own upload or the office's return
+// file) to the student who owns the submission.
+router.get(
+  "/document-submissions/:submissionId/files/:fileId",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const submissionId = parseInt(req.params.submissionId, 10);
+    const fileId = parseInt(req.params.fileId, 10);
+    if (!submissionId || !fileId) {
+      return res.status(400).json({ error: "Invalid submission or file id" });
+    }
+    try {
+      await serveStudentDocumentSubmissionFile(res, {
+        submissionId,
+        fileId,
+        studentId,
+      });
+    } catch (error) {
+      sendServerError(res, error, "Get document submission file error");
+    }
+  },
+);
+
+// GET /api/student/documents/service-types
+// Returns document services visible to the student: their own dept + global (NULL dept),
+// filtered to recipient_type 'students' or 'both', active only.
+router.get(
+  "/documents/service-types",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    try {
+      const studentId = req.user.userId;
+      const [[stu]] = await pool.query(
+        `SELECT department_id FROM students WHERE student_id = ?`,
+        [studentId],
+      );
+      const studentDeptId = stu?.department_id ?? null;
+
+      // All colleges, regardless of whether they have any configured document
+      // types yet — lets the request form list every college and show
+      // "No Documents Available" for ones with none, instead of omitting them.
+      const [allDepartments] = await pool.query(
+        `SELECT department_id AS id, department_name AS name, department_abbreviation AS abbrev
+         FROM departments
+         ORDER BY department_name ASC`,
+      );
+
+      const [rows] = await pool.query(
+        `SELECT ds.service_id, ds.service_name, ds.department_id, ds.is_cross_college,
+                ds.processing_time, d.department_name, d.department_abbreviation
+         FROM document_services ds
+         JOIN departments d ON ds.department_id = d.department_id
+         WHERE (ds.department_id = ? OR ds.is_cross_college = TRUE)
+           AND ds.recipient_type IN ('students', 'both')
+           AND ds.status = 'active'
+         ORDER BY ds.service_name ASC`,
+        [studentDeptId],
+      );
+
+      const serviceIds = rows.map((r) => r.service_id);
+      const requirementsMap = {};
+      if (serviceIds.length > 0) {
+        const [reqRows] = await pool.query(
+          `SELECT service_id, requirement_name, description, is_mandatory
+           FROM document_requirements WHERE service_id IN (?) ORDER BY is_mandatory DESC, requirement_id ASC`,
+          [serviceIds],
+        );
+        for (const req of reqRows) {
+          if (!requirementsMap[req.service_id])
+            requirementsMap[req.service_id] = [];
+          requirementsMap[req.service_id].push({
+            name: req.requirement_name,
+            description: req.description,
+            isMandatory: !!req.is_mandatory,
+          });
+        }
+      }
+
+      // Group services by their real owning department.
+      const servicesByDepartmentId = {};
+      for (const row of rows) {
+        if (!servicesByDepartmentId[row.department_id]) {
+          servicesByDepartmentId[row.department_id] = [];
+        }
+        servicesByDepartmentId[row.department_id].push({
+          name: row.service_name,
+          processingTime: row.processing_time,
+          requirements: requirementsMap[row.service_id] ?? [],
+        });
+      }
+
+      res.json({
+        departments: allDepartments,
+        servicesByDepartmentId,
+      });
+    } catch (error) {
+      sendServerError(res, error, "Document service types error");
+    }
+  },
+);
+
+// DELETE /api/student/documents/:docId
+// Cancels a pending or processing document request/submission owned by the
+// student. Soft-cancel (status = 'cancelled'), not a real delete, so it
+// stays visible in the student's transaction history the same way a
+// cancelled queue ticket or appointment does. docId is prefixed ("req-12"/
+// "sub-7") since GET /documents merges two tables whose auto-increment ids
+// would otherwise collide -- parseInt alone can't handle that prefix.
+router.delete(
+  "/documents/:docId",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const match = /^(req|sub)-(\d+)$/.exec(req.params.docId);
+    if (!match) {
+      return res.status(400).json({ error: "Invalid document id" });
+    }
+    const role = match[1] === "sub" ? "submission" : "student";
+    const requestId = parseInt(match[2], 10);
+
+    const conn = await pool.getConnection();
+    try {
+      const result = await cancelOwnDocumentRequest(conn, {
+        role,
+        ownerId: studentId,
+        requestId,
+      });
+      if (!result.ok) {
+        return res.status(result.status).json({ error: result.message });
+      }
+
+      emitToUser(studentId, "document:cancelled", { requestId, studentId });
+      emitToDept(result.departmentId, "document:cancelled", {
+        requestId,
+        studentId,
+      });
+
+      res.json({
+        message: "Document request cancelled successfully",
+        requestId: req.params.docId,
+      });
+    } catch (error) {
+      await conn.rollback();
+      sendServerError(res, error, "Cancel document request error");
+    } finally {
+      conn.release();
+    }
+  },
+);
+
+// PATCH /api/student/documents/:docId/claim
+// Owner-initiated Ready -> Claimed, the document counterpart to a student
+// marking an appointment as done. `:docId` is prefixed ("req-12"/"sub-7") the
+// same way GET /documents and DELETE /documents/:docId are. Only succeeds for
+// the student's own request/submission and only from the 'ready' state;
+// 'claimed' is treated as an idempotent success.
+router.patch(
+  "/documents/:docId/claim",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const match = /^(req|sub)-(\d+)$/.exec(req.params.docId);
+    if (!match) {
+      return res.status(400).json({ error: "Invalid document id" });
+    }
+    const role = match[1] === "sub" ? "submission" : "student";
+    const requestId = parseInt(match[2], 10);
+
+    const conn = await pool.getConnection();
+    try {
+      const result = await selfClaimDocument(conn, { role, ownerId: studentId, requestId });
+      if (!result.ok) {
+        return res.status(result.status).json({ error: result.message });
+      }
+
+      emitToUser(studentId, "document:status-updated", { requestId, status: "claimed" });
+      emitToDept(result.departmentId, "document:status-updated", { requestId, status: "claimed" });
+      if (!result.already) {
+        createNotification(
+          studentId,
+          `You claimed your ${result.label} document (${result.trackingNumber}).`,
+          "document",
+        );
+      }
+
+      res.json({ message: "Document claimed", requestId: req.params.docId, status: "claimed" });
+    } catch (error) {
+      try { await conn.rollback(); } catch { /* already rolled back */ }
+      sendServerError(res, error, "Claim document error");
+    } finally {
+      conn.release();
+    }
+  },
+);
+
+// GET /api/student/documents/:requestId/files/:fileId
+// Streams one soft-copy file the office attached to the student's own request.
+router.get(
+  "/documents/:requestId/files/:fileId",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const requestId = parseInt(req.params.requestId, 10);
+    const fileId = parseInt(req.params.fileId, 10);
+    if (!requestId || !fileId) {
+      return res.status(400).json({ error: "Invalid request or file id" });
+    }
+    try {
+      await serveRequestFile(res, { requestId, fileId, faculty: false, requesterId: studentId });
+    } catch (error) {
+      sendServerError(res, error, "Get document request file error");
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
+// QUEUE ENDPOINTS
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/student/queues/available
+// Returns today's queue slots students should know about, including ones
+// currently 'full' (visible but not joinable, so a student can see it exists
+// and check back if a seat frees up) -- 'expired'/'completed'/'closed' slots
+// are done for the day and stay hidden. Scope:
+//   - Service belongs to the student's own department, OR
+//   - Service is cross-college (is_cross_college = TRUE) — owned by another
+//     department but shared with every other department's students.
+router.get(
+  "/queues/available",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    try {
+      const studentId = req.user.userId;
+      const [[stu]] = await pool.query(
+        `SELECT department_id FROM students WHERE student_id = ?`,
+        [studentId],
+      );
+      const studentDeptId = stu?.department_id ?? null;
+      const manilaToday = getManilaDateString();
+
+      const COUNT_SUBQUERIES = `
+           -- Office line only: a new joiner enters the office's line, so a
+           -- student a professor is handling is neither "now serving" at the
+           -- counter nor ahead of them.
+           (
+             SELECT q.queue_number FROM queues q
+             WHERE q.slot_id = qs.slot_id AND q.status = 'serving'
+               AND q.assigned_faculty_id IS NULL
+             ORDER BY q.called_at DESC LIMIT 1
+           ) AS currently_serving_number,
+           (
+             SELECT COUNT(*) FROM queues q2
+             WHERE q2.slot_id = qs.slot_id AND q2.status = 'waiting'
+               AND q2.assigned_faculty_id IS NULL
+           ) AS waiting_count,
+           (
+             SELECT COUNT(*) FROM queues q6
+             WHERE q6.slot_id = qs.slot_id AND q6.status IN ('waiting', 'serving', 'completed')
+           ) AS claimed_count`;
+
+      // 1. Normal single-service slots (unchanged scoping).
+      const [slots] = await pool.query(
+        `SELECT
+           qs.slot_id, qs.service_id, qs.slot_date, qs.start_time, qs.end_time,
+           qs.max_capacity, qs.current_count, qs.status, qs.no_show_timeout_minutes,
+           qs.service_time_minutes,
+           s.service_name, s.is_cross_college, s.description AS service_description,
+           l.location_name AS service_location,
+           d.department_id, d.department_name, d.department_abbreviation,
+           ${COUNT_SUBQUERIES}
+         FROM queue_slots qs
+         JOIN services s ON qs.service_id = s.service_id
+         JOIN departments d ON s.department_id = d.department_id
+         LEFT JOIN locations l ON s.location_id = l.location_id
+         WHERE qs.slot_date = ?
+           AND qs.is_universal = FALSE
+           AND qs.status IN ('open', 'paused', 'full')
+           AND (s.department_id = ? OR s.is_cross_college = TRUE)
+         ORDER BY qs.created_at DESC`,
+        [manilaToday, studentDeptId],
+      );
+
+      // 2. Universal Service Queue slots -- visible to the hosting dept's own
+      // students, or to anyone if the hosting dept has >=1 cross-college service.
+      const [uniSlots] = await pool.query(
+        `SELECT
+           qs.slot_id, qs.slot_date, qs.start_time, qs.end_time, qs.max_capacity,
+           qs.current_count, qs.status, qs.no_show_timeout_minutes, qs.service_time_minutes,
+           qs.department_id, d.department_name, d.department_abbreviation, d.office_location,
+           ${COUNT_SUBQUERIES}
+         FROM queue_slots qs
+         JOIN departments d ON qs.department_id = d.department_id
+         WHERE qs.slot_date = ?
+           AND qs.is_universal = TRUE
+           AND qs.status IN ('open', 'paused', 'full')
+           AND (
+             qs.department_id = ?
+             OR EXISTS (SELECT 1 FROM services sx
+                        WHERE sx.department_id = qs.department_id AND sx.is_cross_college = TRUE)
+           )
+         ORDER BY qs.created_at DESC`,
+        [manilaToday, studentDeptId],
+      );
+
+      const manilaNow = getManilaTimeString();
+      const codeOf = (serviceName) =>
+        serviceName.split(" ")[0].substring(0, 3).toUpperCase();
+
+      const formatted = slots.map((slot) => {
+        const waitingCount = slot.waiting_count || 0;
+        const claimedCount = slot.claimed_count || 0;
+        const avgWaitMin = waitingCount * slot.service_time_minutes;
+        const deptAbbrev = slot.department_abbreviation;
+        const currentlyServing = slot.currently_serving_number
+          ? `${deptAbbrev}-${codeOf(slot.service_name)}-${String(slot.currently_serving_number).padStart(3, "0")}`
+          : "—";
+
+        return {
+          slotId: slot.slot_id,
+          serviceId: slot.service_id,
+          isUniversal: false,
+          serviceName: slot.service_name,
+          departmentId: slot.department_id,
+          departmentName: slot.department_name,
+          departmentAbbrev: deptAbbrev,
+          isCrossCollege: !!slot.is_cross_college,
+          description: slot.service_description || null,
+          location: slot.service_location || null,
+          slotDate: slot.slot_date,
+          startTime: slot.start_time,
+          endTime: slot.end_time,
+          maxCapacity: slot.max_capacity,
+          currentCount: claimedCount,
+          hasCapacity: slot.status === "open" && claimedCount < slot.max_capacity,
+          isWithinHours: manilaNow >= slot.start_time && manilaNow <= slot.end_time,
+          status: slot.status,
+          waitingCount,
+          currentlyServing,
+          avgWaitTime: waitingCount === 0 ? "No wait" : `~${avgWaitMin} min`,
+          voidTimeoutMinutes: slot.no_show_timeout_minutes,
+        };
+      });
+
+      for (const slot of uniSlots) {
+        const isOwnDept = slot.department_id === studentDeptId;
+        // The dept's services this student may pick, minus any that currently
+        // have their own live single-service queue today.
+        const [pickable] = await pool.query(
+          `SELECT s.service_id, s.service_name, s.is_cross_college, s.description
+           FROM services s
+           WHERE s.department_id = ?
+             ${isOwnDept ? "" : "AND s.is_cross_college = TRUE"}
+             AND NOT EXISTS (
+               SELECT 1 FROM queue_slots qx
+               WHERE qx.service_id = s.service_id AND qx.slot_date = ?
+                 AND qx.status IN ('open', 'paused', 'full')
+             )
+           ORDER BY s.service_name ASC`,
+          [slot.department_id, manilaToday],
+        );
+        if (pickable.length === 0) continue; // nothing to pick -> hide the card
+
+        const waitingCount = slot.waiting_count || 0;
+        const claimedCount = slot.claimed_count || 0;
+        const avgWaitMin = waitingCount * slot.service_time_minutes;
+
+        formatted.push({
+          slotId: slot.slot_id,
+          serviceId: null,
+          isUniversal: true,
+          serviceName: "Universal Service Queue",
+          departmentId: slot.department_id,
+          departmentName: slot.department_name,
+          departmentAbbrev: slot.department_abbreviation,
+          isCrossCollege: false,
+          description: null,
+          location: slot.office_location || null,
+          slotDate: slot.slot_date,
+          startTime: slot.start_time,
+          endTime: slot.end_time,
+          maxCapacity: slot.max_capacity,
+          currentCount: claimedCount,
+          hasCapacity: slot.status === "open" && claimedCount < slot.max_capacity,
+          isWithinHours: manilaNow >= slot.start_time && manilaNow <= slot.end_time,
+          status: slot.status,
+          waitingCount,
+          currentlyServing: "—",
+          avgWaitTime: waitingCount === 0 ? "No wait" : `~${avgWaitMin} min`,
+          voidTimeoutMinutes: slot.no_show_timeout_minutes,
+          universalServices: pickable.map((s) => ({
+            serviceId: s.service_id,
+            serviceName: s.service_name,
+            isCrossCollege: !!s.is_cross_college,
+            description: s.description || null,
+          })),
+        });
+      }
+
+      res.json({ slots: formatted });
+    } catch (error) {
+      sendServerError(res, error, "Available queues error");
+    }
+  },
+);
+
+// GET /api/student/queues/block-status
+// Today's no-show strike count and whether joining is currently paused.
+// Exists so the queue page can warn the student BEFORE they walk to the
+// office and scan -- discovering the block at the counter would be the worst
+// possible moment to find out.
+router.get(
+  "/queues/block-status",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    try {
+      const state = await getStrikeState(pool, req.user.userId);
+      res.json(state);
+    } catch (error) {
+      sendServerError(res, error, "Queue block status error:");
+    }
+  },
+);
+
+// GET /api/student/queues/:queueId/requirements
+// The service's requirement checklist for one of the student's own queue
+// entries, with what they've already ticked off.
+//
+// This is the "pre-processing" the panel asked for (2026-09-30): the student
+// confirms what they brought while waiting, so the staff member already
+// knows whether they're ready when their number comes up, instead of
+// discovering a missing document at the counter.
+router.get(
+  "/queues/:queueId/requirements",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const queueId = parseInt(req.params.queueId, 10);
+    if (!Number.isInteger(queueId) || queueId <= 0) {
+      return res.status(400).json({ error: "Invalid queueId" });
+    }
+    try {
+      const [[entry]] = await pool.query(
+        `SELECT queue_id, service_id FROM queues WHERE queue_id = ? AND student_id = ?`,
+        [queueId, studentId],
+      );
+      if (!entry) {
+        return res.status(404).json({ error: "Queue entry not found" });
+      }
+
+      const [rows] = await pool.query(
+        `SELECT r.requirement_id, r.requirement_name, r.description, r.is_mandatory,
+                COALESCE(c.is_checked, 0) AS is_checked
+           FROM service_requirements r
+           LEFT JOIN queue_requirement_checks c
+             ON c.requirement_id = r.requirement_id AND c.queue_id = ?
+          WHERE r.service_id = ?
+          ORDER BY r.is_mandatory DESC, r.requirement_name`,
+        [queueId, entry.service_id],
+      );
+
+      res.json({
+        requirements: rows.map((r) => ({
+          requirementId: r.requirement_id,
+          name: r.requirement_name,
+          description: r.description,
+          // mysql2 hands back TINYINT(1) as a Number -- coerce, or strict
+          // comparisons on the client silently always take one branch.
+          isMandatory: !!r.is_mandatory,
+          isChecked: !!r.is_checked,
+        })),
+      });
+    } catch (error) {
+      sendServerError(res, error, "Queue requirements fetch error:");
+    }
+  },
+);
+
+// PUT /api/student/queues/:queueId/requirements
+// Body: { requirementId, isChecked }
+router.put(
+  "/queues/:queueId/requirements",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const queueId = parseInt(req.params.queueId, 10);
+    const requirementId = parseInt(req.body?.requirementId, 10);
+    const isChecked = req.body?.isChecked === true;
+    if (!Number.isInteger(queueId) || !Number.isInteger(requirementId)) {
+      return res.status(400).json({ error: "queueId and requirementId are required" });
+    }
+    try {
+      // Only while the ticket is live: editing the checklist of a finished
+      // or cancelled visit would rewrite what the staff member saw.
+      const [[entry]] = await pool.query(
+        `SELECT q.queue_id, q.slot_id, q.assigned_faculty_id
+           FROM queues q
+          WHERE q.queue_id = ? AND q.student_id = ?
+            AND q.status IN ('waiting', 'serving')`,
+        [queueId, studentId],
+      );
+      if (!entry) {
+        return res.status(404).json({ error: "Queue entry not found or no longer active" });
+      }
+
+      // The requirement must belong to this entry's own service, or a
+      // student could tick boxes against another service's checklist.
+      const [[req0]] = await pool.query(
+        `SELECT r.requirement_id
+           FROM service_requirements r
+           JOIN queues q ON q.service_id = r.service_id
+          WHERE r.requirement_id = ? AND q.queue_id = ?`,
+        [requirementId, queueId],
+      );
+      if (!req0) {
+        return res.status(404).json({ error: "Requirement not found for this service" });
+      }
+
+      await pool.query(
+        `INSERT INTO queue_requirement_checks (queue_id, requirement_id, is_checked, checked_at)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE is_checked = VALUES(is_checked), checked_at = VALUES(checked_at)`,
+        [queueId, requirementId, isChecked, isChecked ? new Date() : null],
+      );
+
+      // Lets the host's entry list update live while the student ticks.
+      emitToSlot(entry.slot_id, "queue:requirements-updated", { queueId, requirementId, isChecked });
+      // Faculty don't join slot rooms, so reach the professor holding it directly.
+      if (entry.assigned_faculty_id) {
+        emitToUser(entry.assigned_faculty_id, "queue:requirements-updated", { queueId, requirementId, isChecked });
+      }
+
+      res.json({ message: "Saved" });
+    } catch (error) {
+      sendServerError(res, error, "Queue requirement update error:");
+    }
+  },
+);
+
+// GET /api/student/queues/active
+// Returns all waiting/serving queue entries for the logged-in student. A
+// completed entry drops off this list immediately (rather than lingering
+// for a grace window) so the student can rejoin the same slot right away.
+router.get(
+  "/queues/active",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+
+    try {
+      const [rows] = await pool.query(
+        `SELECT
+           q.queue_id,
+           q.queue_number,
+           q.slot_id,
+           q.service_id,
+           q.status,
+           q.notes,
+           q.created_at AS joined_at,
+           q.arrived_at,
+           q.completed_at,
+           q.assigned_faculty_id,
+           q.assigned_at,
+           CONCAT(fa.first_name, ' ', fa.last_name) AS assigned_faculty_name,
+           qs.start_time,
+           qs.end_time,
+           qs.max_capacity,
+           qs.status AS slot_status,
+           qs.pause_reason,
+           qs.no_show_timeout_minutes,
+           s.service_name,
+           q.service_label_snapshot,
+           s.description AS service_description,
+           l.location_name AS service_location,
+           d.department_name,
+           d.department_abbreviation,
+           -- Position: how many 'waiting' entries in MY LINE sit at or before
+           -- mine in the canonical order (priority, then arrival) -- NOT by
+           -- queue_number, which is only a display label. My line is the
+           -- office's line on this slot, or the professor I was passed to.
+           -- See queueDisplay.js.
+           (
+             SELECT COUNT(*)
+             FROM queues q2
+             WHERE q2.status = 'waiting'
+               AND ${queueLanePredicate("q2", "q")}
+               AND ${queueAtOrBeforePredicate("q2", "q")}
+           ) AS position,
+           -- Total waiting in my line
+           (
+             SELECT COUNT(*)
+             FROM queues q3
+             WHERE q3.status = 'waiting'
+               AND ${queueLanePredicate("q3", "q")}
+           ) AS total_waiting,
+           -- Cumulative headcount for this slot: everyone who joined today and
+           -- hasn't cancelled (waiting + serving + completed)
+           (
+             SELECT COUNT(*)
+             FROM queues q4
+             WHERE q4.slot_id = q.slot_id
+               AND q4.status IN ('waiting', 'serving', 'completed')
+           ) AS total_in_queue,
+           -- How many of those have already been fully serviced
+           (
+             SELECT COUNT(*)
+             FROM queues q5
+             WHERE q5.slot_id = q.slot_id
+               AND q5.status = 'completed'
+           ) AS serviced_count,
+           qs.service_time_minutes AS avg_service_minutes
+         FROM queues q
+         JOIN queue_slots qs ON q.slot_id = qs.slot_id
+         JOIN services s ON q.service_id = s.service_id
+         JOIN departments d ON s.department_id = d.department_id
+         LEFT JOIN locations l ON s.location_id = l.location_id
+         LEFT JOIN faculty fa ON fa.faculty_id = q.assigned_faculty_id
+         WHERE q.student_id = ?
+           AND q.status IN ('waiting', 'serving')
+         ORDER BY q.created_at DESC`,
+        [studentId],
+      );
+
+      const formatted = rows.map((row) => {
+        const { position, estimatedWait } = getQueueDisplayInfo({
+          status: row.status,
+          rawPosition: row.position,
+          arrivedAt: row.arrived_at,
+          avgServiceMinutes: row.avg_service_minutes,
+        });
+        const deptAbbrev = row.department_abbreviation;
+        const serviceCode = row.service_name
+          .split(" ")[0]
+          .substring(0, 3)
+          .toUpperCase();
+        const queueNumberBadge = `${deptAbbrev}-${serviceCode}-${String(row.queue_number).padStart(3, "0")}`;
+
+        const maxCapacity = row.max_capacity || 0;
+        const totalInQueue = row.total_in_queue || 0;
+        const servicedCount = row.serviced_count || 0;
+        const queueOccupancyPercent =
+          maxCapacity > 0
+            ? Math.min(100, Math.round((totalInQueue / maxCapacity) * 100))
+            : 0;
+        const servicedPercent =
+          totalInQueue > 0
+            ? Math.min(100, Math.round((servicedCount / totalInQueue) * 100))
+            : 0;
+
+        return {
+          queueId: row.queue_id,
+          queueNumber: row.queue_number,
+          queueNumberBadge,
+          slotId: row.slot_id,
+          serviceId: row.service_id,
+          serviceName: row.service_label_snapshot || row.service_name,
+          departmentName: row.department_name,
+          departmentAbbrev: deptAbbrev,
+          status: row.status,
+          arrivedAt: row.arrived_at,
+          completedAt: row.completed_at
+            ? new Date(row.completed_at).toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                timeZone: "Asia/Manila",
+              })
+            : null,
+          notes: row.notes ?? null,
+          description: row.service_description || null,
+          location: row.service_location || null,
+          // A ticket passed to a professor isn't affected by the office
+          // pausing or stopping its own line (the professor keeps serving),
+          // so its EFFECTIVE status is open -- this one mapping keeps every
+          // "queue paused" banner/toast off passed students on web + mobile.
+          slotStatus: row.assigned_faculty_id ? "open" : row.slot_status,
+          slotPauseReason: row.assigned_faculty_id ? null : (row.pause_reason ?? null),
+          passedTo: row.assigned_faculty_id
+            ? { facultyId: row.assigned_faculty_id, name: row.assigned_faculty_name }
+            : null,
+          passedAt: row.assigned_at ?? null,
+          position,
+          totalWaiting: row.total_waiting || 0,
+          maxCapacity,
+          totalInQueue,
+          servicedCount,
+          queueOccupancyPercent,
+          servicedPercent,
+          estimatedWait,
+          joinedAt: new Date(row.joined_at).toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "Asia/Manila",
+          }),
+          startTime: formatTime12h(row.start_time),
+          endTime: formatTime12h(row.end_time),
+          voidTimeoutMinutes: row.no_show_timeout_minutes,
+        };
+      });
+
+      res.json({ queues: formatted });
+    } catch (error) {
+      sendServerError(res, error, "Active queues error");
+    }
+  },
+);
+
+router.get(
+  "/queues/history",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+
+    try {
+      const [rows] = await pool.query(
+        `SELECT
+           q.queue_id,
+           q.queue_number,
+           q.status,
+           q.created_at,
+           q.completed_at,
+           q.cancelled_at,
+           s.service_name,
+           q.service_label_snapshot,
+           d.department_name,
+           d.department_abbreviation
+         FROM queues q
+         JOIN services s ON q.service_id = s.service_id
+         JOIN departments d ON s.department_id = d.department_id
+         WHERE q.student_id = ?
+           AND q.status IN ('completed', 'cancelled', 'no_show')
+         ORDER BY q.created_at DESC
+         LIMIT 50`,
+        [studentId],
+      );
+
+      const formatted = rows.map((row) => {
+        const deptAbbrev = row.department_abbreviation;
+        const serviceCode = row.service_name
+          .split(" ")[0]
+          .substring(0, 3)
+          .toUpperCase();
+        const endTime = row.completed_at || row.cancelled_at;
+
+        let actualWaitTime = "—";
+        if (row.completed_at) {
+          const diffMs = new Date(row.completed_at) - new Date(row.created_at);
+          const diffMin = Math.max(0, Math.round(diffMs / 60000));
+          actualWaitTime = `${diffMin} min`;
+        }
+
+        return {
+          id: row.queue_id,
+          service: row.service_label_snapshot || row.service_name,
+          college: row.department_name,
+          queueNumber: `${deptAbbrev}-${serviceCode}-${String(row.queue_number).padStart(3, "0")}`,
+          status: row.status,
+          date: new Date(row.created_at).toLocaleDateString("en-CA", {
+            timeZone: "Asia/Manila",
+          }),
+          joinedAt: new Date(row.created_at).toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "Asia/Manila",
+          }),
+          completedAt: endTime
+            ? new Date(endTime).toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                timeZone: "Asia/Manila",
+              })
+            : "—",
+          actualWaitTime,
+        };
+      });
+
+      res.json({ history: formatted });
+    } catch (error) {
+      sendServerError(res, error, "Queue history error");
+    }
+  },
+);
+
+// POST /api/student/queues/join
+// Body: { qrToken, notes?, serviceId? }
+//
+// On-site only (2026-09-30 panel review: "No more online reservation"). The
+// slot is resolved from the scanned token rather than taken from the body --
+// a student cannot name the queue they want to join, they can only present
+// proof that they are standing in front of it.
+//
+// The route PATH is kept even though the contract changed, so the shipped
+// mobile build (which still posts { slotId }) receives an explainable 400
+// instead of a 404 it has no handling for. See ONSITE_QR_REQUIRED below.
+router.post(
+  "/queues/join",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const { notes, qrToken } = req.body;
+    // For a Universal Service Queue the student picks which specific service
+    // they're here for; ignored for a normal single-service slot.
+    const pickedServiceId = req.body.serviceId
+      ? parseInt(req.body.serviceId, 10)
+      : null;
+    const trimmedNotes = typeof notes === "string" ? notes.trim() : "";
+
+    if (typeof qrToken !== "string" || !qrToken.trim()) {
+      return res.status(400).json({
+        error:
+          "Joining a queue now requires scanning the QR code shown at the office.",
+        code: "ONSITE_QR_REQUIRED",
+      });
+    }
+    if (trimmedNotes.length > 255) {
+      return res
+        .status(400)
+        .json({ error: "Notes must be 255 characters or fewer" });
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      // Resolve the scanned code to its slot. Expiry is judged by MySQL's
+      // NOW() inside resolveSlotToken, never a client clock. An unknown,
+      // expired or revoked code is reported identically -- the student just
+      // needs the code currently on screen, and distinguishing the cases
+      // would tell a probe which guesses were real.
+      // Anti-abuse gate, checked before the token so a blocked student gets
+      // the real reason rather than a confusing "expired code" if their scan
+      // happens to land on a rotation boundary.
+      const blocked = await getBlockRejection(conn, studentId);
+      if (blocked) {
+        await conn.rollback();
+        return res.status(403).json(blocked);
+      }
+
+      const tokenRow = await resolveSlotToken(conn, qrToken.trim());
+      if (!tokenRow) {
+        await conn.rollback();
+        return res.status(410).json({
+          error:
+            "That QR code has expired. Scan the code currently shown at the office.",
+          code: "QR_EXPIRED",
+        });
+      }
+      const slotId = tokenRow.slot_id;
+
+      // 1. Lock and fetch the slot, including the owning service's
+      // department/cross-college scope so we can re-check eligibility
+      // below (the same condition GET /queues/available already applies
+      // when deciding what to show — this re-applies it at write time so
+      // a department-exclusive queue can't be joined by guessing/reusing
+      // a slotId that was never actually shown to this student).
+      const [[slot]] = await conn.query(
+        `SELECT qs.slot_id, qs.service_id, qs.is_universal, qs.department_id AS slot_department_id,
+                qs.status, qs.current_count, qs.max_capacity, qs.start_time, qs.end_time,
+                s.service_name, s.department_id AS service_department_id, s.is_cross_college
+         FROM queue_slots qs
+         LEFT JOIN services s ON qs.service_id = s.service_id
+         WHERE qs.slot_id = ? AND qs.slot_date = ?
+         FOR UPDATE`,
+        [slotId, getManilaDateString()],
+      );
+
+      if (!slot) {
+        await conn.rollback();
+        return res
+          .status(404)
+          .json({ error: "Queue slot not found or not available today" });
+      }
+
+      const [[stu]] = await conn.query(
+        `SELECT department_id FROM students WHERE student_id = ?`,
+        [studentId],
+      );
+
+      // Resolve which service this ticket is for + its scope. For a universal
+      // slot the student must pick; for a normal slot it's the slot's service.
+      let queueServiceId;
+      let queueServiceName;
+      let scopeDeptId;
+      let scopeCrossCollege;
+      if (slot.is_universal) {
+        if (!pickedServiceId) {
+          await conn.rollback();
+          return res.status(400).json({ error: "Please choose the specific service you're here for." });
+        }
+        const [[picked]] = await conn.query(
+          `SELECT s.service_id, s.service_name, s.department_id, s.is_cross_college
+           FROM services s WHERE s.service_id = ?`,
+          [pickedServiceId],
+        );
+        // Must belong to the hosting department, and be one this student may use.
+        if (!picked || picked.department_id !== slot.slot_department_id) {
+          await conn.rollback();
+          return res.status(400).json({ error: "That service isn't part of this queue." });
+        }
+        if (!picked.is_cross_college && picked.department_id !== stu?.department_id) {
+          await conn.rollback();
+          return res.status(403).json({ error: "That service isn't available to your department." });
+        }
+        // A service with its own live queue is excluded from the universal picker.
+        const [[ownQueue]] = await conn.query(
+          `SELECT 1 FROM queue_slots
+            WHERE service_id = ? AND slot_date = ? AND status IN ('open','paused','full')
+            LIMIT 1`,
+          [pickedServiceId, getManilaDateString()],
+        );
+        if (ownQueue) {
+          await conn.rollback();
+          return res.status(409).json({
+            error: "That service has its own queue open right now — join that one instead.",
+          });
+        }
+        queueServiceId = picked.service_id;
+        queueServiceName = `Universal Service Queue - ${picked.service_name}`;
+        scopeDeptId = picked.department_id;
+        scopeCrossCollege = picked.is_cross_college;
+      } else {
+        queueServiceId = slot.service_id;
+        queueServiceName = slot.service_name;
+        scopeDeptId = slot.service_department_id;
+        scopeCrossCollege = slot.is_cross_college;
+      }
+
+      if (!scopeCrossCollege && scopeDeptId !== stu?.department_id) {
+        await conn.rollback();
+        return res
+          .status(403)
+          .json({ error: "This queue is not available to your department" });
+      }
+
+      if (slot.status !== "open") {
+        await conn.rollback();
+        return res
+          .status(409)
+          .json({ error: "This queue is not currently open" });
+      }
+
+      const manilaNow = getManilaTimeString();
+      if (manilaNow < slot.start_time) {
+        await conn.rollback();
+        return res.status(409).json({
+          error: `This queue hasn't opened yet — it opens at ${slot.start_time}`,
+        });
+      }
+      if (manilaNow > slot.end_time) {
+        await conn.rollback();
+        return res
+          .status(409)
+          .json({ error: "This queue's hours have ended for today" });
+      }
+
+      // 1b. Live capacity check — max_capacity is a total daily cap, not a
+      // concurrent-waiting-room limit, so it counts everyone who has already
+      // claimed a spot today (waiting + serving + completed), not just those
+      // still waiting. Avoids relying on drifted current_count.
+      //
+      // FOR UPDATE is load-bearing, not decoration. This transaction is
+      // REPEATABLE READ, and its snapshot is fixed by the FIRST read --
+      // which is now the block check / token lookup ABOVE, both of which
+      // run before the slot row is locked. A plain SELECT here would
+      // therefore still see the pre-lock snapshot and miss a join that
+      // committed while we were waiting on the lock, letting the queue be
+      // oversold. A locking read always sees the latest committed rows.
+      const [[countRow]] = await conn.query(
+        `SELECT COUNT(*) AS claimed
+         FROM queues
+         WHERE slot_id = ? AND status IN ('waiting', 'serving', 'completed')
+         FOR UPDATE`,
+        [slotId],
+      );
+      if (countRow.claimed >= slot.max_capacity) {
+        await conn.rollback();
+        return res
+          .status(409)
+          .json({ error: "This queue is at full capacity" });
+      }
+
+      // 2. Check if student is already in this slot
+      const [[existing]] = await conn.query(
+        // Locking read for the same snapshot reason as the capacity count
+        // above -- otherwise a double-scan a few ms apart wouldn't see its
+        // own first entry.
+        `SELECT queue_id FROM queues
+         WHERE student_id = ? AND slot_id = ? AND status IN ('waiting', 'serving')
+         LIMIT 1
+         FOR UPDATE`,
+        [studentId, slotId],
+      );
+
+      if (existing) {
+        await conn.rollback();
+        return res.status(409).json({ error: "You are already in this queue" });
+      }
+
+      // 3. Generate next queue_number for this slot
+      const [[maxRow]] = await conn.query(
+        // Locking read: with a plain SELECT this returned the pre-lock
+        // snapshot, so simultaneous scanners of the same on-screen code all
+        // computed the same number and every one but the first died on
+        // uq_queue_slot_number with an opaque 500. Reproduced 3/3 before
+        // this was added.
+        `SELECT COALESCE(MAX(queue_number), 0) AS max_num
+         FROM queues WHERE slot_id = ?
+         FOR UPDATE`,
+        [slotId],
+      );
+      const queueNumber = maxRow.max_num + 1;
+
+      // 3b. Does this student hold a live priority credit for this service?
+      // Claimed under the slot row lock already held above, so two
+      // simultaneous scans can't both spend the same one. Note the strike
+      // check ran earlier and would have rejected a blocked student before
+      // reaching here -- a blocked student's credit is deliberately left
+      // unspent so clearing the block still restores their head start.
+      const credit = await claimPriorityCredit(conn, {
+        studentId,
+        serviceId: queueServiceId,
+      });
+
+      // 4. Insert queue entry. service_label_snapshot freezes the display label
+      // at join time so a later service rename never rewrites this ticket.
+      // priority_rank 1 puts a credit-holder ahead of everyone on rank 0
+      // under the canonical ordering (see utils/queueDisplay.js).
+      const [insertResult] = await conn.query(
+        `INSERT INTO queues (student_id, service_id, slot_id, queue_number, priority_rank, status, notes, service_label_snapshot, created_at)
+         VALUES (?, ?, ?, ?, ?, 'waiting', ?, ?, NOW())`,
+        [studentId, queueServiceId, slotId, queueNumber, credit ? 1 : 0, trimmedNotes || null, queueServiceName],
+      );
+      const queueId = insertResult.insertId;
+
+      if (credit) {
+        await consumePriorityCredit(conn, { creditId: credit.credit_id, queueId });
+      }
+
+      // 5. Increment slot current_count
+      await conn.query(
+        `UPDATE queue_slots SET current_count = current_count + 1 WHERE slot_id = ?`,
+        [slotId],
+      );
+
+      // 5b. This join may have used up the last spot for the day — mark the
+      // slot 'full' to block new joins. Already-queued students keep being
+      // served normally; only /queues/join and /queues/available check this
+      // status. Reopens automatically (see settleSlotAfterEntryChange) if a
+      // seat frees up before the slot's posted hours end.
+      let slotAutoClosed = false;
+      if (countRow.claimed + 1 >= slot.max_capacity) {
+        await conn.query(
+          `UPDATE queue_slots SET status = 'full', close_reason = 'Capacity reached — queue full for today' WHERE slot_id = ?`,
+          [slotId],
+        );
+        slotAutoClosed = true;
+      }
+
+      // 6. Write audit log
+      await conn.query(
+        `INSERT INTO queue_status_logs (queue_id, old_status, new_status, changed_by, notes, created_at)
+         VALUES (?, NULL, 'waiting', ?, 'Student joined queue', NOW())`,
+        [queueId, studentId],
+      );
+
+      await conn.commit();
+
+      // 7. Fetch full details for the response
+      const [[newEntry]] = await conn.query(
+        `SELECT
+           q.queue_id, q.queue_number, q.slot_id, q.service_id, q.status, q.created_at AS joined_at, q.arrived_at,
+           qs.max_capacity,
+           qs.status AS slot_status,
+           qs.no_show_timeout_minutes,
+           s.service_name,
+           q.service_label_snapshot,
+           d.department_id,
+           d.department_name,
+           d.department_abbreviation,
+           (
+             SELECT COUNT(*) FROM queues q2
+             WHERE q2.status = 'waiting'
+               AND ${queueLanePredicate("q2", "q")}
+               AND ${queueAtOrBeforePredicate("q2", "q")}
+           ) AS position,
+           (
+             SELECT COUNT(*) FROM queues q3
+             WHERE q3.status = 'waiting'
+               AND ${queueLanePredicate("q3", "q")}
+           ) AS total_waiting,
+           (
+             SELECT COUNT(*) FROM queues q4
+             WHERE q4.slot_id = q.slot_id AND q4.status IN ('waiting', 'serving', 'completed')
+           ) AS total_in_queue,
+           (
+             SELECT COUNT(*) FROM queues q5
+             WHERE q5.slot_id = q.slot_id AND q5.status = 'completed'
+           ) AS serviced_count,
+           qs.service_time_minutes AS avg_service_minutes
+         FROM queues q
+         JOIN queue_slots qs ON q.slot_id = qs.slot_id
+         JOIN services s ON q.service_id = s.service_id
+         JOIN departments d ON s.department_id = d.department_id
+         WHERE q.queue_id = ?`,
+        [queueId],
+      );
+
+      const deptAbbrev = newEntry.department_abbreviation;
+      const serviceCode = newEntry.service_name
+        .split(" ")[0]
+        .substring(0, 3)
+        .toUpperCase();
+      const { position, estimatedWait } = getQueueDisplayInfo({
+        status: newEntry.status,
+        rawPosition: newEntry.position,
+        arrivedAt: newEntry.arrived_at,
+        avgServiceMinutes: newEntry.avg_service_minutes,
+      });
+      const maxCapacity = newEntry.max_capacity || 0;
+      const totalInQueue = newEntry.total_in_queue || 0;
+      const servicedCount = newEntry.serviced_count || 0;
+      const queueOccupancyPercent =
+        maxCapacity > 0
+          ? Math.min(100, Math.round((totalInQueue / maxCapacity) * 100))
+          : 0;
+      const servicedPercent =
+        totalInQueue > 0
+          ? Math.min(100, Math.round((servicedCount / totalInQueue) * 100))
+          : 0;
+
+      emitToSlot(slotId, "queue:student-joined", {
+        slotId,
+        queueId,
+        studentId,
+        queueNumber: newEntry.queue_number,
+        currentCount: totalInQueue,
+      });
+      emitToDept(newEntry.department_id, "queue:student-joined", {
+        slotId,
+        queueId,
+        studentId,
+        queueNumber: newEntry.queue_number,
+        currentCount: totalInQueue,
+      });
+      if (slotAutoClosed) {
+        const closedPayload = {
+          slotId,
+          status: "full",
+          reason: "Capacity reached — queue full for today",
+        };
+        emitToSlot(slotId, "queue:slot-status", closedPayload);
+        emitToDept(newEntry.department_id, "queue:slot-status", closedPayload);
+      }
+
+      res.status(201).json({
+        message: "Successfully joined the queue",
+        queue: {
+          queueId: newEntry.queue_id,
+          queueNumber: newEntry.queue_number,
+          queueNumberBadge: `${deptAbbrev}-${serviceCode}-${String(newEntry.queue_number).padStart(3, "0")}`,
+          slotId: newEntry.slot_id,
+          serviceId: newEntry.service_id,
+          serviceName: newEntry.service_label_snapshot || newEntry.service_name,
+          departmentName: newEntry.department_name,
+          departmentAbbrev: deptAbbrev,
+          status: newEntry.status,
+          arrivedAt: newEntry.arrived_at,
+          slotStatus: newEntry.slot_status,
+          position,
+          totalWaiting: newEntry.total_waiting || 0,
+          maxCapacity,
+          totalInQueue,
+          servicedCount,
+          queueOccupancyPercent,
+          servicedPercent,
+          estimatedWait,
+          joinedAt: new Date(newEntry.joined_at).toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "Asia/Manila",
+          }),
+          voidTimeoutMinutes: newEntry.no_show_timeout_minutes,
+        },
+      });
+    } catch (error) {
+      await conn.rollback();
+      sendServerError(res, error, "Join queue error");
+    } finally {
+      conn.release();
+    }
+  },
+);
+
+// POST /api/student/queues/:queueId/leave
+router.post(
+  "/queues/:queueId/leave",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const queueId = parseInt(req.params.queueId, 10);
+
+    if (!queueId || isNaN(queueId)) {
+      return res.status(400).json({ error: "Invalid queueId" });
+    }
+
+    const conn = await getTxConnection();
+    try {
+      await conn.beginTransaction();
+
+      // 1. Look up which slot this entry belongs to, so we know which
+      // queue_slots row to lock first.
+      //
+      // This read is intentionally unlocked. slot_id is effectively
+      // immutable now (passing a student to a professor keeps them on the
+      // same slot; the old slot-to-slot relay was removed), but the
+      // re-check after the row lock below is kept as a cheap safety net.
+      const [[entryLookup]] = await conn.query(
+        `SELECT slot_id FROM queues WHERE queue_id = ?`,
+        [queueId],
+      );
+      if (!entryLookup) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Queue entry not found" });
+      }
+
+      // 2. Lock order: queue_slots row first, then the queues row — matches
+      // join/pause/close/call-next/mark-arrived/serve/skip, so this can
+      // never deadlock against them.
+      await conn.query(
+        `SELECT slot_id FROM queue_slots WHERE slot_id = ? FOR UPDATE`,
+        [entryLookup.slot_id],
+      );
+
+      const [[entry]] = await conn.query(
+        `SELECT queue_id, student_id, slot_id, status, assigned_faculty_id
+         FROM queues WHERE queue_id = ? FOR UPDATE`,
+        [queueId],
+      );
+
+      if (!entry) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Queue entry not found" });
+      }
+      // Staff relayed this entry to a different queue between the unlocked
+      // read above and this row lock, so the slot we locked is no longer
+      // the one we're about to mutate and settle. Locking the new slot now
+      // would take a queue_slots lock while already holding a queues lock
+      // -- the reverse of the order every other route (and transfer
+      // itself) uses, which is exactly how deadlocks happen. Bail out and
+      // let the client retry instead; the window is sub-second and the
+      // retry lands cleanly on the new slot.
+      if (entry.slot_id !== entryLookup.slot_id) {
+        await conn.rollback();
+        return res.status(409).json({
+          error: "Staff just moved you to another queue. Please try again.",
+          code: "QUEUE_MOVED_RETRY",
+        });
+      }
+      if (entry.student_id !== studentId) {
+        await conn.rollback();
+        return res
+          .status(403)
+          .json({ error: "You can only leave your own queue" });
+      }
+      if (entry.status !== "waiting" && entry.status !== "serving") {
+        await conn.rollback();
+        return res.status(409).json({
+          error: `Queue is already ${entry.status}`,
+        });
+      }
+
+      // 2. Cancel the queue entry
+      await conn.query(
+        `UPDATE queues SET status = 'cancelled', cancelled_at = NOW() WHERE queue_id = ?`,
+        [queueId],
+      );
+
+      // 3. Decrement slot current_count (floor at 0)
+      await conn.query(
+        `UPDATE queue_slots SET current_count = GREATEST(current_count - 1, 0) WHERE slot_id = ?`,
+        [entry.slot_id],
+      );
+
+      // 3b. Cancelling frees a spot under the daily cap and removes this
+      // entry from the unserved count -- settle the slot: reopen it if it
+      // was 'full' and there's room again (and hours haven't ended), or
+      // mark it 'completed' if nobody's left waiting/serving.
+      const settleResult = await settleSlotAfterEntryChange(
+        conn,
+        entry.slot_id,
+      );
+
+      // 4. Write audit log
+      await conn.query(
+        `INSERT INTO queue_status_logs (queue_id, old_status, new_status, changed_by, notes, created_at)
+         VALUES (?, ?, 'cancelled', ?, 'Student left queue', NOW())`,
+        [queueId, entry.status, studentId],
+      );
+
+      const [[deptRow]] = await conn.query(
+        `SELECT department_id FROM queue_slots WHERE slot_id = ?`,
+        [entry.slot_id],
+      );
+
+      await conn.commit();
+      // Hand the connection back before the awaited nudge below (a pool
+      // query) -- holding it would need two connections at once, which
+      // exhausts the pool under load. See utils/txConnection.js.
+      conn.release();
+
+      const leftPayload = { slotId: entry.slot_id, queueId, studentId };
+      emitToSlot(entry.slot_id, "queue:student-left", leftPayload);
+      emitToDept(deptRow?.department_id, "queue:student-left", leftPayload);
+      if (entry.assigned_faculty_id) {
+        emitToUser(entry.assigned_faculty_id, "queue:student-left", leftPayload);
+      }
+      if (settleResult) {
+        const settledPayload = {
+          slotId: entry.slot_id,
+          status: settleResult.newStatus,
+        };
+        emitToSlot(entry.slot_id, "queue:slot-status", settledPayload);
+        emitToDept(deptRow?.department_id, "queue:slot-status", settledPayload);
+      }
+
+      // Someone ahead just left -- nudge whoever's now #2/#3. Best-effort.
+      try {
+        await notifyAlmostUp(
+          entry.assigned_faculty_id
+            ? { facultyId: entry.assigned_faculty_id }
+            : { slotId: entry.slot_id },
+        );
+      } catch (nudgeErr) {
+        console.error("[leave queue] almost-up nudge failed:", nudgeErr.message);
+      }
+
+      res.json({ message: "Successfully left the queue", queueId });
+    } catch (error) {
+      await conn.rollback();
+      sendServerError(res, error, "Leave queue error");
+    } finally {
+      conn.release();
+    }
+  },
+);
+
+// GET /api/student/queues/metrics
+// Returns aggregate queue stats for the student's "Analytics" tab.
+router.get(
+  "/queues/metrics",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+
+    try {
+      const [[counts]] = await pool.query(
+        `SELECT
+           COUNT(*) AS total_joined,
+           SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS total_completed,
+           SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS total_cancelled
+         FROM queues
+         WHERE student_id = ?`,
+        [studentId],
+      );
+
+      res.json({
+        totalQueuesJoined: counts.total_joined || 0,
+        totalQueuesCompleted: counts.total_completed || 0,
+        totalQueuesCancelled: counts.total_cancelled || 0,
+      });
+    } catch (error) {
+      sendServerError(res, error, "Queue metrics error");
+    }
+  },
+);
+
+// PATCH /api/student/queues/:queueId/notes
+// Body: { notes }
+// Lets the student edit the "concern" text on their own active queue entry.
+router.patch(
+  "/queues/:queueId/notes",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const queueId = parseInt(req.params.queueId, 10);
+    const { notes } = req.body;
+
+    if (!queueId || isNaN(queueId)) {
+      return res.status(400).json({ error: "Invalid queueId" });
+    }
+
+    const trimmedNotes = typeof notes === "string" ? notes.trim() : "";
+    if (trimmedNotes.length > 255) {
+      return res
+        .status(400)
+        .json({ error: "Notes must be 255 characters or fewer" });
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const [[entry]] = await conn.query(
+        `SELECT queue_id, student_id, slot_id, status FROM queues WHERE queue_id = ? FOR UPDATE`,
+        [queueId],
+      );
+
+      if (!entry) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Queue entry not found" });
+      }
+      if (entry.student_id !== studentId) {
+        await conn.rollback();
+        return res
+          .status(403)
+          .json({ error: "You can only edit your own queue entry" });
+      }
+      if (entry.status !== "waiting" && entry.status !== "serving") {
+        await conn.rollback();
+        return res.status(409).json({
+          error: `Queue is already ${entry.status}`,
+        });
+      }
+
+      await conn.query(`UPDATE queues SET notes = ? WHERE queue_id = ?`, [
+        trimmedNotes || null,
+        queueId,
+      ]);
+
+      const [[deptRow]] = await conn.query(
+        `SELECT department_id FROM queue_slots WHERE slot_id = ?`,
+        [entry.slot_id],
+      );
+
+      await conn.commit();
+
+      const notesPayload = { queueId, notes: trimmedNotes || null };
+      emitToDept(deptRow?.department_id, "queue:notes-updated", notesPayload);
+      // Also nudge the student's own other devices (the dept room doesn't reach them).
+      emitToUser(studentId, "queue:notes-updated", notesPayload);
+
+      res.json({ message: "Updated", queueId, notes: trimmedNotes || null });
+    } catch (error) {
+      await conn.rollback();
+      sendServerError(res, error, "Update queue notes error");
+    } finally {
+      conn.release();
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
+// APPOINTMENT ENDPOINTS
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/student/appointments
+// Returns all appointments for the logged-in student (upcoming + past).
+router.get(
+  "/appointments",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+
+    try {
+      const [rows] = await pool.query(
+        `SELECT
+           a.appointment_id,
+           a.tracking_number,
+           a.availability_id,
+           a.appointment_date,
+           a.status,
+           a.notes,
+           (af.appointment_id IS NOT NULL) AS has_feedback,
+           a.rejection_reason,
+           a.booking_year_program,
+           a.course_code,
+           a.shared_comment,
+           a.comment_updated_by,
+           a.comment_updated_at,
+           a.created_at,
+           a.approved_at,
+           a.completed_at,
+           a.cancelled_by,
+           a.cancel_reason,
+           f.faculty_id,
+           CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
+           d.department_name                       AS college,
+           d.department_abbreviation               AS college_abbrev,
+           COALESCE(a.window_start_snapshot, fda.start_time) AS window_start,
+           COALESCE(a.window_end_snapshot,   fda.end_time)   AS window_end,
+           COALESCE(a.location_snapshot,     fda.location)   AS location,
+           COALESCE(a.slot_note_snapshot,    fda.slot_note)  AS slot_note,
+           s.service_name
+         FROM appointments a
+         JOIN faculty      f ON a.faculty_id    = f.faculty_id
+         JOIN departments  d ON f.department_id = d.department_id
+         LEFT JOIN faculty_availability fda ON a.availability_id = fda.availability_id
+         LEFT JOIN appointment_services s ON a.service_id = s.service_id
+         -- Lets the booking page surface "you haven't rated this yet"
+         -- without a second request per appointment.
+         LEFT JOIN appointment_feedback af ON af.appointment_id = a.appointment_id
+         WHERE a.student_id = ?
+         ORDER BY a.created_at DESC`,
+        [studentId],
+      );
+
+      const formatted = rows.map((row) => ({
+        id: row.appointment_id,
+        trackingNumber: row.tracking_number ?? null,
+        availabilityId: row.availability_id,
+        appointmentType: row.service_name ?? null,
+        // mysql2 returns this as 0/1, not a boolean -- coerce, or a strict
+        // comparison on the client silently always takes one branch.
+        hasFeedback: !!row.has_feedback,
+        college: row.college,
+        collegeAbbrev: row.college_abbrev ?? "",
+        person: row.faculty_name,
+        date:
+          row.appointment_date instanceof Date
+            ? getManilaDateString(row.appointment_date)
+            : String(row.appointment_date).split("T")[0],
+        windowStart: row.window_start ? formatTime12h(row.window_start) : null,
+        windowEnd: row.window_end ? formatTime12h(row.window_end) : null,
+        location: row.location ?? "TBA",
+        slotNote: row.slot_note ?? null,
+        purpose: row.notes ?? "",
+        status: row.status,
+        rejectionReason: row.rejection_reason ?? null,
+        bookingYearProgram: row.booking_year_program ?? null,
+        courseCode: row.course_code ?? null,
+        sharedComment: row.shared_comment ?? null,
+        commentUpdatedBy: row.comment_updated_by ?? null,
+        commentUpdatedAt: row.comment_updated_at ?? null,
+        createdAt: row.created_at ? getManilaDateString(row.created_at) : null,
+        approvedAtRaw: row.approved_at ?? null,
+        completedAtRaw: row.completed_at ?? null,
+        cancelledBy: row.cancelled_by ?? null,
+        cancelReason: row.cancel_reason ?? null,
+      }));
+
+      res.json({ appointments: formatted });
+    } catch (error) {
+      sendServerError(res, error, "Fetch appointments error");
+    }
+  },
+);
+
+// The shared appointment comment is professor-authored only (see PATCH
+// /professor/appointments/:id/comment in professorRoutes.js). Students view
+// it read-only on stud-appointment-status.jsx; there is no write path for
+// them to this field, by design.
+
+// DELETE /api/student/appointments/:appointmentId
+// Cancels a pending appointment, or an approved one with no actions taken
+// recorded yet. Only the owning student may cancel.
+router.delete(
+  "/appointments/:appointmentId",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const appointmentId = parseInt(req.params.appointmentId, 10);
+
+    if (!appointmentId || isNaN(appointmentId)) {
+      return res.status(400).json({ error: "Invalid appointmentId" });
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const [[appt]] = await conn.query(
+        `SELECT a.appointment_id, a.student_id, a.status, a.faculty_id, a.department_id,
+                a.appointment_date, a.appointment_time, a.shared_comment, s.first_name, s.last_name,
+                sv.service_name
+         FROM appointments a
+         JOIN students s ON a.student_id = s.student_id
+         LEFT JOIN appointment_services sv ON a.service_id = sv.service_id
+         WHERE a.appointment_id = ? FOR UPDATE`,
+        [appointmentId],
+      );
+
+      if (!appt) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      if (appt.student_id !== studentId) {
+        await conn.rollback();
+        return res
+          .status(403)
+          .json({ error: "You can only cancel your own appointments" });
+      }
+      if (!["pending", "approved"].includes(appt.status)) {
+        await conn.rollback();
+        return res.status(409).json({
+          error: `Cannot cancel an appointment that is already ${appt.status}`,
+        });
+      }
+      // Actions taken can only be recorded once the meeting has happened, so
+      // cancelling after that would erase a served appointment (and dodge
+      // the sweeper's auto-complete). Mirrors report-not-served's same guard.
+      if (appt.status === "approved" && appt.shared_comment && appt.shared_comment.trim()) {
+        await conn.rollback();
+        return res.status(409).json({
+          error: "This appointment can't be cancelled — the professor has already recorded actions taken for it.",
+        });
+      }
+
+      const [result] = await conn.query(
+        `UPDATE appointments SET status = 'cancelled', cancelled_by = 'student'
+         WHERE appointment_id = ? AND status = ?`,
+        [appointmentId, appt.status],
+      );
+      if (result.affectedRows === 0) {
+        await conn.rollback();
+        return res.status(409).json({
+          error:
+            "This appointment was just updated elsewhere. Please refresh and try again.",
+        });
+      }
+
+      await conn.commit();
+
+      emitToDept(appt.department_id, "appointment:status-updated", {
+        appointmentId,
+        status: "cancelled",
+      });
+      emitToUser(appt.faculty_id, "appointment:status-updated", {
+        appointmentId,
+        status: "cancelled",
+      });
+      const cancelServicePart = appt.service_name
+        ? ` ${appt.service_name}`
+        : "";
+      createNotification(
+        appt.faculty_id,
+        `${appt.first_name} ${appt.last_name} cancelled their${cancelServicePart} appointment on ${getManilaDateString(appt.appointment_date)} at ${formatTime12h(appt.appointment_time)}.`,
+        "appointment",
+      );
+
+      res.json({
+        message: "Appointment cancelled successfully",
+        appointmentId,
+      });
+    } catch (error) {
+      await conn.rollback();
+      sendServerError(res, error, "Cancel appointment error");
+    } finally {
+      conn.release();
+    }
+  },
+);
+
+// GET /api/student/appointments/:appointmentId/feedback
+// Returns this student's existing feedback for the appointment, or null.
+// The UI uses it to decide between showing the form and showing what they
+// already said -- feedback is one-shot, so it must never offer a second box.
+router.get(
+  "/appointments/:appointmentId/feedback",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const appointmentId = parseInt(req.params.appointmentId, 10);
+    if (!Number.isInteger(appointmentId) || appointmentId <= 0) {
+      return res.status(400).json({ error: "Invalid appointmentId" });
+    }
+    try {
+      const [[appt]] = await pool.query(
+        `SELECT appointment_id, status FROM appointments
+          WHERE appointment_id = ? AND student_id = ?`,
+        [appointmentId, studentId],
+      );
+      if (!appt) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      const [[row]] = await pool.query(
+        `SELECT feedback_text, created_at FROM appointment_feedback WHERE appointment_id = ?`,
+        [appointmentId],
+      );
+      res.json({
+        // Optional, and only once the meeting actually happened.
+        canSubmit: appt.status === "completed" && !row,
+        feedback: row ? { text: row.feedback_text, createdAt: row.created_at } : null,
+      });
+    } catch (error) {
+      sendServerError(res, error, "Appointment feedback fetch error:");
+    }
+  },
+);
+
+// POST /api/student/appointments/:appointmentId/feedback
+// Body: { feedback }
+//
+// Optional, student-only, exactly once, any time after the appointment is
+// completed (2026-09-30 panel: "evaluation/feedback after appointment").
+// Deliberately separate from appointments.shared_comment, which is the
+// professor's "actions taken" note and is not student-writable.
+router.post(
+  "/appointments/:appointmentId/feedback",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const appointmentId = parseInt(req.params.appointmentId, 10);
+    const text = typeof req.body?.feedback === "string" ? req.body.feedback.trim() : "";
+
+    if (!Number.isInteger(appointmentId) || appointmentId <= 0) {
+      return res.status(400).json({ error: "Invalid appointmentId" });
+    }
+    if (!text) {
+      return res.status(400).json({ error: "Please write your feedback before submitting." });
+    }
+    if (text.length > 2000) {
+      return res.status(400).json({ error: "Feedback must be 2000 characters or fewer." });
+    }
+
+    try {
+      const [[appt]] = await pool.query(
+        `SELECT appointment_id, status FROM appointments
+          WHERE appointment_id = ? AND student_id = ?`,
+        [appointmentId, studentId],
+      );
+      if (!appt) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      if (appt.status !== "completed") {
+        return res.status(409).json({
+          error: "You can only leave feedback once the appointment is completed.",
+        });
+      }
+
+      try {
+        await pool.query(
+          `INSERT INTO appointment_feedback (appointment_id, student_id, feedback_text)
+           VALUES (?, ?, ?)`,
+          [appointmentId, studentId, text],
+        );
+      } catch (err) {
+        // appointment_id is the PRIMARY KEY, so a double-submit (double tap,
+        // or two tabs) collides here rather than creating a second row --
+        // the "exactly once" rule is enforced by the schema, not by the UI
+        // hiding the form.
+        if (err.code === "ER_DUP_ENTRY") {
+          return res.status(409).json({ error: "You've already left feedback for this appointment." });
+        }
+        throw err;
+      }
+
+      res.status(201).json({ message: "Thanks for your feedback." });
+    } catch (error) {
+      sendServerError(res, error, "Appointment feedback submit error:");
+    }
+  },
+);
+
+// PATCH /api/student/appointments/:appointmentId/complete
+// Lets a student manually close out an APPROVED appointment they've already
+// attended, in case the professor forgets to. Mirrors the professor's
+// approved -> completed transition (same event + notification shape as
+// appointmentReminderSweeper.js:resolveStaleApproved). approved -> completed only.
+router.patch(
+  "/appointments/:appointmentId/complete",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const appointmentId = parseInt(req.params.appointmentId, 10);
+
+    if (!appointmentId || isNaN(appointmentId)) {
+      return res.status(400).json({ error: "Invalid appointmentId" });
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const [[appt]] = await conn.query(
+        `SELECT appointment_id, student_id, status, faculty_id, department_id, appointment_date
+         FROM appointments WHERE appointment_id = ? FOR UPDATE`,
+        [appointmentId],
+      );
+
+      if (!appt) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      if (appt.student_id !== studentId) {
+        await conn.rollback();
+        return res
+          .status(403)
+          .json({ error: "You can only update your own appointments" });
+      }
+      // Idempotent: the 3h-grace auto-complete sweep or the professor may have
+      // already finished it -- don't surface that as an error.
+      if (appt.status === "completed") {
+        await conn.rollback();
+        return res.json({
+          message: "Appointment already marked as completed",
+          appointmentId,
+        });
+      }
+      if (!isValidTransition(appt.status, "completed")) {
+        await conn.rollback();
+        return res.status(409).json({
+          error: `Only an approved appointment can be marked as completed (this one is ${appt.status}).`,
+        });
+      }
+      const apptDate =
+        appt.appointment_date instanceof Date
+          ? getManilaDateString(appt.appointment_date)
+          : String(appt.appointment_date).split("T")[0];
+      if (apptDate > getManilaDateString()) {
+        await conn.rollback();
+        return res.status(409).json({
+          error: "This appointment hasn't happened yet — you can only mark a past or same-day appointment as completed.",
+        });
+      }
+
+      const [result] = await conn.query(
+        `UPDATE appointments
+         SET status = 'completed',
+             completed_at = CASE WHEN completed_at IS NULL THEN NOW() ELSE completed_at END
+         WHERE appointment_id = ? AND status = 'approved'`,
+        [appointmentId],
+      );
+      if (result.affectedRows === 0) {
+        await conn.rollback();
+        return res.status(409).json({
+          error:
+            "This appointment was just updated elsewhere. Please refresh and try again.",
+        });
+      }
+
+      const [[stu]] = await conn.query(
+        `SELECT first_name, last_name FROM students WHERE student_id = ?`,
+        [studentId],
+      );
+
+      await conn.commit();
+
+      emitToUser(studentId, "appointment:status-updated", { appointmentId, status: "completed" });
+      emitToUser(appt.faculty_id, "appointment:status-updated", { appointmentId, status: "completed" });
+      emitToDept(appt.department_id, "appointment:status-updated", { appointmentId, status: "completed" });
+      createNotification(
+        appt.faculty_id,
+        `${stu?.first_name ?? "A student"} ${stu?.last_name ?? ""}`.trim() +
+          ` marked their appointment on ${apptDate} as completed.`,
+        "appointment",
+      );
+
+      res.json({ message: "Appointment marked as completed", appointmentId });
+    } catch (error) {
+      await conn.rollback();
+      sendServerError(res, error, "Complete appointment error");
+    } finally {
+      conn.release();
+    }
+  },
+);
+
+// PATCH /api/student/appointments/:appointmentId/report-not-served
+// Lets a student flag that the professor never actually served them on an
+// APPROVED appointment (no-show / never followed up). Separate, additional
+// action from the plain DELETE /appointments/:appointmentId cancel above --
+// that route is untouched. approved -> cancelled only, writing a distinct
+// cancelled_by='student_no_show' (+ optional cancel_reason) so the activity
+// feed/admin view can tell this apart from an ordinary student cancel.
+// Mirrors PATCH /appointments/:appointmentId/complete's transaction/locking/
+// date-gating shape, since both are student-authored, approved-only,
+// not-future-dated self-service actions.
+router.patch(
+  "/appointments/:appointmentId/report-not-served",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const appointmentId = parseInt(req.params.appointmentId, 10);
+    const trimmedReason =
+      typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
+
+    if (!appointmentId || isNaN(appointmentId)) {
+      return res.status(400).json({ error: "Invalid appointmentId" });
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const [[appt]] = await conn.query(
+        `SELECT a.appointment_id, a.student_id, a.status, a.faculty_id, a.department_id,
+                a.appointment_date, a.appointment_time, a.shared_comment, s.first_name, s.last_name,
+                sv.service_name
+         FROM appointments a
+         JOIN students s ON a.student_id = s.student_id
+         LEFT JOIN appointment_services sv ON a.service_id = sv.service_id
+         WHERE a.appointment_id = ? FOR UPDATE`,
+        [appointmentId],
+      );
+
+      if (!appt) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      if (appt.student_id !== studentId) {
+        await conn.rollback();
+        return res
+          .status(403)
+          .json({ error: "You can only report your own appointments" });
+      }
+      // Only 'approved' -- not 'pending' (you can't claim a no-show for a
+      // request that was never even approved), and not any terminal status.
+      if (appt.status !== "approved") {
+        await conn.rollback();
+        return res.status(409).json({
+          error: `Only an approved appointment can be reported as not served (this one is ${appt.status}).`,
+        });
+      }
+      // Once the professor has recorded actions taken, the appointment was
+      // clearly served -- a report-not-served claim no longer makes sense
+      // and the UI hides this action once shared_comment is set (see
+      // AppointmentDetail's canReportNotServed / AppointmentListItem's own
+      // copy of the same gate). Enforced here too since this route doesn't
+      // otherwise stop a direct API call.
+      if (appt.shared_comment && appt.shared_comment.trim()) {
+        await conn.rollback();
+        return res.status(409).json({
+          error:
+            "This appointment can't be reported as not served — the professor has already recorded actions taken.",
+        });
+      }
+      const apptDate =
+        appt.appointment_date instanceof Date
+          ? getManilaDateString(appt.appointment_date)
+          : String(appt.appointment_date).split("T")[0];
+      if (apptDate > getManilaDateString()) {
+        await conn.rollback();
+        return res.status(409).json({
+          error:
+            "This appointment hasn't happened yet — you can only report a past or same-day appointment as not served.",
+        });
+      }
+
+      const [result] = await conn.query(
+        `UPDATE appointments
+         SET status = 'cancelled', cancelled_by = 'student_no_show', cancel_reason = ?
+         WHERE appointment_id = ? AND status = 'approved'`,
+        [trimmedReason || null, appointmentId],
+      );
+      if (result.affectedRows === 0) {
+        await conn.rollback();
+        return res.status(409).json({
+          error:
+            "This appointment was just updated elsewhere. Please refresh and try again.",
+        });
+      }
+
+      await conn.commit();
+
+      emitToDept(appt.department_id, "appointment:status-updated", {
+        appointmentId,
+        status: "cancelled",
+      });
+      emitToUser(appt.faculty_id, "appointment:status-updated", {
+        appointmentId,
+        status: "cancelled",
+      });
+      const reportServicePart = appt.service_name ? ` ${appt.service_name}` : "";
+      const reasonSuffix = trimmedReason ? ` They added: "${trimmedReason}"` : "";
+      createNotification(
+        appt.faculty_id,
+        `${appt.first_name} ${appt.last_name} reported that you did not serve them for their${reportServicePart} appointment on ${getManilaDateString(appt.appointment_date)} at ${formatTime12h(appt.appointment_time)}.${reasonSuffix}`,
+        "appointment",
+      );
+
+      res.json({
+        message: "Appointment reported as not served",
+        appointmentId,
+      });
+    } catch (error) {
+      await conn.rollback();
+      sendServerError(res, error, "Report appointment not served error");
+    } finally {
+      conn.release();
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
+// PROFESSOR SCHEDULE ENDPOINTS
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/student/professor-schedules
+ *
+ * Returns every department together with its faculty members and
+ * each faculty member's weekly consultation availability, grouped
+ * by day. Single aggregated query — mirrors the pattern used in
+ * /services/by-department so the frontend never waterfalls requests.
+ */
+router.get(
+  "/professor-schedules",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    try {
+      const [departments] = await pool.query(
+        `SELECT department_id, department_name, department_abbreviation
+         FROM departments
+         ORDER BY department_name ASC`,
+      );
+
+      const [rows] = await pool.query(
+        `SELECT
+           f.faculty_id,
+           f.first_name,
+           f.last_name,
+           f.position,
+           f.specialization,
+           f.email,
+           f.department_id,
+           f.availability_status,
+           f.unavailable_reason,
+           EXISTS (
+             SELECT 1 FROM user_sessions us
+             WHERE us.user_id = f.faculty_id
+               AND us.logout_at IS NULL
+               AND us.expires_at > NOW()
+           ) AS has_active_session,
+           fa.availability_id,
+           fa.day_of_week,
+           fa.start_time,
+           fa.end_time,
+           fa.location
+         FROM faculty f
+         LEFT JOIN faculty_availability fa
+           ON fa.faculty_id = f.faculty_id
+         ORDER BY f.department_id, f.last_name ASC,
+           FIELD(fa.day_of_week, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'),
+           fa.start_time ASC`,
+      );
+
+      // Group rows -> faculty (faculty_id -> { ...info, availability: [] })
+      const facultyMap = new Map();
+      for (const row of rows) {
+        if (!facultyMap.has(row.faculty_id)) {
+          facultyMap.set(row.faculty_id, {
+            facultyId: row.faculty_id,
+            name: `${row.first_name} ${row.last_name}`,
+            position: row.position,
+            specialization: row.specialization,
+            email: row.email,
+            departmentId: row.department_id,
+            // Login-session-derived: a professor who has logged out, whose
+            // session has expired, or who has never logged in reads as
+            // unavailable regardless of their stored toggle.
+            availabilityStatus: row.has_active_session
+              ? row.availability_status
+              : "unavailable",
+            unavailableReason:
+              row.has_active_session && row.availability_status === "unavailable"
+                ? row.unavailable_reason
+                : null,
+            availability: [],
+          });
+        }
+        if (row.availability_id) {
+          facultyMap.get(row.faculty_id).availability.push({
+            day: row.day_of_week,
+            timeStart: formatTime12h(row.start_time),
+            timeEnd: formatTime12h(row.end_time),
+            location: row.location ?? "TBA",
+          });
+        }
+      }
+
+      // Group faculty -> department
+      const deptMap = new Map();
+      for (const dept of departments) {
+        deptMap.set(dept.department_id, {
+          departmentId: dept.department_id,
+          departmentName: dept.department_name,
+          departmentAbbrev: dept.department_abbreviation,
+          faculty: [],
+        });
+      }
+      for (const fac of facultyMap.values()) {
+        const dept = deptMap.get(fac.departmentId);
+        if (dept) dept.faculty.push(fac);
+      }
+
+      // Every department is included, even with zero faculty -- lets a
+      // college filter elsewhere (e.g. stud-appointments.jsx) list every
+      // college in the DB instead of silently hiding ones with no faculty.
+      const result = [...deptMap.values()];
+
+      res.json({ departments: result });
+    } catch (error) {
+      sendServerError(res, error, "Professor schedules error");
+    }
+  },
+);
+
+// GET /api/student/transactions
+// Returns a unified history of queues, appointments, and document requests
+// Pagination: `page` (default 1) + `limit` (default 20, hard max 100); response
+// carries `totalPages` and filtered `stats`. Callers needing everything (web
+// export) loop pages. Same limit rules as admin/professor transactions.
+router.get(
+  "/transactions",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+
+    // Maps raw per-table statuses -> the 3 badge states the UI understands.
+    // Deliberately a coarser, differently-shaped mapping than admin's
+    // equivalent map in adminRoutes.js's GET /transactions (which keeps
+    // granular per-status labels for its filter dropdown) -- the two
+    // aren't meant to agree, since they serve different audiences/UIs, so
+    // don't merge them into one shared map.
+    const STATUS_MAP = {
+      waiting: "ongoing",
+      serving: "ongoing",
+      completed: "completed",
+      cancelled: "cancelled",
+      no_show: "cancelled",
+      pending: "ongoing",
+      approved: "ongoing",
+      rejected: "cancelled",
+      processing: "ongoing",
+      ready: "ongoing",
+      // Defensive aliases for rows that predate the lifeline collapse.
+      generated: "ongoing",
+      released: "ongoing",
+      claimed: "completed",
+    };
+    const STATUS_GROUPS = { completed: [], ongoing: [], cancelled: [] };
+    for (const [raw, mapped] of Object.entries(STATUS_MAP)) {
+      STATUS_GROUPS[mapped].push(raw);
+    }
+
+    const { search, type, status, startDate, endDate } = req.query;
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit, 10) || 20, 1),
+      100,
+    );
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const offset = (page - 1) * limit;
+
+    // Each branch is only ever filtered by student_id -- type/status/search
+    // are applied once, on the unioned result, so they consider the
+    // student's whole history rather than one branch at a time.
+    const unionSql = `
+      (
+        SELECT
+          'queue' AS type,
+          q.queue_id AS id,
+          IF(q.admin_reason IS NOT NULL, 'Queue Stopped', CONCAT('Queue for ', COALESCE(q.service_label_snapshot, s.service_name))) AS title,
+          d.department_name AS college,
+          q.status AS raw_status,
+          q.notes AS details,
+          CAST(NULL AS CHAR(50) CHARACTER SET utf8mb4) AS trackingNumber,
+          q.admin_reason AS adminReason,
+          CAST(NULL AS CHAR(1000) CHARACTER SET utf8mb4) AS sharedComment,
+          CAST(NULL AS CHAR(10) CHARACTER SET utf8mb4) AS commentUpdatedBy,
+          CAST(NULL AS DATETIME) AS commentUpdatedAt,
+          CAST(NULL AS DATETIME) AS approvedAt,
+          CAST(NULL AS DATETIME) AS completedAt,
+          CAST(NULL AS CHAR(20) CHARACTER SET utf8mb4) AS cancelledBy,
+          CAST(NULL AS CHAR(1000) CHARACTER SET utf8mb4) AS cancelReason,
+          q.updated_at AS event_time
+        FROM queues q
+        JOIN services s ON q.service_id = s.service_id
+        JOIN departments d ON s.department_id = d.department_id
+        WHERE q.student_id = ?
+      )
+      UNION ALL
+      (
+        SELECT
+          'appointment' AS type,
+          a.appointment_id AS id,
+          CONCAT('Appointment with ', CONCAT(f.first_name, ' ', f.last_name)) AS title,
+          d.department_name AS college,
+          a.status AS raw_status,
+          a.notes AS details,
+          a.tracking_number AS trackingNumber,
+          CAST(NULL AS CHAR(255) CHARACTER SET utf8mb4) AS adminReason,
+          a.shared_comment AS sharedComment,
+          a.comment_updated_by AS commentUpdatedBy,
+          a.comment_updated_at AS commentUpdatedAt,
+          a.approved_at AS approvedAt,
+          a.completed_at AS completedAt,
+          a.cancelled_by AS cancelledBy,
+          a.cancel_reason AS cancelReason,
+          a.updated_at AS event_time
+        FROM appointments a
+        JOIN faculty f ON a.faculty_id = f.faculty_id
+        JOIN departments d ON f.department_id = d.department_id
+        WHERE a.student_id = ?
+      )
+      UNION ALL
+      (
+        SELECT
+          'document' AS type,
+          dr.request_id AS id,
+          CONCAT(dr.request_type, ' Request') AS title,
+          d.department_name AS college,
+          dr.status AS raw_status,
+          dr.purpose AS details,
+          dr.tracking_number AS trackingNumber,
+          CAST(NULL AS CHAR(255) CHARACTER SET utf8mb4) AS adminReason,
+          CAST(NULL AS CHAR(1000) CHARACTER SET utf8mb4) AS sharedComment,
+          CAST(NULL AS CHAR(10) CHARACTER SET utf8mb4) AS commentUpdatedBy,
+          CAST(NULL AS DATETIME) AS commentUpdatedAt,
+          CAST(NULL AS DATETIME) AS approvedAt,
+          CAST(NULL AS DATETIME) AS completedAt,
+          CAST(NULL AS CHAR(20) CHARACTER SET utf8mb4) AS cancelledBy,
+          CAST(NULL AS CHAR(1000) CHARACTER SET utf8mb4) AS cancelReason,
+          dr.updated_at AS event_time
+        FROM document_requests dr
+        JOIN document_services s ON dr.service_id = s.service_id
+        JOIN departments d ON s.department_id = d.department_id
+        WHERE dr.student_id = ?
+      )
+      UNION ALL
+      (
+        SELECT
+          'submission' AS type,
+          ds.submission_id AS id,
+          CONCAT('Document Submission: ', ds.title) AS title,
+          d.department_name AS college,
+          ds.status AS raw_status,
+          ds.purpose AS details,
+          ds.tracking_number AS trackingNumber,
+          CAST(NULL AS CHAR(255) CHARACTER SET utf8mb4) AS adminReason,
+          CAST(NULL AS CHAR(1000) CHARACTER SET utf8mb4) AS sharedComment,
+          CAST(NULL AS CHAR(10) CHARACTER SET utf8mb4) AS commentUpdatedBy,
+          CAST(NULL AS DATETIME) AS commentUpdatedAt,
+          CAST(NULL AS DATETIME) AS approvedAt,
+          CAST(NULL AS DATETIME) AS completedAt,
+          CAST(NULL AS CHAR(20) CHARACTER SET utf8mb4) AS cancelledBy,
+          CAST(NULL AS CHAR(1000) CHARACTER SET utf8mb4) AS cancelReason,
+          ds.updated_at AS event_time
+        FROM document_submissions ds
+        JOIN departments d ON ds.department_id = d.department_id
+        WHERE ds.student_id = ?
+      )
+    `;
+
+    try {
+      const filterClauses = [];
+      const filterParams = [];
+      if (type === "document") {
+        // Document requests and document submissions share one lifecycle --
+        // the "Document" filter option covers both raw types.
+        filterClauses.push("type IN (?)");
+        filterParams.push(["document", "submission"]);
+      } else if (
+        type &&
+        ["queue", "appointment", "document", "submission"].includes(type)
+      ) {
+        filterClauses.push("type = ?");
+        filterParams.push(type);
+      }
+      if (status && STATUS_GROUPS[status]?.length) {
+        filterClauses.push("raw_status IN (?)");
+        filterParams.push(STATUS_GROUPS[status]);
+      }
+      const trimmedSearch = typeof search === "string" ? search.trim() : "";
+      if (trimmedSearch) {
+        filterClauses.push("(title LIKE ? OR details LIKE ?)");
+        const likeTerm = `%${trimmedSearch}%`;
+        filterParams.push(likeTerm, likeTerm);
+      }
+      const startUTC = manilaDayStartUTC(startDate);
+      const endExclusiveUTC = manilaDayEndExclusiveUTC(endDate);
+      if (startUTC) {
+        filterClauses.push("event_time >= ?");
+        filterParams.push(startUTC);
+      }
+      if (endExclusiveUTC) {
+        filterClauses.push("event_time < ?");
+        filterParams.push(endExclusiveUTC);
+      }
+      const whereClause = filterClauses.length
+        ? `WHERE ${filterClauses.join(" AND ")}`
+        : "";
+
+      // Total count over the FILTERED (search/type/status/date) result set,
+      // used to compute totalPages. The stats query below reuses this same
+      // whereClause/filterParams so its counts match what's actually on
+      // screen, instead of always covering the student's unfiltered history.
+      const [[{ total: filteredTotal }]] = await pool.query(
+        `SELECT COUNT(*) AS total FROM (${unionSql}) AS combined ${whereClause}`,
+        [studentId, studentId, studentId, studentId, ...filterParams],
+      );
+      const totalPages = Math.max(1, Math.ceil(filteredTotal / limit));
+
+      const [rows] = await pool.query(
+        `SELECT * FROM (${unionSql}) AS combined
+         ${whereClause}
+         ORDER BY event_time DESC, type, id DESC
+         LIMIT ? OFFSET ?`,
+        [
+          studentId,
+          studentId,
+          studentId,
+          studentId,
+          ...filterParams,
+          limit,
+          offset,
+        ],
+      );
+
+      const transactions = rows.map((row) => {
+        const eventDate = new Date(row.event_time);
+        return {
+          id: `${row.type}-${row.id}`,
+          type: row.type,
+          title: row.title,
+          college: row.college,
+          date: eventDate.toLocaleDateString("en-CA", {
+            timeZone: "Asia/Manila",
+          }),
+          time: eventDate.toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+            timeZone: "Asia/Manila",
+          }),
+          status: STATUS_MAP[row.raw_status] ?? "ongoing",
+          details: row.details || "No additional details provided.",
+          trackingNumber: row.trackingNumber || null,
+          adminReason: row.adminReason || null,
+          sharedComment: row.sharedComment || null,
+          commentUpdatedBy: row.commentUpdatedBy || null,
+          commentUpdatedAt: row.commentUpdatedAt || null,
+          approvedAtRaw: row.approvedAt || null,
+          completedAtRaw: row.completedAt || null,
+          cancelledBy: row.cancelledBy || null,
+          cancelReason: row.cancelReason || null,
+        };
+      });
+
+      // Stats are computed over the same filtered (search/type/status/date)
+      // result set as the list above -- just unpaginated, so the tiles
+      // reflect the full filtered count, not only whatever page is loaded.
+      const [manilaYear, manilaMonth] = getManilaDateString()
+        .split("-")
+        .map(Number);
+      const monthStartUTC = new Date(
+        `${manilaYear}-${String(manilaMonth).padStart(2, "0")}-01T00:00:00+08:00`,
+      );
+
+      // Placeholder order must match how they appear in the final SQL
+      // string: the SELECT-clause `?`s come before the FROM-clause's
+      // (unionSql's per-branch student_id `?`s), since unionSql is
+      // interpolated after this SELECT list.
+      const [[statsRow]] = await pool.query(
+        `SELECT
+           COUNT(*) AS total,
+           COALESCE(SUM(raw_status IN (?)), 0) AS completed,
+           COALESCE(SUM(raw_status IN (?)), 0) AS ongoing,
+           COALESCE(SUM(event_time >= ?), 0) AS thisMonth
+         FROM (${unionSql}) AS combined ${whereClause}`,
+        [
+          STATUS_GROUPS.completed,
+          STATUS_GROUPS.ongoing,
+          monthStartUTC,
+          studentId,
+          studentId,
+          studentId,
+          studentId,
+          ...filterParams,
+        ],
+      );
+
+      res.json({
+        transactions,
+        page,
+        totalPages,
+        stats: {
+          total: statsRow.total,
+          completed: statsRow.completed,
+          ongoing: statsRow.ongoing,
+          thisMonth: statsRow.thisMonth,
+        },
+      });
+    } catch (error) {
+      sendServerError(res, error, "Fetch transactions error");
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
+// BOOKING SLOTS ENDPOINTS (derived from faculty_availability — a recurring
+// weekly template is projected onto upcoming calendar dates below, so
+// students still pick from a list of concrete dated windows even though
+// only the day-of-week pattern is actually stored.)
+// ─────────────────────────────────────────────────────────────
+
+const WEEKDAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
+// GET /api/student/appointments/available-slots
+// Returns open availability windows with occupancy counts.
+// Optional query params: ?facultyId=&date=
+router.get(
+  "/appointments/available-slots",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const DAYS_AHEAD = 30;
+    const { date } = req.query;
+    const facultyId = Array.isArray(req.query.facultyId)
+      ? req.query.facultyId[0]
+      : req.query.facultyId;
+
+    try {
+      // Professors toggled 'unavailable' are still included (with their
+      // status flagged) rather than filtered out, so students can see they
+      // exist but can't currently be booked, instead of the professor
+      // silently disappearing from the list.
+      let tmplQuery = `
+        SELECT
+          fa.availability_id, fa.faculty_id, fa.day_of_week,
+          fa.start_time, fa.end_time, fa.location, fa.slot_note, fa.max_students,
+          CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
+          f.specialization, f.availability_status,
+          d.department_abbreviation AS college,
+          d.department_id
+        FROM faculty_availability fa
+        JOIN faculty f ON fa.faculty_id = f.faculty_id
+        JOIN departments d ON f.department_id = d.department_id`;
+      const tmplParams = [];
+      if (facultyId) {
+        tmplQuery += " WHERE fa.faculty_id = ?";
+        tmplParams.push(facultyId);
+      }
+      tmplQuery += " ORDER BY fa.faculty_id, fa.start_time";
+
+      const [templates] = await pool.query(tmplQuery, tmplParams);
+      if (templates.length === 0) return res.json({ slots: [] });
+
+      const availabilityIds = templates.map((t) => t.availability_id);
+
+      // Fetch appointment services (types) linked to each recurring template
+      const [typeRows] = await pool.query(
+        `SELECT fas.availability_id, aps.service_id, aps.service_name
+         FROM faculty_availability_services fas
+         JOIN appointment_services aps ON fas.service_id = aps.service_id
+         WHERE fas.availability_id IN (?)
+         ORDER BY fas.id ASC`,
+        [availabilityIds],
+      );
+      const typeMap = {};
+      for (const t of typeRows) {
+        (typeMap[t.availability_id] ||= []).push({
+          id: t.service_id,
+          name: t.service_name,
+        });
+      }
+
+      // Count confirmed bookings per (template, specific date) pair across the
+      // whole projection window in one query, to avoid one query per day.
+      const now = new Date();
+      const todayStr = getManilaDateString(now);
+      const [bookingCounts] = await pool.query(
+        `SELECT availability_id, appointment_date, COUNT(*) AS booked
+         FROM appointments
+         WHERE availability_id IN (?)
+           AND appointment_date >= ?
+           AND appointment_date < ? + INTERVAL ? DAY
+           AND status NOT IN ('cancelled', 'rejected')
+         GROUP BY availability_id, appointment_date`,
+        [availabilityIds, todayStr, todayStr, DAYS_AHEAD],
+      );
+      const bookedMap = {};
+      for (const b of bookingCounts) {
+        const dStr =
+          b.appointment_date instanceof Date
+            ? getManilaDateString(b.appointment_date)
+            : String(b.appointment_date).split("T")[0];
+        bookedMap[`${b.availability_id}_${dStr}`] = b.booked;
+      }
+
+      const slots = [];
+
+      // Project each template onto every matching weekday within the window.
+      const datesToCheck = date
+        ? [date]
+        : Array.from({ length: DAYS_AHEAD }, (_, i) => {
+            const d = new Date();
+            d.setDate(d.getDate() + i);
+            return getManilaDateString(d);
+          });
+
+      for (const dateStr of datesToCheck) {
+        const weekday = WEEKDAY_NAMES[new Date(`${dateStr}T00:00:00`).getDay()];
+        for (const t of templates) {
+          if (t.day_of_week !== weekday) continue;
+
+          // Windows that have already ended (only relevant for today) and
+          // fully-booked windows are still returned -- flagged as isPast /
+          // isFull -- so the frontend can show them disabled instead of
+          // silently disappearing. Anchored to +08:00 explicitly so this is
+          // correct regardless of the server process's own timezone, not
+          // just when TZ=Asia/Manila happens to be set (see adminRoutes.js's
+          // manilaMidnightUTC for the same pattern).
+          let isPast = false;
+          if (dateStr === todayStr) {
+            const windowEnd = new Date(`${dateStr}T${t.end_time}+08:00`);
+            isPast = windowEnd <= now;
+          }
+
+          const totalBooked = bookedMap[`${t.availability_id}_${dateStr}`] ?? 0;
+          const spotsLeft =
+            t.max_students != null
+              ? Math.max(0, t.max_students - totalBooked)
+              : null;
+          const isFull =
+            t.max_students != null && totalBooked >= t.max_students;
+
+          slots.push({
+            availabilityId: t.availability_id,
+            professorId: t.faculty_id,
+            professorName: t.faculty_name,
+            specialization: t.specialization,
+            college: t.college,
+            departmentId: t.department_id,
+            date: dateStr,
+            windowStart: String(t.start_time).slice(0, 5),
+            windowEnd: String(t.end_time).slice(0, 5),
+            location: t.location ?? "TBA",
+            slotNote: t.slot_note ?? null,
+            maxStudents: t.max_students,
+            totalBooked,
+            spotsLeft,
+            isPast,
+            isFull,
+            appointmentTypes: typeMap[t.availability_id] ?? [],
+            professorAvailabilityStatus: t.availability_status,
+          });
+        }
+      }
+
+      slots.sort(
+        (a, b) => a.date.localeCompare(b.date) || a.professorId - b.professorId,
+      );
+
+      res.json({ slots });
+    } catch (error) {
+      sendServerError(res, error, "Available slots error");
+    }
+  },
+);
+
+// POST /api/student/appointments/book-slot
+// Body: { availabilityId, appointmentDate, purpose, appointmentType?, yearProgram, courseCode }
+// availabilityId identifies the recurring weekly template (faculty_availability);
+// appointmentDate is the specific projected date the student is booking into,
+// since one template now spans many possible calendar dates.
+// Occupies one spot in that (template, date) pair (first come, first served).
+router.post(
+  "/appointments/book-slot",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const {
+      availabilityId,
+      appointmentDate,
+      purpose,
+      appointmentType,
+      yearProgram,
+      courseCode,
+    } = req.body;
+
+    if (!availabilityId || !appointmentDate) {
+      return res.status(400).json({
+        error: "availabilityId and appointmentDate are required",
+      });
+    }
+    if (
+      typeof appointmentDate !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate)
+    ) {
+      return res
+        .status(400)
+        .json({ error: "appointmentDate must be a YYYY-MM-DD string" });
+    }
+    if (appointmentDate < getManilaDateString()) {
+      return res
+        .status(400)
+        .json({ error: "Appointment date cannot be in the past" });
+    }
+    // Same 30-day window GET /appointments/available-slots offers (DAYS_AHEAD
+    // there: today + 0..29).
+    {
+      const limit = new Date();
+      limit.setDate(limit.getDate() + 29);
+      if (appointmentDate > getManilaDateString(limit)) {
+        return res.status(400).json({
+          error: "Appointment date is outside the bookable 30-day window",
+        });
+      }
+    }
+    if (
+      purpose != null &&
+      (typeof purpose !== "string" || purpose.length > 255)
+    ) {
+      return res
+        .status(400)
+        .json({ error: "Purpose must be a string of 255 characters or fewer" });
+    }
+    if (typeof yearProgram !== "string" || !yearProgram.trim()) {
+      return res.status(400).json({
+        error: "Year Level and Program is required",
+      });
+    }
+    if (yearProgram.trim().length > 150) {
+      return res.status(400).json({
+        error: "Year Level and Program must be 150 characters or fewer",
+      });
+    }
+    if (typeof courseCode === "string" && courseCode.trim().length > 50) {
+      return res
+        .status(400)
+        .json({ error: "Course Code must be 50 characters or fewer" });
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      // Lock the recurring template row to prevent race conditions
+      const [[slot]] = await conn.query(
+        `SELECT availability_id, faculty_id, day_of_week, start_time, end_time, location, slot_note, max_students
+         FROM faculty_availability
+         WHERE availability_id = ?
+         FOR UPDATE`,
+        [availabilityId],
+      );
+
+      if (!slot) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Availability slot not found" });
+      }
+
+      // The chosen date must actually fall on this template's weekday —
+      // guards against a tampered/stale request pairing a template with an
+      // unrelated date.
+      const weekday =
+        WEEKDAY_NAMES[new Date(`${appointmentDate}T00:00:00`).getDay()];
+      if (weekday !== slot.day_of_week) {
+        await conn.rollback();
+        return res
+          .status(400)
+          .json({ error: `${appointmentDate} is not a ${slot.day_of_week}` });
+      }
+
+      // Reject a same-day booking whose window has already ended — mirrors
+      // the identical check in GET /appointments/available-slots, which the
+      // client's cached list can drift out of sync with if left open past
+      // the window's end without a refresh. Anchored to +08:00 explicitly,
+      // same reasoning as that check.
+      if (appointmentDate === getManilaDateString()) {
+        const windowEnd = new Date(`${appointmentDate}T${slot.end_time}+08:00`);
+        if (windowEnd <= new Date()) {
+          await conn.rollback();
+          return res.status(409).json({
+            error: "This availability window has already ended for today",
+          });
+        }
+      }
+
+      // Guard against the professor toggling themselves unavailable between
+      // the student loading the slot list and submitting this booking.
+      const [[facultyStatus]] = await conn.query(
+        `SELECT availability_status FROM faculty WHERE faculty_id = ?`,
+        [slot.faculty_id],
+      );
+      if (facultyStatus?.availability_status === "unavailable") {
+        await conn.rollback();
+        return res.status(409).json({
+          error: "This professor is currently unavailable for booking",
+        });
+      }
+
+      // Enforce capacity: count active bookings for this (template, date) pair
+      const [[{ total }]] = await conn.query(
+        `SELECT COUNT(*) AS total FROM appointments
+         WHERE availability_id = ? AND appointment_date = ? AND status NOT IN ('cancelled', 'rejected')`,
+        [availabilityId, appointmentDate],
+      );
+      if (slot.max_students != null && total >= slot.max_students) {
+        await conn.rollback();
+        return res
+          .status(409)
+          .json({ error: "This availability window is fully booked" });
+      }
+
+      // Guard: student cannot book the same (template, date) pair twice
+      const [[dup]] = await conn.query(
+        `SELECT appointment_id FROM appointments
+         WHERE student_id = ? AND availability_id = ? AND appointment_date = ?
+           AND status NOT IN ('cancelled', 'rejected')`,
+        [studentId, availabilityId, appointmentDate],
+      );
+      if (dup) {
+        await conn.rollback();
+        return res.status(409).json({
+          error: "You already have a booking in this availability window",
+        });
+      }
+
+      // Validate appointmentType against the template's linked services (if any)
+      const [tmplServices] = await conn.query(
+        `SELECT fas.service_id FROM faculty_availability_services fas
+         WHERE fas.availability_id = ?`,
+        [availabilityId],
+      );
+      const validServiceIds = tmplServices.map((r) => r.service_id);
+      const chosenServiceId = appointmentType
+        ? parseInt(appointmentType, 10)
+        : null;
+      if (validServiceIds.length > 0 && !chosenServiceId) {
+        await conn.rollback();
+        return res
+          .status(400)
+          .json({ error: "Please select an appointment type" });
+      }
+      if (
+        validServiceIds.length > 0 &&
+        !validServiceIds.includes(chosenServiceId)
+      ) {
+        await conn.rollback();
+        return res
+          .status(400)
+          .json({ error: "Invalid appointment type for this slot" });
+      }
+
+      const [[facultyRow]] = await conn.query(
+        `SELECT department_id FROM faculty WHERE faculty_id = ?`,
+        [slot.faculty_id],
+      );
+      if (!facultyRow) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Faculty member not found" });
+      }
+
+      // Store the window's start_time as appointment_time for reference
+      const appointmentTime = String(slot.start_time).slice(0, 8);
+
+      // Snapshot the template's current location/window onto the appointment
+      // itself, so this row's display data survives the professor later
+      // editing or deleting the template it was booked against.
+      //
+      // Always insert a fresh row, even if a cancelled/rejected row already
+      // exists for this exact (student, faculty, date, time) -- that prior
+      // row is left untouched, permanently, as an honest history entry.
+      // Nothing here dodges the DB's uniqueness rule: uq_active_booking (see
+      // oams_db.sql) is scoped to non-cancelled/non-rejected rows only, so it
+      // never collides with that history -- only with a second genuinely
+      // active booking for the same slot, which the dup-guard above should
+      // already have caught (see the catch block below for the backstop).
+      const trackingNumber = await nextTrackingNumber(conn, "APT");
+      const [result] = await conn.query(
+        `INSERT INTO appointments
+           (tracking_number, student_id, faculty_id, department_id, service_id, availability_id,
+            location_snapshot, slot_note_snapshot, window_start_snapshot, window_end_snapshot,
+            appointment_date, appointment_time, status, notes,
+            booking_year_program, course_code, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, NOW())`,
+        [
+          trackingNumber,
+          studentId,
+          slot.faculty_id,
+          facultyRow.department_id,
+          chosenServiceId,
+          availabilityId,
+          slot.location,
+          slot.slot_note,
+          slot.start_time,
+          slot.end_time,
+          appointmentDate,
+          appointmentTime,
+          purpose?.trim() || null,
+          yearProgram.trim(),
+          (typeof courseCode === "string" && courseCode.trim()) || null,
+        ],
+      );
+      const appointmentId = result.insertId;
+
+      await conn.commit();
+
+      // ── Everything below is best-effort side-effects / response
+      // formatting -- the booking itself is already committed at this
+      // point. A failure here must NOT roll back (there's nothing left to
+      // roll back) and must NOT surface as an error to the student, who
+      // has already been successfully booked. Previously this code ran
+      // inside the same try block as the transaction: if any of it threw
+      // (a socket emit, a notification query, etc.), execution fell into
+      // the catch block below, which called conn.rollback() on an
+      // already-committed connection and sent the client a failure
+      // response/toast -- even though the appointment row was already
+      // committed to the database. That's why the booking only ever
+      // appeared after a manual refresh.
+      const newSpotsLeft =
+        slot.max_students != null ? slot.max_students - (total + 1) : null;
+      try {
+        emitToDept(facultyRow.department_id, "appointment:slot-updated", {
+          availabilityId,
+          date: appointmentDate,
+          spotsLeft: newSpotsLeft,
+        });
+        emitToUser(slot.faculty_id, "appointment:slot-updated", {
+          availabilityId,
+          date: appointmentDate,
+          spotsLeft: newSpotsLeft,
+        });
+        const [[bookedByStudent]] = await pool.query(
+          `SELECT first_name, last_name FROM students WHERE student_id = ?`,
+          [studentId],
+        );
+        let bookedServiceName = null;
+        if (chosenServiceId) {
+          const [[svc]] = await pool.query(
+            `SELECT service_name FROM appointment_services WHERE service_id = ?`,
+            [chosenServiceId],
+          );
+          bookedServiceName = svc?.service_name ?? null;
+        }
+        const bookedServicePart = bookedServiceName
+          ? ` a ${bookedServiceName}`
+          : "";
+        createNotification(
+          slot.faculty_id,
+          `${bookedByStudent.first_name} ${bookedByStudent.last_name} booked${bookedServicePart} appointment with you on ${appointmentDate} at ${formatTime12h(appointmentTime)}.`,
+          "appointment",
+        );
+      } catch (sideEffectError) {
+        console.error(
+          "Book slot post-commit side-effect error:",
+          sideEffectError,
+        );
+      }
+
+      // Read the just-written snapshot directly off the appointment row --
+      // no join needed, since we populated it ourselves a moment ago.
+      let newRow = null;
+      try {
+        [[newRow]] = await pool.query(
+          `SELECT
+             a.appointment_id, a.appointment_date, a.status, a.notes,
+             a.window_start_snapshot AS window_start, a.window_end_snapshot AS window_end,
+             a.location_snapshot AS location, a.slot_note_snapshot AS slot_note,
+             CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
+             f.specialization AS faculty_role,
+             d.department_name AS college
+           FROM appointments a
+           JOIN faculty f ON a.faculty_id = f.faculty_id
+           JOIN departments d ON f.department_id = d.department_id
+           WHERE a.appointment_id = ?`,
+          [appointmentId],
+        );
+      } catch (readError) {
+        console.error("Book slot confirmation read error:", readError);
+      }
+
+      // Even if the confirmation read above failed, the booking itself is
+      // already committed -- fall back to data we already have in hand
+      // (from the slot row locked/fetched earlier) so the student still
+      // gets a real success response instead of a false error.
+      return res.status(201).json({
+        message: "Appointment booked successfully",
+        appointment: newRow
+          ? {
+              id: newRow.appointment_id,
+              trackingNumber,
+              title: newRow.faculty_role ?? "Faculty Consultation",
+              professorName: newRow.faculty_name,
+              personRole: newRow.faculty_role ?? "Faculty",
+              college: newRow.college,
+              date: String(newRow.appointment_date).split("T")[0],
+              windowStart: formatTime12h(newRow.window_start),
+              windowEnd: formatTime12h(newRow.window_end),
+              location: newRow.location ?? "TBA",
+              slotNote: newRow.slot_note ?? null,
+              purpose: newRow.notes ?? "",
+              status: newRow.status,
+            }
+          : {
+              id: appointmentId,
+              trackingNumber,
+              title: "Faculty Consultation",
+              college: null,
+              date: appointmentDate,
+              windowStart: formatTime12h(slot.start_time),
+              windowEnd: formatTime12h(slot.end_time),
+              location: slot.location ?? "TBA",
+              purpose: purpose?.trim() || "",
+              status: "pending",
+            },
+      });
+    } catch (error) {
+      await conn.rollback();
+      // Backstop for uq_active_booking (see oams_db.sql): the dup-guard above
+      // should already prevent this in every normal case, but if a genuine
+      // race slips past it, surface a clean 409 instead of a 500. Only that
+      // index means "already booked" -- any other duplicate (e.g. a tracking
+      // number during a deploy overlap) is a retryable conflict.
+      if (error.code === "ER_DUP_ENTRY") {
+        const alreadyBooked = String(error.sqlMessage ?? error.message).includes("uq_active_booking");
+        return res.status(409).json({
+          error: alreadyBooked
+            ? "You already have an active booking for this date and time."
+            : "Your booking couldn't be completed because of a conflict. Please try again.",
+        });
+      }
+      sendServerError(res, error, "Book slot error");
+    } finally {
+      conn.release();
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
+// AVAIL-SERVICES ENDPOINTS
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/student/services/by-department
+ *
+ * Returns every department together with its services.
+ * For each service we also attach:
+ *   - requirements  → rows from service_requirements (or the service description as fallback)
+ *   - todaySlot     → the open queue_slot for today, if one exists (null otherwise)
+ *
+ * This single endpoint powers the entire Avail-Services page so the
+ * frontend never needs to waterfall multiple requests.
+ */
+router.get(
+  "/services/by-department",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    try {
+      const studentId = req.user.userId;
+      const [[stu]] = await pool.query(
+        `SELECT department_id FROM students WHERE student_id = ?`,
+        [studentId],
+      );
+      const ownDeptId = stu?.department_id ?? null;
+
+      // 1. All departments
+      const [departments] = await pool.query(
+        `SELECT department_id, department_name, department_abbreviation, office_location
+         FROM departments
+         ORDER BY department_name ASC`,
+      );
+
+      // 2. All services with their requirements (LEFT JOIN so services without
+      //    rows in service_requirements are still returned), scoped to the
+      //    student's own department or ones open to every department -- a
+      //    service that belongs to another department and isn't
+      //    cross-college was never meant to be visible/joinable here.
+      const [services] = await pool.query(
+        `SELECT
+           s.service_id,
+           s.service_name,
+           s.description,
+           s.department_id,
+           s.is_cross_college,
+           sr.requirement_id,
+           sr.requirement_name,
+           sr.description  AS req_description,
+           sr.is_mandatory
+         FROM services s
+         LEFT JOIN service_requirements sr ON sr.service_id = s.service_id
+         WHERE s.department_id = ? OR s.is_cross_college = TRUE
+         ORDER BY s.department_id, s.service_name, sr.requirement_id`,
+        [ownDeptId],
+      );
+
+      // 2b. All procedure steps for every service, ordered by step_number.
+      const [procedureSteps] = await pool.query(
+        `SELECT step_id, service_id, step_number, step_title, description
+         FROM service_procedure_steps
+         ORDER BY service_id, step_number ASC`,
+      );
+
+      // 3. Open queue slots for today (one per service; we pick the first open one)
+      const [slots] = await pool.query(
+        `SELECT
+           qs.slot_id,
+           qs.service_id,
+           qs.start_time,
+           qs.end_time,
+           qs.max_capacity,
+           qs.current_count,
+           qs.status,
+           qs.no_show_timeout_minutes,
+           qs.service_time_minutes,
+           -- Office line only (tickets passed to a professor excluded).
+           (
+             SELECT COUNT(*)
+             FROM queues q
+             WHERE q.slot_id = qs.slot_id AND q.status = 'waiting'
+               AND q.assigned_faculty_id IS NULL
+           ) AS waiting_count,
+           (
+             SELECT q2.queue_number
+             FROM queues q2
+             WHERE q2.slot_id = qs.slot_id AND q2.status = 'serving'
+               AND q2.assigned_faculty_id IS NULL
+             ORDER BY q2.called_at DESC
+             LIMIT 1
+           ) AS currently_serving_number,
+           (
+             -- Total daily cap usage: everyone who has claimed a spot today
+             -- (waiting + serving + completed) — this is what max_capacity
+             -- gates against, not just who's currently waiting.
+             SELECT COUNT(*)
+             FROM queues q3
+             WHERE q3.slot_id = qs.slot_id AND q3.status IN ('waiting', 'serving', 'completed')
+           ) AS claimed_count
+         FROM queue_slots qs
+         WHERE qs.slot_date = ?
+           AND qs.status IN ('open', 'paused')
+         ORDER BY qs.start_time ASC`,
+        [getManilaDateString()],
+      );
+
+      // ── Assemble: group requirements per service ──────────────────────────
+      // serviceMap: service_id → { ...service fields, requirements: [], procedureSteps: [] }
+      const serviceMap = new Map();
+      for (const row of services) {
+        if (!serviceMap.has(row.service_id)) {
+          serviceMap.set(row.service_id, {
+            serviceId: row.service_id,
+            serviceName: row.service_name,
+            description: row.description ?? "",
+            departmentId: row.department_id,
+            isCrossCollege: !!row.is_cross_college,
+            requirements: [],
+            procedureSteps: [],
+          });
+        }
+        // Attach requirement row if it exists
+        if (row.requirement_id) {
+          serviceMap.get(row.service_id).requirements.push({
+            id: row.requirement_id,
+            name: row.requirement_name,
+            description: row.req_description ?? "",
+            isMandatory: !!row.is_mandatory,
+          });
+        }
+      }
+
+      // ── Assemble: attach procedure steps per service ──────────────────────
+      for (const step of procedureSteps) {
+        const svc = serviceMap.get(step.service_id);
+        if (svc) {
+          svc.procedureSteps.push({
+            id: step.step_id,
+            stepNumber: step.step_number,
+            title: step.step_title,
+            description: step.description ?? "",
+          });
+        }
+      }
+
+      // ── Assemble: index slots by service_id (first open slot wins) ────────
+      const slotByService = new Map();
+      for (const slot of slots) {
+        if (!slotByService.has(slot.service_id)) {
+          const waitingCount = Number(slot.waiting_count) || 0;
+          const claimedCount = Number(slot.claimed_count) || 0;
+          const avgWaitMin = waitingCount * slot.service_time_minutes;
+          slotByService.set(slot.service_id, {
+            slotId: slot.slot_id,
+            startTime: formatTime12h(slot.start_time),
+            endTime: formatTime12h(slot.end_time),
+            maxCapacity: slot.max_capacity,
+            currentCount: claimedCount,
+            waitingCount,
+            hasCapacity:
+              slot.status === "open" && claimedCount < slot.max_capacity,
+            status: slot.status,
+            avgWaitTime: waitingCount === 0 ? "No wait" : `~${avgWaitMin} min`,
+            currentlyServingNumber: slot.currently_serving_number ?? null,
+            voidTimeoutMinutes: slot.no_show_timeout_minutes,
+          });
+        }
+      }
+
+      // ── Assemble: group services under their real owning department ───────
+      // Cross-college services still belong to one department; the UI uses
+      // each service's isCrossCollege flag to also surface it under other
+      // colleges' filters instead of relying on a synthetic bucket.
+      const deptMap = new Map();
+      for (const dept of departments) {
+        deptMap.set(dept.department_id, {
+          departmentId: dept.department_id,
+          departmentName: dept.department_name,
+          departmentAbbrev: dept.department_abbreviation,
+          officeLocation: dept.office_location ?? "",
+          services: [],
+        });
+      }
+
+      for (const svc of serviceMap.values()) {
+        const dept = deptMap.get(svc.departmentId);
+        if (!dept) continue;
+
+        const todaySlot = slotByService.get(svc.serviceId) ?? null;
+
+        dept.services.push({
+          serviceId: svc.serviceId,
+          serviceName: svc.serviceName,
+          description: svc.description,
+          isCrossCollege: svc.isCrossCollege,
+          requirements: svc.requirements,
+          procedureSteps: svc.procedureSteps,
+          todaySlot,
+          // Convenience flags the UI uses directly
+          hasQueueToday: todaySlot !== null,
+          isQueueOpen: todaySlot?.hasCapacity ?? false,
+        });
+      }
+
+      // Every department is returned, even one with no in-scope services yet
+      // (empty `services: []`), so the student Queue screen's college filter can
+      // list all colleges regardless of whether they're hosting a queue today.
+      const result = [...deptMap.values()];
+
+      res.json({ departments: result });
+    } catch (error) {
+      sendServerError(res, error, "Services by-department error");
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
+// OFFICE HOURS ENDPOINT
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/student/office-hours
+router.get(
+  "/office-hours",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    try {
+      const [[dept]] = await pool.query(
+        `SELECT d.department_name, d.department_abbreviation, d.office_location, d.office_hours
+         FROM students s
+         JOIN departments d ON s.department_id = d.department_id
+         WHERE s.student_id = ?`,
+        [studentId],
+      );
+      if (!dept) return res.status(404).json({ error: "Department not found" });
+      res.json({
+        departmentName: dept.department_name,
+        departmentAbbrev: dept.department_abbreviation,
+        officeLocation: dept.office_location ?? "",
+        officeHours: dept.office_hours ?? "",
+      });
+    } catch (error) {
+      sendServerError(res, error, "Office hours error");
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/student/notifications
+router.get(
+  "/notifications",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    try {
+      const result = await notificationsController.getNotifications(
+        req.user.userId,
+        {
+          type: req.query.type,
+          page: req.query.page,
+        },
+      );
+      res.json(result);
+    } catch (error) {
+      sendServerError(res, error, "Get notifications error");
+    }
+  },
+);
+
+// PATCH /api/student/notifications/:id/read
+router.patch(
+  "/notifications/:id/read",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const notificationId = parseInt(req.params.id, 10);
+    if (!notificationId || isNaN(notificationId)) {
+      return res.status(400).json({ error: "Invalid notification id" });
+    }
+
+    try {
+      const affectedRows = await notificationsController.markNotificationRead(
+        req.user.userId,
+        notificationId,
+      );
+      if (affectedRows === 0) {
+        return res.status(404).json({ error: "Notification not found" });
+      }
+      res.json({ message: "Marked as read" });
+    } catch (error) {
+      sendServerError(res, error, "Mark notification read error");
+    }
+  },
+);
+
+// PATCH /api/student/notifications/read-all
+router.patch(
+  "/notifications/read-all",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    try {
+      await notificationsController.markAllNotificationsRead(req.user.userId);
+      res.json({ message: "All marked as read" });
+    } catch (error) {
+      sendServerError(res, error, "Mark all notifications read error");
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
+// WEB PUSH (browser notifications, even when the site is closed)
+// ─────────────────────────────────────────────────────────────
+
+// POST /api/student/push-subscription
+// Body: the raw PushSubscription.toJSON() shape -- { endpoint, keys: { p256dh, auth } }.
+// Upserts by endpoint (same device re-subscribing, e.g. after clearing site
+// data, replaces its own row rather than erroring on the unique constraint).
+router.post(
+  "/push-subscription",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const { endpoint, keys } = req.body || {};
+    if (!endpoint || !keys?.p256dh || !keys?.auth) {
+      return res.status(400).json({ message: "endpoint and keys.p256dh/auth are required" });
+    }
+    try {
+      await pool.query(
+        `INSERT INTO web_push_subscriptions (user_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), p256dh = VALUES(p256dh), auth = VALUES(auth)`,
+        [req.user.userId, endpoint, keys.p256dh, keys.auth],
+      );
+      res.status(201).json({ message: "Subscribed" });
+    } catch (error) {
+      sendServerError(res, error, "Save push subscription error");
+    }
+  },
+);
+
+// DELETE /api/student/push-subscription
+// Body: { endpoint } -- removes this device's subscription (explicit
+// "disable notifications" action, or the browser reports it as expired).
+router.delete(
+  "/push-subscription",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const { endpoint } = req.body || {};
+    if (!endpoint) return res.status(400).json({ message: "endpoint is required" });
+    try {
+      await pool.query(
+        `DELETE FROM web_push_subscriptions WHERE user_id = ? AND endpoint = ?`,
+        [req.user.userId, endpoint],
+      );
+      res.json({ message: "Unsubscribed" });
+    } catch (error) {
+      sendServerError(res, error, "Remove push subscription error");
+    }
+  },
+);
+
+// GET /api/student/settings/satisfaction-survey
+// Read-only mirror scoped to the student's own department -- each
+// department has its own external survey link (departments.satisfaction_survey_url);
+// see adminRoutes.js's own copy for where this gets written.
+router.get(
+  "/settings/satisfaction-survey",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    try {
+      const [[row]] = await pool.query(
+        `SELECT d.satisfaction_survey_url
+         FROM students s
+         JOIN departments d ON s.department_id = d.department_id
+         WHERE s.student_id = ?`,
+        [req.user.userId],
+      );
+      res.json({ surveyUrl: row?.satisfaction_survey_url || "" });
+    } catch (error) {
+      sendServerError(res, error, "Satisfaction survey config get error:");
+    }
+  },
+);
+
+module.exports = router;

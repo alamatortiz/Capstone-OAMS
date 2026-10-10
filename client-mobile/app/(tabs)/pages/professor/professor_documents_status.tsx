@@ -1,0 +1,1554 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import type { ComponentProps } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  ImageSourcePropType,
+  Modal,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+  Platform,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import QRCode from 'react-native-qrcode-svg';
+import { useAuth } from '@/context/AuthContext';
+import { useAttachmentOpener } from '@/hooks/useAttachmentOpener';
+import ImagePreviewOverlay from '@/components/ImagePreviewOverlay';
+import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
+import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
+import { notify } from '@/utils/notifications';
+import NotificationBell from '@/components/NotificationBell';
+import RefreshButton from '@/components/RefreshButton';
+import QueueReasonModal from '@/components/QueueReasonModal';
+import ProfessorAvailabilityToggle from '@/components/ProfessorAvailabilityToggle';
+import { useProfessorAvailability } from '@/hooks/useProfessorAvailability';
+import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
+import { DocStatus, getDetailStatusMeta, normalizeDocStatus } from '@/utils/documentStatus';
+import { formatManilaDate } from '@/utils/date';
+
+const pncLogo = require('@/assets/Pnc-Logo.png');
+const oamsLogo = require('@/assets/oams_logo.png');
+const darkModeIcon = require('@/assets/darkmode_icon.png');
+const sunIcon = require('@/assets/sun_icon.png');
+const ccsLogo = require('@/assets/CCS.png');
+const cbaaLogo = require('@/assets/CBAA.png');
+const coedLogo = require('@/assets/COED.png');
+const coeLogo = require('@/assets/COE.png');
+const casLogo = require('@/assets/CAS.png');
+const chasLogo = require('@/assets/CHAS.png');
+
+type IoniconName = ComponentProps<typeof Ionicons>['name'];
+
+// Matches web's getCollegeLogo() -- resolves by full department name (the
+// only college field this endpoint returns), falling back to a substring
+// match against the college's abbreviation embedded in the name, and to the
+// PNC logo for anything unrecognized.
+function collegeLogoForName(collegeName?: string): ImageSourcePropType {
+  const name = (collegeName ?? '').toUpperCase();
+  if (name.includes('COMPUTING')) return ccsLogo;
+  if (name.includes('BUSINESS')) return cbaaLogo;
+  if (name.includes('EDUCATION')) return coedLogo;
+  if (name.includes('ENGINEERING')) return coeLogo;
+  if (name.includes('HEALTH')) return chasLogo;
+  if (name.includes('ARTS')) return casLogo;
+  if (name.includes('CCS')) return ccsLogo;
+  if (name.includes('CBAA')) return cbaaLogo;
+  if (name.includes('COED')) return coedLogo;
+  if (name.includes('COE')) return coeLogo;
+  if (name.includes('CHAS')) return chasLogo;
+  if (name.includes('CAS')) return casLogo;
+  return pncLogo;
+}
+
+function OamsLogo({
+  style,
+  outline,
+}: {
+  style: { height: number; width: number };
+  outline: boolean;
+}) {
+  if (!outline) {
+    return <Image source={oamsLogo} style={style} resizeMode="contain" />;
+  }
+  const layerStyle = {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    width: style.width,
+    height: style.height,
+  };
+  return (
+    <View style={[style, { position: 'relative', overflow: 'hidden' }]}>
+      {[
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ].map(([dx, dy]) => (
+        <Image
+          key={`${dx}-${dy}`}
+          source={oamsLogo}
+          resizeMode="contain"
+          style={[
+            layerStyle,
+            { tintColor: '#ffffff', transform: [{ translateX: dx }, { translateY: dy }] },
+          ]}
+        />
+      ))}
+      <Image source={oamsLogo} resizeMode="contain" style={layerStyle} />
+    </View>
+  );
+}
+
+// ─── Field shapes documented here mirror what Field shapes mirror what
+// GET /professor/documents really returns (service_name, college,
+// purpose, created_at, status, tracking_number, notes, estimated_completion,
+// released_at, claimed_at) — this screen ports the actual wired
+// prof-document-status.jsx/.css 1:1: Active/Completed tabs, tap-through to a
+// full detail view (hero, request details, notes, tracking number, cancel),
+// and the "opened from the request page" back-navigation behavior. IDs match
+// the demo set in professor_documents.tsx so a tap-through from there resolves. ───
+interface DocumentAttachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
+interface DocumentRecord {
+  id: string;
+  kind?: 'request' | 'submission';
+  type: string;
+  college: string;
+  purpose: string;
+  copies?: number;
+  requestDate: string;
+  status: DocStatus;
+  trackingNumber: string;
+  notes?: string;
+  estimatedCompletion?: string;
+  neededBy?: string;
+  claimBy?: string;
+  releasedDate?: string;
+  claimedDate?: string;
+  facultyFiles?: DocumentAttachment[];
+  adminFiles?: DocumentAttachment[];
+  isDigitalDelivery?: boolean;
+  deliveryCode?: string;
+}
+
+interface DocumentRequirement {
+  name: string;
+  description?: string;
+  isMandatory: boolean;
+}
+
+interface DocumentTypeOption {
+  name: string;
+  requirements: DocumentRequirement[];
+}
+
+interface NavItem {
+  key: string;
+  label: string;
+  icon: IoniconName;
+}
+
+const navItems: NavItem[] = [
+  { key: 'dashboard', label: 'Dashboard', icon: 'home-outline' },
+  { key: 'announcements', label: 'Announcements', icon: 'megaphone-outline' },
+  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
+  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
+  { key: 'transactions', label: 'Transactions', icon: 'time-outline' },
+];
+
+// The documents API returns full ISO timestamp strings (…T05:30:00.000Z);
+// `new Date(`${dateStr}T00:00:00`)` produced an Invalid Date and fell back to
+// the raw string. Delegate to the shared Manila formatter, keeping the local
+// "—" empty placeholder.
+const formatDate = (dateStr?: string) => {
+  if (!dateStr) return '—';
+  return formatManilaDate(dateStr);
+};
+
+const formatDateShort = (dateStr?: string) => {
+  if (!dateStr) return '—';
+  return formatManilaDate(dateStr, { month: 'short' });
+};
+
+const formatDateTime = (dateStr?: string) => {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return `${d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+};
+
+const formatTimeOnly = (dateStr?: string) => {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+};
+
+type TabKey = 'active' | 'claimed' | 'rejected' | 'cancelled';
+const TAB_META: Record<TabKey, { label: string; icon: IoniconName }> = {
+  active: { label: 'Active Requests', icon: 'alert-circle-outline' },
+  claimed: { label: 'Claimed', icon: 'checkmark-circle-outline' },
+  rejected: { label: 'Rejected', icon: 'close-circle-outline' },
+  cancelled: { label: 'Cancelled', icon: 'close-circle-outline' },
+};
+
+export default function ProfessorDocumentsStatusScreen() {
+  const params = useLocalSearchParams<{ docId?: string; from?: string }>();
+  const router = useRouter();
+
+  const { isDarkMode, toggleTheme } = useTheme();
+  const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const {
+    isAvailable,
+    unavailableReasonModalOpen,
+    unavailableReasonText,
+    unavailableReasonSubmitting,
+    setUnavailableReasonText,
+    toggleAvailability,
+    confirmMarkUnavailable,
+    cancelUnavailableModal,
+  } = useProfessorAvailability();
+  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(params.docId ?? null);
+  const [detailOpenedFromExternal, setDetailOpenedFromExternal] = useState(
+    params.from === 'document-request' && !!params.docId,
+  );
+  const [activeTab, setActiveTab] = useState<TabKey>('active');
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showClaimDialog, setShowClaimDialog] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [claiming, setClaiming] = useState(false);
+  const { user, logout, token } = useAuth();
+  const { openingId, previewFile, openAttachment, closePreview } = useAttachmentOpener();
+
+  const theme = isDarkMode ? darkPalette : lightPalette;
+  const styles = createStyles(theme);
+
+  const comingSoon = () => Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
+  const goToDashboard = () => router.push('/pages/professor/professor_dashboard');
+  const goToRequestPage = () => router.push('/pages/professor/professor_documents');
+
+  // Guards against out-of-order responses: mount, the status-change socket
+  // event, and the 45s fallback poll below can all independently trigger
+  // this fetch, so a slower-but-earlier response landing after a newer one
+  // could otherwise overwrite fresh state with stale data.
+  const requestIdRef = useRef(0);
+
+  const fetchDocuments = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    setLoading(true);
+    try {
+      const { data } = await api.get('/professor/documents');
+      if (requestId !== requestIdRef.current) return;
+      setDocuments(
+        (data ?? []).map((r: any) => ({
+          id: String(r.request_id),
+          kind: r.kind,
+          type: r.service_name,
+          college: r.college,
+          purpose: r.purpose,
+          copies: r.copies,
+          requestDate: r.created_at,
+          status: r.status,
+          trackingNumber: r.tracking_number,
+          notes: r.notes || undefined,
+          estimatedCompletion: r.estimated_completion || undefined,
+          neededBy: r.needed_by || undefined,
+          claimBy: r.claim_by || undefined,
+          releasedDate: r.released_at || undefined,
+          claimedDate: r.claimed_at || undefined,
+          facultyFiles: r.faculty_files || undefined,
+          adminFiles: r.admin_files || undefined,
+          isDigitalDelivery: !!r.is_digital_delivery,
+          deliveryCode: r.delivery_code || undefined,
+          serviceSnapshot: r.service_snapshot ?? null,
+        })),
+      );
+    } catch (err) {
+      if (requestId !== requestIdRef.current) return;
+      console.error('Fetch document requests error:', err);
+      Alert.alert('Error', 'Could not load your document requests.');
+    } finally {
+      if (requestId === requestIdRef.current) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
+
+  // ── Fallback poll (safety net only — sockets drive live updates) ──────────
+  useEffect(() => {
+    if (!user || !token) return undefined;
+    const interval = setInterval(() => {
+      fetchDocuments();
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [user, token, fetchDocuments]);
+
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+    const refetch = () => fetchDocuments();
+    const onStatusUpdated = () => {
+      notify('Document update', 'A document request status has changed.');
+    };
+    socket.on('document:status-updated', refetch);
+    socket.on('document:status-updated', onStatusUpdated);
+    return () => {
+      socket.off('document:status-updated', refetch);
+      socket.off('document:status-updated', onStatusUpdated);
+    };
+  }, [user, token, fetchDocuments]);
+
+  const handleNavPress = (key: string) => {
+    setMenuOpen(false);
+    if (key === 'dashboard') { goToDashboard(); return; }
+    if (key === 'announcements') { router.push('/pages/professor/professor_announcement'); return; }
+    if (key === 'appointments') { router.push('/pages/professor/professor_appointment'); return; }
+    if (key === 'documents') { goToRequestPage(); return; }
+    if (key === 'transactions') { router.push('/pages/professor/professor_transactions'); return; }
+    comingSoon();
+  };
+
+  const handleLogout = () => { setMenuOpen(false); setLogoutModalVisible(true); };
+  const confirmLogout = () => { setLogoutModalVisible(false); logout(); router.replace('/login'); };
+
+  const selectedDoc = selectedDocId ? documents.find((d) => d.id === selectedDocId) ?? null : null;
+
+  // Requirements come from the request's own frozen service_snapshot (captured
+  // at submit) -- a later catalogue edit can't retro-change a finished request.
+  const selectedDocRequirements = (selectedDoc as any)?.serviceSnapshot?.requirements ?? [];
+
+  const activeDocuments = documents.filter(
+    (d) => d.status !== 'claimed' && d.status !== 'rejected' && d.status !== 'cancelled',
+  );
+  const claimedDocuments = documents.filter((d) => d.status === 'claimed');
+  const rejectedDocuments = documents.filter((d) => d.status === 'rejected');
+  const cancelledDocuments = documents.filter((d) => d.status === 'cancelled');
+  const tabCounts: Record<TabKey, number> = {
+    active: activeDocuments.length,
+    claimed: claimedDocuments.length,
+    rejected: rejectedDocuments.length,
+    cancelled: cancelledDocuments.length,
+  };
+
+  const openDocument = (id: string) => {
+    setDetailOpenedFromExternal(false);
+    setSelectedDocId(id);
+  };
+
+  const backFromDetail = () => {
+    if (detailOpenedFromExternal) { goToRequestPage(); return; }
+    setSelectedDocId(null);
+  };
+
+  const confirmCancelRequest = async () => {
+    if (!selectedDoc) return;
+    setCancelling(true);
+    try {
+      await api.delete(`/professor/documents/${selectedDoc.id}`);
+      setDocuments((prev) =>
+        prev.map((d) => (d.id === selectedDoc.id ? { ...d, status: 'cancelled' } : d)),
+      );
+      setShowCancelDialog(false);
+      setSelectedDocId(null);
+      Alert.alert('Request cancelled', 'Your document request has been cancelled.');
+    } catch (err: any) {
+      console.error('Cancel document request error:', err);
+      Alert.alert('Error', err?.response?.data?.message ?? 'Failed to cancel document request.');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  // Owner self-claim (Ready -> Claimed), mirroring how a student marks an
+  // appointment as done. selectedDoc.id is already prefixed ("req-12"/"sub-7")
+  // and the /claim route parses that prefix, so pass it through unchanged.
+  const claimDocument = async () => {
+    if (!selectedDoc || claiming) return;
+    setClaiming(true);
+    try {
+      await api.patch(`/professor/documents/${selectedDoc.id}/claim`);
+      setDocuments((prev) =>
+        prev.map((d) => (d.id === selectedDoc.id ? { ...d, status: 'claimed' } : d)),
+      );
+      setShowClaimDialog(false);
+    } catch (err: any) {
+      console.error('Claim document error:', err);
+      Alert.alert('Error', err?.response?.data?.message ?? err?.response?.data?.error ?? 'Could not mark the document as claimed.');
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  const breadcrumbFromRequestPage = params.from === 'document-request';
+
+  return (
+    <View style={styles.root}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerBrand}>
+            <Image source={pncLogo} style={styles.headerPncLogo} resizeMode="contain" />
+            <OamsLogo style={styles.headerOamsLogo} outline={isDarkMode} />
+          </View>
+          <View style={styles.headerActions}>
+            <Pressable style={styles.iconBtn} onPress={toggleTheme} hitSlop={8}>
+              <Image source={isDarkMode ? sunIcon : darkModeIcon} style={styles.iconBtnImg} resizeMode="contain" />
+            </Pressable>
+            <RefreshButton onPress={() => fetchDocuments()} loading={loading} style={styles.iconBtn} color={theme.text} label="Refresh documents" />
+            <NotificationBell
+              endpointBase="professor"
+              theme={theme}
+              typePaths={PROFESSOR_NOTIFICATION_PATHS}
+              viewAllPath={PROFESSOR_NOTIFICATIONS_VIEW_ALL}
+            />
+            <Pressable style={styles.iconBtn} onPress={() => setMenuOpen(true)} hitSlop={8}>
+              <Ionicons name="menu-outline" size={20} color={theme.text} />
+            </Pressable>
+          </View>
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {selectedDoc ? (
+            <DocumentDetail
+              theme={theme}
+              isDarkMode={isDarkMode}
+              styles={styles}
+              doc={selectedDoc}
+              backLabel={detailOpenedFromExternal ? 'Document Requests and Submissions' : 'All Requests'}
+              onBack={backFromDetail}
+              onCancel={() => setShowCancelDialog(true)}
+              onClaim={() => setShowClaimDialog(true)}
+              claiming={claiming}
+              requirements={selectedDocRequirements}
+              reqLoading={loading && !selectedDoc}
+              onOpenFile={openAttachment}
+              downloadingFileId={openingId}
+            />
+          ) : (
+            <>
+              {/* Breadcrumb */}
+              <Pressable
+                style={styles.breadcrumb}
+                onPress={breadcrumbFromRequestPage ? goToRequestPage : goToDashboard}
+                hitSlop={8}
+              >
+                <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+                <Text style={styles.breadcrumbText}>
+                  {breadcrumbFromRequestPage ? 'Document Requests and Submissions' : 'Home'}
+                </Text>
+              </Pressable>
+
+              {/* Title */}
+              <View style={styles.titleRow}>
+                <LinearGradient colors={['#f97316', '#ea580c']} style={styles.titleIcon}>
+                  <Ionicons name="document-text-outline" size={22} color="#ffffff" />
+                </LinearGradient>
+                <View style={styles.titleTextWrap}>
+                  <Text style={styles.pageTitle}>My Document Requests</Text>
+                  <Text style={styles.pageSubtitle}>Track and manage all your document requests</Text>
+                </View>
+              </View>
+
+              {/* Tabs */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsRow} contentContainerStyle={{ gap: 8 }}>
+                {(Object.keys(TAB_META) as TabKey[]).map((tab) => {
+                  const active = activeTab === tab;
+                  return (
+                    <Pressable key={tab} style={[styles.tab, active && styles.tabActive]} onPress={() => setActiveTab(tab)}>
+                      <Ionicons name={TAB_META[tab].icon} size={15} color={active ? theme.orange : theme.subtext} />
+                      <Text style={[styles.tabText, active && styles.tabTextActive]}>{TAB_META[tab].label}</Text>
+                      <View style={styles.tabCountPill}><Text style={styles.tabCountText}>{tabCounts[tab]}</Text></View>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Active Tab */}
+              {activeTab === 'active' && (
+                loading ? (
+                  <View style={styles.emptyCard}>
+                    <Text style={styles.emptyDescription}>Loading requests…</Text>
+                  </View>
+                ) : activeDocuments.length > 0 ? (
+                  <View style={styles.docsList}>
+                    {activeDocuments.map((doc) => (
+                      <DocumentListItem
+                        key={doc.id}
+                        theme={theme}
+                        isDarkMode={isDarkMode}
+                        styles={styles}
+                        doc={doc}
+                        variant="active"
+                        onPress={() => openDocument(doc.id)}
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptyCard}>
+                    <Ionicons name="document-text-outline" size={32} color={theme.tertiary} />
+                    <Text style={styles.emptyTitle}>No Active Requests</Text>
+                    <Text style={styles.emptyDescription}>You have no active document requests.</Text>
+                    <Pressable style={styles.emptyRequestBtn} onPress={goToRequestPage}>
+                      <Text style={styles.emptyRequestBtnText}>Request a Document</Text>
+                    </Pressable>
+                  </View>
+                )
+              )}
+
+              {/* Claimed Tab */}
+              {activeTab === 'claimed' && (
+                loading ? (
+                  <View style={styles.emptyCard}>
+                    <Text style={styles.emptyDescription}>Loading requests…</Text>
+                  </View>
+                ) : claimedDocuments.length > 0 ? (
+                  <View style={styles.docsList}>
+                    {claimedDocuments.map((doc) => (
+                      <DocumentListItem
+                        key={doc.id}
+                        theme={theme}
+                        isDarkMode={isDarkMode}
+                        styles={styles}
+                        doc={doc}
+                        variant="claimed"
+                        onPress={() => openDocument(doc.id)}
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptyCard}>
+                    <Ionicons name="checkmark-circle-outline" size={32} color={theme.tertiary} />
+                    <Text style={styles.emptyTitle}>No Completed Requests</Text>
+                    <Text style={styles.emptyDescription}>You have no records of claimed documents.</Text>
+                  </View>
+                )
+              )}
+
+              {/* Rejected Tab */}
+              {activeTab === 'rejected' && (
+                loading ? (
+                  <View style={styles.emptyCard}>
+                    <Text style={styles.emptyDescription}>Loading requests…</Text>
+                  </View>
+                ) : rejectedDocuments.length > 0 ? (
+                  <View style={styles.docsList}>
+                    {rejectedDocuments.map((doc) => (
+                      <DocumentListItem
+                        key={doc.id}
+                        theme={theme}
+                        isDarkMode={isDarkMode}
+                        styles={styles}
+                        doc={doc}
+                        variant="rejected"
+                        onPress={() => openDocument(doc.id)}
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptyCard}>
+                    <Ionicons name="close-circle-outline" size={32} color={theme.tertiary} />
+                    <Text style={styles.emptyTitle}>No Rejected Requests</Text>
+                    <Text style={styles.emptyDescription}>You have no records of rejected document requests.</Text>
+                  </View>
+                )
+              )}
+
+              {/* Cancelled Tab */}
+              {activeTab === 'cancelled' && (
+                loading ? (
+                  <View style={styles.emptyCard}>
+                    <Text style={styles.emptyDescription}>Loading requests…</Text>
+                  </View>
+                ) : cancelledDocuments.length > 0 ? (
+                  <View style={styles.docsList}>
+                    {cancelledDocuments.map((doc) => (
+                      <DocumentListItem
+                        key={doc.id}
+                        theme={theme}
+                        isDarkMode={isDarkMode}
+                        styles={styles}
+                        doc={doc}
+                        variant="cancelled"
+                        onPress={() => openDocument(doc.id)}
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptyCard}>
+                    <Ionicons name="close-circle-outline" size={32} color={theme.tertiary} />
+                    <Text style={styles.emptyTitle}>No Cancelled Requests</Text>
+                    <Text style={styles.emptyDescription}>You have no records of cancelled document requests.</Text>
+                  </View>
+                )
+              )}
+            </>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+
+      {/* Nav Drawer */}
+      <Modal visible={menuOpen} animationType="fade" transparent onRequestClose={() => setMenuOpen(false)}>
+        <View style={styles.drawerOverlay}>
+          <SafeAreaView style={styles.drawerPanel} edges={['top', 'bottom']}>
+            <View style={styles.drawerProfile}>
+              <View style={styles.drawerProfileHeader}>
+                <View style={styles.drawerAvatar}>
+                  <Ionicons name="person-outline" size={15} color={theme.primary} />
+                </View>
+                <Text style={styles.drawerName}>{user?.name ?? 'Faculty'}</Text>
+              </View>
+              <View style={styles.drawerRoleBadge}>
+                <Text style={styles.drawerRoleBadgeText}>Professor</Text>
+              </View>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
+            </View>
+
+            <ProfessorAvailabilityToggle isAvailable={isAvailable} onToggle={(v) => toggleAvailability(v, () => setMenuOpen(false))} styles={styles} />
+
+            <View style={styles.drawerNav}>
+              {navItems.map((item) => {
+                // Not highlighted here — the sidebar's "Documents" destination is
+                // professor_documents.tsx; this tracking/status screen is reached
+                // from the dashboard's Documents stat tile instead.
+                const active = false;
+                return (
+                  <Pressable
+                    key={item.key}
+                    style={[styles.drawerNavItem, active && styles.drawerNavItemActive]}
+                    onPress={() => handleNavPress(item.key)}
+                  >
+                    <Ionicons name={item.icon} size={18} color={active ? '#ffffff' : theme.subtext} />
+                    <Text style={[styles.drawerNavLabel, active && styles.drawerNavLabelActive]}>{item.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Pressable style={styles.drawerLogout} onPress={handleLogout}>
+              <Ionicons name="log-out-outline" size={18} color="#ef4444" />
+              <Text style={styles.drawerLogoutText}>Logout</Text>
+            </Pressable>
+          </SafeAreaView>
+          <Pressable style={styles.drawerBackdrop} onPress={() => setMenuOpen(false)} />
+        </View>
+      </Modal>
+
+      {/* Cancel Request Confirm Modal */}
+      <Modal visible={showCancelDialog} animationType="fade" transparent onRequestClose={() => setShowCancelDialog(false)}>
+        <View style={styles.logoutOverlay}>
+          <View style={styles.logoutModalCard}>
+            <View style={styles.logoutIconCircle}>
+              <Ionicons name="document-text-outline" size={26} color="#ef4444" />
+            </View>
+            <Text style={styles.logoutModalTitle}>Cancel Request?</Text>
+            <Text style={styles.logoutModalDescription}>
+              You are about to cancel your request for {selectedDoc?.type}. It will move to your Cancelled
+              requests — you&apos;re welcome to submit a new one if you change your mind.
+            </Text>
+            <View style={styles.logoutModalActions}>
+              <Pressable style={styles.logoutCancelBtn} onPress={() => setShowCancelDialog(false)}>
+                <Text style={styles.logoutCancelBtnText}>Keep Request</Text>
+              </Pressable>
+              <Pressable style={styles.logoutConfirmBtn} onPress={confirmCancelRequest} disabled={cancelling}>
+                <Ionicons name="close-circle-outline" size={16} color="#ffffff" />
+                <Text style={styles.logoutConfirmBtnText}>{cancelling ? 'Cancelling…' : 'Cancel Request'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Mark as Claimed Confirm Modal */}
+      <Modal visible={showClaimDialog} animationType="fade" transparent onRequestClose={() => setShowClaimDialog(false)}>
+        <View style={styles.logoutOverlay}>
+          <View style={styles.logoutModalCard}>
+            <View style={[styles.logoutIconCircle, { backgroundColor: 'rgba(34, 197, 94, 0.12)' }]}>
+              <Ionicons name="checkmark-circle-outline" size={26} color="#22c55e" />
+            </View>
+            <Text style={styles.logoutModalTitle}>Mark Document as Claimed?</Text>
+            <Text style={styles.logoutModalDescription}>
+              Mark {selectedDoc?.type} as claimed? Only do this once you&apos;ve received your document.
+            </Text>
+            <View style={styles.logoutModalActions}>
+              <Pressable style={styles.logoutCancelBtn} onPress={() => setShowClaimDialog(false)}>
+                <Text style={styles.logoutCancelBtnText}>Not Yet</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.logoutConfirmBtn, { backgroundColor: '#22c55e' }]}
+                onPress={claimDocument}
+                disabled={claiming}
+              >
+                <Ionicons name="checkmark-circle" size={16} color="#ffffff" />
+                <Text style={styles.logoutConfirmBtnText}>{claiming ? 'Marking…' : 'Mark as Claimed'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Confirm Logout Modal */}
+      <Modal visible={logoutModalVisible} animationType="fade" transparent onRequestClose={() => setLogoutModalVisible(false)}>
+        <View style={styles.logoutOverlay}>
+          <View style={styles.logoutModalCard}>
+            <View style={styles.logoutIconCircle}>
+              <Ionicons name="log-out-outline" size={26} color="#ef4444" />
+            </View>
+            <Text style={styles.logoutModalTitle}>Confirm Logout</Text>
+            <Text style={styles.logoutModalDescription}>
+              Are you sure you want to log out? Any unsaved changes will be lost.
+            </Text>
+            <View style={styles.logoutModalActions}>
+              <Pressable style={styles.logoutCancelBtn} onPress={() => setLogoutModalVisible(false)}>
+                <Text style={styles.logoutCancelBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.logoutConfirmBtn} onPress={confirmLogout}>
+                <Ionicons name="log-out-outline" size={16} color="#ffffff" />
+                <Text style={styles.logoutConfirmBtnText}>Log Out</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <QueueReasonModal
+        visible={unavailableReasonModalOpen}
+        title="Mark Yourself Unavailable"
+        message="Let students and admins know why you're unavailable right now. This reason will be shown wherever your schedule is visible."
+        confirmText={unavailableReasonSubmitting ? 'Submitting...' : 'Confirm'}
+        confirmColor="#ef4444"
+        reason={unavailableReasonText}
+        onChangeReason={setUnavailableReasonText}
+        onCancel={cancelUnavailableModal}
+        onConfirm={() => confirmMarkUnavailable(unavailableReasonText)}
+        theme={theme}
+        styles={{
+          modalOverlay: styles.availModalOverlay,
+          confirmModalCard: styles.availConfirmModalCard,
+          confirmIconCircle: styles.availConfirmIconCircle,
+          confirmTitle: styles.availConfirmTitle,
+          confirmDescription: styles.availConfirmDescription,
+          reasonInput: styles.availReasonInput,
+          confirmActionsRow: styles.availConfirmActionsRow,
+          cancelBtn: styles.availCancelBtn,
+          cancelBtnText: styles.availCancelBtnText,
+          confirmBtn: styles.availConfirmBtn,
+          confirmBtnText: styles.availConfirmBtnText,
+          formSubmitBtnDisabled: styles.availFormSubmitBtnDisabled,
+        }}
+        submitting={unavailableReasonSubmitting}
+      />
+      <ImagePreviewOverlay file={previewFile} onClose={closePreview} />
+    </View>
+  );
+}
+
+// ─── List item card — mirrors dss-list-item ───
+function DocumentListItem({
+  theme,
+  styles,
+  doc,
+  variant,
+  onPress,
+  isDarkMode,
+}: {
+  theme: ThemePalette;
+  styles: ReturnType<typeof createStyles>;
+  doc: DocumentRecord;
+  variant: TabKey;
+  onPress: () => void;
+  isDarkMode: boolean;
+}) {
+  const meta = getDetailStatusMeta(doc.status, isDarkMode);
+  const completed = variant !== 'active';
+  return (
+    <Pressable style={[styles.listCard, completed && styles.listCardCompleted]} onPress={onPress}>
+      <View style={styles.listCardHeader}>
+        <View style={[styles.listIconWrap, completed && styles.listIconWrapCompleted]}>
+          <Ionicons name="document-text-outline" size={17} color={completed ? theme.tertiary : theme.orange} />
+        </View>
+        <View style={styles.listTitleSection}>
+          <Text style={styles.listTitle}>{doc.type}</Text>
+          {variant === 'claimed' ? (
+            <>
+              <Text style={styles.listCollege}>{doc.college}</Text>
+              {doc.claimedDate && (
+                <>
+                  <Text style={styles.listClaimedDate}>{formatDate(doc.claimedDate)}</Text>
+                  <Text style={styles.listClaimedTime}>{formatTimeOnly(doc.claimedDate)}</Text>
+                </>
+              )}
+            </>
+          ) : variant === 'rejected' || variant === 'cancelled' ? (
+            <Text style={styles.listCollege}>
+              {doc.college} • {formatDateShort(doc.requestDate)}
+            </Text>
+          ) : (
+            <Text style={styles.listCollege}>{doc.college}</Text>
+          )}
+          <Text style={styles.listTracking}>
+            Tracking: <Text style={styles.listTrackingValue}>{doc.trackingNumber}</Text>
+          </Text>
+        </View>
+        <View style={[styles.statusBadgePill, { backgroundColor: meta.bg, borderColor: meta.border }]}>
+          <Text style={[styles.statusBadgeTextPill, { color: meta.color }]}>{meta.label}</Text>
+        </View>
+      </View>
+
+      {variant === 'active' && (
+        <View style={styles.listFieldsGrid}>
+          <View style={styles.listField}>
+            <Text style={styles.listFieldLabel}>Request Date</Text>
+            <Text style={styles.listFieldValue}>{formatDateShort(doc.requestDate)}</Text>
+          </View>
+          <View style={styles.listFieldFull}>
+            <Text style={styles.listFieldLabel}>Purpose</Text>
+            <Text style={styles.listFieldValueMuted} numberOfLines={2}>{doc.purpose}</Text>
+          </View>
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+// ─── Detail view — hero + request details + notes + tracking + cancel ───
+function DocumentDetail({
+  theme,
+  styles,
+  doc,
+  backLabel,
+  onBack,
+  onCancel,
+  onClaim,
+  claiming,
+  requirements,
+  reqLoading,
+  isDarkMode,
+  onOpenFile,
+  downloadingFileId,
+}: {
+  theme: ThemePalette;
+  styles: ReturnType<typeof createStyles>;
+  doc: DocumentRecord;
+  backLabel: string;
+  onBack: () => void;
+  onCancel: () => void;
+  onClaim: () => void;
+  claiming: boolean;
+  requirements: DocumentRequirement[];
+  reqLoading: boolean;
+  isDarkMode: boolean;
+  onOpenFile: (endpointPath: string, cacheName: string, file: DocumentAttachment) => void;
+  downloadingFileId: string | null;
+}) {
+  const meta = getDetailStatusMeta(doc.status, isDarkMode);
+  const canCancel = doc.status === 'pending' || doc.status === 'processing';
+  const canClaim = normalizeDocStatus(doc.status) === 'ready';
+
+  // Shared opener (utils/openAttachment.ts), owned by the screen so the
+  // image preview can render full-screen above the ScrollView.
+  const viewDocFile = (file: DocumentAttachment) => {
+    const isSub = doc.kind === 'submission';
+    const rawId = doc.id.replace(/^(sub|req)-/, '');
+    const endpoint = isSub
+      ? `/professor/document-submissions/${rawId}/files/${file.id}`
+      : `/professor/documents/${rawId}/files/${file.id}`;
+    onOpenFile(endpoint, `${isSub ? 'submission' : 'request'}-${rawId}`, file);
+  };
+
+  return (
+    <>
+      {/* Breadcrumb */}
+      <Pressable style={styles.breadcrumb} onPress={onBack} hitSlop={8}>
+        <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+        <Text style={styles.breadcrumbText}>{backLabel}</Text>
+      </Pressable>
+
+      {/* Title */}
+      <View style={styles.titleRow}>
+        <LinearGradient colors={['#f97316', '#ea580c']} style={styles.titleIcon}>
+          <Ionicons name="document-text-outline" size={22} color="#ffffff" />
+        </LinearGradient>
+        <View style={styles.titleTextWrap}>
+          <Text style={styles.pageTitle}>Document Details</Text>
+          <Text style={styles.pageSubtitle}>Track your document request status</Text>
+        </View>
+      </View>
+
+      {/* Hero */}
+      <LinearGradient colors={['#f97316', '#ea580c']} style={styles.heroCard}>
+        <View style={styles.heroTopRow}>
+          <View style={styles.heroLogoBox}>
+            <Image source={collegeLogoForName(doc.college)} style={styles.heroLogoImg} resizeMode="contain" />
+          </View>
+          <View style={styles.heroTextWrap}>
+            <Text style={styles.heroDocName}>{doc.type}</Text>
+            <Text style={styles.heroCollegeName}>{doc.college}</Text>
+          </View>
+        </View>
+        <View style={styles.heroBadgeRow}>
+          <View style={styles.heroBadge}>
+            <Text style={styles.heroBadgeText}>{doc.trackingNumber}</Text>
+          </View>
+        </View>
+      </LinearGradient>
+
+      {/* Ready alert */}
+      {canClaim && (
+        <View style={styles.readyBanner}>
+          <Ionicons name="checkmark-circle" size={22} color="#ffffff" />
+          <Text style={styles.readyBannerText}>
+            Your document is ready for pickup — please proceed to the designated location.
+            {doc.claimBy ? ` Please collect it by ${formatDate(doc.claimBy)}.` : ''}
+          </Text>
+        </View>
+      )}
+
+      {/* Digital Pickup Code -- shown once an admin generated a QR code for this
+          Ready request. Claiming is done from the "Mark as Claimed" card below. */}
+      {doc.isDigitalDelivery && doc.deliveryCode && (canClaim || doc.status === 'claimed') && (
+        <View style={styles.card}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardTitleRow}>
+              <Ionicons name="qr-code-outline" size={18} color={theme.orange} />
+              <Text style={styles.cardTitleText}>Digital Pickup Code</Text>
+            </View>
+          </View>
+          <View style={styles.qrWrap}>
+            <View style={styles.qrBox}>
+              <QRCode value={doc.deliveryCode} size={160} />
+            </View>
+            <Text style={styles.deliveryCodeText}>{doc.deliveryCode}</Text>
+            <Text style={styles.claimedNote}>
+              {doc.status === 'claimed'
+                ? 'Kept here for verification purposes.'
+                : 'Show this code to the office when you collect your document.'}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* Request details */}
+      <View style={styles.card}>
+        <View style={styles.cardHeaderRow}>
+          <View style={styles.cardTitleRow}>
+            <Ionicons name="document-text-outline" size={18} color={theme.orange} />
+            <Text style={styles.cardTitleText}>Request Details</Text>
+          </View>
+          <View style={[styles.statusBadgePill, { backgroundColor: meta.bg, borderColor: meta.border }]}>
+            <Text style={[styles.statusBadgeTextPill, { color: meta.color }]}>{meta.label}</Text>
+          </View>
+        </View>
+
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Date Requested</Text>
+          <Text style={styles.detailValue}>{formatDate(doc.requestDate)}</Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Date Needed</Text>
+          <Text style={styles.detailValue}>
+            {doc.neededBy ? formatDate(doc.neededBy) : 'No date requested for the document to be claimable.'}
+          </Text>
+        </View>
+        {doc.claimBy && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Claim By</Text>
+            <Text style={styles.detailValue}>{formatDate(doc.claimBy)}</Text>
+          </View>
+        )}
+        {doc.status === 'claimed' && doc.claimedDate && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Date and Time Claimed</Text>
+            <Text style={styles.detailValue}>{formatDateTime(doc.claimedDate)}</Text>
+          </View>
+        )}
+        {doc.copies != null && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Number of Copies</Text>
+            <Text style={styles.detailValue}>{doc.copies}</Text>
+          </View>
+        )}
+        <View style={[styles.detailRow, styles.detailRowLast]}>
+          <Text style={styles.detailLabel}>Purpose</Text>
+          <Text style={styles.detailValue}>{doc.purpose}</Text>
+        </View>
+      </View>
+
+      {/* Requirements -- N/A for a sent document: doc.type there is the
+          professor's free-text Title, which could coincidentally match a
+          real service name and pull in unrelated requirements, so this is
+          hidden outright rather than just visually de-emphasized. */}
+      {doc.kind !== 'submission' && (
+        <View style={styles.card}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardTitleRow}>
+              <Ionicons name="checkmark-circle-outline" size={18} color={theme.orange} />
+              <Text style={styles.cardTitleText}>Requirements</Text>
+            </View>
+          </View>
+          {reqLoading ? (
+            <View style={styles.reqLoadingRow}>
+              <ActivityIndicator size="small" color={theme.orange} />
+              <Text style={styles.reqSubtext}>Loading requirements…</Text>
+            </View>
+          ) : requirements.length > 0 ? (
+            <View style={{ gap: 10 }}>
+              {requirements.map((req) => (
+                <View key={req.name} style={styles.reqItemRow}>
+                  <Ionicons name="checkmark-circle-outline" size={16} color={theme.orange} style={{ marginTop: 1 }} />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <View style={styles.reqNameRow}>
+                      <Text style={styles.bodyText}>{req.name}</Text>
+                      <View style={req.isMandatory ? styles.reqTagRequired : styles.reqTagOptional}>
+                        <Text style={req.isMandatory ? styles.reqTagRequiredText : styles.reqTagOptionalText}>
+                          {req.isMandatory ? 'Required' : 'Optional'}
+                        </Text>
+                      </View>
+                    </View>
+                    {req.description && <Text style={styles.reqDescText}>{req.description}</Text>}
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.reqSubtext}>
+              No specific requirements have been defined for this service yet. Contact the office for details.
+            </Text>
+          )}
+        </View>
+      )}
+
+      {/* Attachments -- only for a sent document */}
+      {doc.kind === 'submission' && (
+        <View style={styles.card}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardTitleRow}>
+              <Ionicons name="document-text-outline" size={18} color={theme.orange} />
+              <Text style={styles.cardTitleText}>Attachments</Text>
+            </View>
+          </View>
+          <Text style={styles.reqSubtext}>Your Files</Text>
+          {doc.facultyFiles && doc.facultyFiles.length > 0 ? (
+            <View style={{ gap: 8, marginTop: 6, marginBottom: 10 }}>
+              {doc.facultyFiles.map((f) => (
+                <Pressable key={f.id} style={styles.attachChip} onPress={() => viewDocFile(f)} disabled={!!downloadingFileId}>
+                  <Ionicons name="document-text-outline" size={14} color={theme.orange} />
+                  <Text style={styles.attachChipText} numberOfLines={1}>{f.filename}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            <Text style={[styles.reqSubtext, { marginTop: 4, marginBottom: 10 }]}>No files attached.</Text>
+          )}
+          <Text style={styles.reqSubtext}>Office Return Files</Text>
+          {doc.adminFiles && doc.adminFiles.length > 0 ? (
+            <View style={{ gap: 8, marginTop: 6 }}>
+              {doc.adminFiles.map((f) => (
+                <Pressable key={f.id} style={styles.attachChip} onPress={() => viewDocFile(f)} disabled={!!downloadingFileId}>
+                  <Ionicons name="document-text-outline" size={14} color={theme.orange} />
+                  <Text style={styles.attachChipText} numberOfLines={1}>{f.filename}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            <Text style={[styles.reqSubtext, { marginTop: 4 }]}>Nothing returned yet.</Text>
+          )}
+        </View>
+      )}
+
+      {/* Soft-copy files the office attached to a document request */}
+      {doc.kind !== 'submission' && doc.adminFiles && doc.adminFiles.length > 0 && (
+        <View style={styles.card}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardTitleRow}>
+              <Ionicons name="document-text-outline" size={18} color={theme.orange} />
+              <Text style={styles.cardTitleText}>Files from the Office</Text>
+            </View>
+          </View>
+          <View style={{ gap: 8, marginTop: 6 }}>
+            {doc.adminFiles.map((f) => (
+              <Pressable key={f.id} style={styles.attachChip} onPress={() => viewDocFile(f)} disabled={!!downloadingFileId}>
+                <Ionicons name="document-text-outline" size={14} color={theme.orange} />
+                <Text style={styles.attachChipText} numberOfLines={1}>{f.filename}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Rejection reason -- replaces the plain Notes card when rejected,
+          mirroring prof-document-status.jsx's rejection callout (the reason
+          is stored in the same `notes` field, reused per
+          admin_document_processing.tsx's reject flow). */}
+      {doc.status === 'rejected' && doc.notes && (
+        <View style={styles.rejectNotice}>
+          <Ionicons name="close-circle-outline" size={20} color="#ef4444" />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rejectNoticeTitle}>This request was rejected.</Text>
+            <Text style={styles.rejectNoticeReason}>Reason: {doc.notes}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Notes */}
+      {doc.status !== 'rejected' && doc.notes && (
+        <View style={styles.card}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardTitleRow}>
+              <Ionicons name="chatbox-outline" size={18} color={theme.orange} />
+              <Text style={styles.cardTitleText}>Notes</Text>
+            </View>
+          </View>
+          <Text style={styles.bodyText}>{doc.notes}</Text>
+        </View>
+      )}
+
+      {/* Tracking number */}
+      <View style={styles.card}>
+        <View style={styles.cardHeaderRow}>
+          <View style={styles.cardTitleRow}>
+            <Ionicons name="pricetag-outline" size={18} color={theme.orange} />
+            <Text style={styles.cardTitleText}>Tracking Number</Text>
+          </View>
+        </View>
+        <View style={{ alignItems: 'center' }}>
+          <Text style={styles.trackingBig}>{doc.trackingNumber}</Text>
+          <Text style={styles.trackingCaption}>{doc.college}</Text>
+        </View>
+      </View>
+
+      {/* Cancel request */}
+      {canCancel && (
+        <View style={[styles.card, styles.cancelCard]}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardTitleRow}>
+              <Ionicons name="close-circle-outline" size={18} color="#ef4444" />
+              <Text style={[styles.cardTitleText, { color: '#ef4444' }]}>Cancel Request</Text>
+            </View>
+          </View>
+          <Text style={styles.cancelDescription}>
+            Cancelling will move this request to your Cancelled requests. You&apos;re welcome to submit a new one if you change your mind.
+          </Text>
+          <Pressable style={styles.cancelBtn} onPress={onCancel}>
+            <Text style={styles.cancelBtnText}>Cancel Request</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {/* Mark as Claimed (only while Ready) -- the document counterpart to
+          marking an appointment as done. */}
+      {canClaim && (
+        <View style={[styles.card, styles.claimCard]}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardTitleRow}>
+              <Ionicons name="checkmark-circle-outline" size={18} color="#22c55e" />
+              <Text style={[styles.cardTitleText, { color: '#22c55e' }]}>Mark as Claimed</Text>
+            </View>
+          </View>
+          <Text style={styles.cancelDescription}>
+            Once you&apos;ve collected this document, mark it as claimed here so its status stays up to date.
+          </Text>
+          <Pressable
+            style={[styles.claimActionBtn, claiming && { opacity: 0.5 }]}
+            onPress={onClaim}
+            disabled={claiming}
+          >
+            <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+            <Text style={styles.claimActionBtnText}>{claiming ? 'Marking…' : 'Mark as Claimed'}</Text>
+          </Pressable>
+        </View>
+      )}
+    </>
+  );
+}
+
+type ThemePalette = {
+  background: string;
+  card: string;
+  border: string;
+  headerBg: string;
+  headerBorder: string;
+  text: string;
+  subtext: string;
+  tertiary: string;
+  primary: string;
+  orange: string;
+  iconBtnBg: string;
+  iconBtnBorder: string;
+};
+
+const darkPalette: ThemePalette = {
+  background: '#0a0f0a',
+  card: '#111612',
+  border: '#1e3a23',
+  headerBg: 'rgba(17, 22, 18, 0.95)',
+  headerBorder: 'rgba(34, 197, 94, 0.15)',
+  text: '#f0fdf4',
+  subtext: '#94a3b8',
+  tertiary: '#94a3b8',
+  primary: '#16a34a',
+  orange: '#f97316',
+  iconBtnBg: 'rgba(34, 197, 94, 0.1)',
+  iconBtnBorder: 'rgba(34, 197, 94, 0.2)',
+};
+
+const lightPalette: ThemePalette = {
+  background: '#f8fafc',
+  card: '#ffffff',
+  border: '#e2e8f0',
+  headerBg: 'rgba(255, 255, 255, 0.95)',
+  headerBorder: 'rgba(34, 197, 94, 0.15)',
+  text: '#1e293b',
+  subtext: '#64748b',
+  tertiary: '#64748b',
+  primary: '#166534',
+  orange: '#ea580c',
+  iconBtnBg: 'rgba(34, 197, 94, 0.08)',
+  iconBtnBorder: 'rgba(34, 197, 94, 0.15)',
+};
+
+function createStyles(theme: ThemePalette) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: theme.background },
+    safeArea: { flex: 1 },
+
+    // Header
+    header: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 16, paddingVertical: 12,
+      backgroundColor: theme.headerBg, borderBottomWidth: 1, borderBottomColor: theme.headerBorder,
+    },
+    headerBrand: { flexDirection: 'row', alignItems: 'center', gap: 0 },
+    headerPncLogo: { width: 40, height: 40 },
+    headerOamsLogo: { height: 34, width: 96 },
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    iconBtn: { padding: 8, borderRadius: 10, backgroundColor: theme.iconBtnBg, borderWidth: 1, borderColor: theme.iconBtnBorder },
+    iconBtnImg: { width: 18, height: 18 },
+
+    scrollContent: { padding: 16, gap: 16, paddingBottom: 40 },
+
+    // Breadcrumb
+    breadcrumb: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
+    breadcrumbText: { fontSize: 14, fontWeight: '600', color: theme.subtext },
+
+    // Title
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+    titleIcon: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    titleTextWrap: { flex: 1 },
+    pageTitle: { fontSize: 20, fontWeight: '800', color: theme.text, letterSpacing: -0.3 },
+    pageSubtitle: { fontSize: 12, color: theme.subtext, marginTop: 3 },
+
+    // Tabs
+    tabsRow: { flexDirection: 'row', gap: 8, borderBottomWidth: 2, borderBottomColor: theme.border },
+    tab: {
+      flexDirection: 'row', alignItems: 'center', gap: 6,
+      paddingVertical: 10, paddingHorizontal: 4, borderBottomWidth: 2, borderBottomColor: 'transparent', marginBottom: -2,
+    },
+    tabActive: { borderBottomColor: theme.orange },
+    tabText: { fontSize: 12, fontWeight: '700', color: theme.subtext, textTransform: 'uppercase', letterSpacing: 0.3 },
+    tabTextActive: { color: theme.orange },
+    tabCountPill: {
+      minWidth: 20, height: 20, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
+      paddingHorizontal: 5, backgroundColor: 'rgba(249, 115, 22, 0.15)',
+    },
+    tabCountText: { fontSize: 10, fontWeight: '700', color: theme.orange },
+
+    // Empty state
+    emptyCard: {
+      backgroundColor: theme.card, borderWidth: 1, borderColor: 'rgba(249, 115, 22, 0.25)', borderRadius: 18,
+      paddingVertical: 32, paddingHorizontal: 20, alignItems: 'center', gap: 8,
+    },
+    emptyTitle: { fontSize: 15, fontWeight: '700', color: theme.text },
+    emptyDescription: { fontSize: 12, color: theme.tertiary, textAlign: 'center', lineHeight: 18 },
+    emptyRequestBtn: {
+      marginTop: 6, paddingVertical: 12, paddingHorizontal: 22, borderRadius: 12,
+      backgroundColor: theme.orange,
+    },
+    emptyRequestBtnText: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
+
+    // List items
+    docsList: { gap: 10 },
+    listCard: {
+      backgroundColor: theme.card, borderWidth: 1, borderColor: 'rgba(249, 115, 22, 0.25)',
+      borderRadius: 18, padding: 11, gap: 10,
+    },
+    listCardCompleted: { opacity: 0.75, borderColor: 'rgba(107, 114, 128, 0.25)' },
+    listCardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
+    listIconWrap: {
+      width: 32, height: 32, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+      backgroundColor: 'rgba(249, 115, 22, 0.1)', flexShrink: 0,
+    },
+    listIconWrapCompleted: { backgroundColor: 'rgba(107, 114, 128, 0.1)' },
+    listTitleSection: { flex: 1, gap: 2 },
+    listTitle: { fontSize: 13.5, fontWeight: '700', color: theme.text },
+    listCollege: { fontSize: 11, color: theme.tertiary },
+    listClaimedDate: { fontSize: 11, color: theme.tertiary, marginTop: 2 },
+    listClaimedTime: { fontSize: 10, color: theme.tertiary },
+    listTracking: { fontSize: 10, color: theme.tertiary, marginTop: 2 },
+    listTrackingValue: { fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }), fontWeight: '700', color: theme.orange, letterSpacing: 0.3 },
+
+    statusBadgePill: {
+      borderWidth: 1, borderRadius: 8, paddingVertical: 3, paddingHorizontal: 8, flexShrink: 0,
+    },
+    statusBadgeTextPill: { fontSize: 9.5, fontWeight: '700' },
+
+    listFieldsGrid: { gap: 8 },
+    listField: { gap: 2 },
+    listFieldFull: { gap: 2 },
+    listFieldLabel: { fontSize: 10, fontWeight: '700', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
+    listFieldValue: { fontSize: 12, fontWeight: '600', color: theme.orange },
+    listFieldValueMuted: { fontSize: 12, fontWeight: '500', color: theme.subtext, lineHeight: 16 },
+
+    // Hero (detail view)
+    heroCard: { borderRadius: 20, padding: 18, gap: 14 },
+    heroTopRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    heroLogoBox: {
+      width: 56, height: 56, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.15)',
+      borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0,
+    },
+    heroLogoImg: { width: 34, height: 34 },
+    heroTextWrap: { flex: 1, gap: 3 },
+    heroDocName: { fontSize: 16, fontWeight: '800', color: '#ffffff' },
+    heroCollegeName: { fontSize: 12, color: 'rgba(255,255,255,0.9)' },
+    heroBadgeRow: { flexDirection: 'row' },
+    heroBadge: { backgroundColor: '#ffffff', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 10 },
+    heroBadgeText: { fontSize: 12, fontWeight: '800', color: '#ea580c', letterSpacing: 0.3 },
+
+    // Banner
+    readyBanner: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      backgroundColor: '#16a34a', borderRadius: 16, padding: 14,
+    },
+    readyBannerText: { flex: 1, fontSize: 13, fontWeight: '700', color: '#ffffff' },
+
+    // Generic card
+    card: {
+      backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border,
+      borderRadius: 18, padding: 16, gap: 12,
+    },
+    cardHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    cardTitleText: { fontSize: 14, fontWeight: '700', color: theme.text },
+
+    detailRow: {
+      gap: 3, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(249, 115, 22, 0.1)',
+    },
+    detailRowLast: { borderBottomWidth: 0, paddingBottom: 0 },
+    detailLabel: { fontSize: 10, fontWeight: '700', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
+    detailValue: { fontSize: 14, color: theme.text, lineHeight: 20 },
+
+    bodyText: { fontSize: 13, color: theme.subtext, lineHeight: 20 },
+
+    reqSubtext: { fontSize: 12, color: theme.tertiary, marginTop: 4 },
+    reqLoadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    reqItemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+    reqNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    reqDescText: { fontSize: 11.5, color: theme.tertiary, opacity: 0.85 },
+    reqTagRequired: {
+      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+      backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.35)',
+    },
+    reqTagRequiredText: { fontSize: 10, fontWeight: '700', color: '#ef4444' },
+    reqTagOptional: {
+      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+      backgroundColor: 'rgba(107, 114, 128, 0.15)', borderWidth: 1, borderColor: 'rgba(107, 114, 128, 0.35)',
+    },
+    reqTagOptionalText: { fontSize: 10, fontWeight: '700', color: '#9ca3af' },
+
+    attachChip: {
+      flexDirection: 'row', alignItems: 'center', gap: 8,
+      paddingVertical: 9, paddingHorizontal: 12, borderRadius: 10,
+      borderWidth: 1, borderColor: theme.border, backgroundColor: theme.background,
+    },
+    attachChipText: { flex: 1, fontSize: 12.5, color: theme.text },
+
+    // Rejection reason callout -- mirrors web's rejection notice
+    rejectNotice: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+      padding: 14,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: 'rgba(239, 68, 68, 0.35)',
+      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    },
+    rejectNoticeTitle: { fontSize: 13.5, fontWeight: '700', color: '#ef4444' },
+    rejectNoticeReason: { fontSize: 12.5, color: theme.text, marginTop: 4, lineHeight: 18 },
+
+    trackingBig: { fontSize: 22, fontWeight: '800', color: theme.orange, fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }), letterSpacing: 1 },
+    trackingCaption: { fontSize: 11, color: theme.tertiary, marginTop: 4 },
+
+    // Cancel card
+    cancelCard: { borderColor: 'rgba(239, 68, 68, 0.25)', backgroundColor: 'rgba(239, 68, 68, 0.05)' },
+    cancelDescription: { fontSize: 12, color: theme.tertiary, marginTop: -6 },
+    cancelBtn: {
+      alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
+      borderRadius: 12, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)',
+    },
+    cancelBtnText: { fontSize: 13, fontWeight: '700', color: '#ef4444' },
+
+    // Mark as Claimed card (green accent, mirrors the cancel card)
+    // Matches student_appointment_status.tsx's completeCard / completeBtn.
+    claimCard: { borderColor: 'rgba(34, 197, 94, 0.25)', backgroundColor: 'rgba(34, 197, 94, 0.04)' },
+    claimActionBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+      paddingVertical: 12, borderRadius: 12,
+      borderWidth: 1.5, borderColor: 'rgba(34, 197, 94, 0.35)', backgroundColor: 'rgba(34, 197, 94, 0.05)',
+      paddingHorizontal: 10,
+    },
+    claimActionBtnText: { fontSize: 13, fontWeight: '700', color: '#22c55e', flexShrink: 1, textAlign: 'center' },
+
+    // Digital Pickup Code card (QR + text code)
+    qrWrap: { alignItems: 'center', paddingVertical: 8, gap: 12 },
+    qrBox: { padding: 12, backgroundColor: '#ffffff', borderRadius: 12 },
+    deliveryCodeText: { fontSize: 15, fontWeight: '700', color: theme.text, fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }), letterSpacing: 1 },
+    claimedNote: { fontSize: 12, color: theme.subtext, textAlign: 'center', marginTop: 4 },
+
+    // Nav drawer
+    drawerOverlay: { flex: 1, flexDirection: 'row' },
+    drawerPanel: {
+      width: 270, backgroundColor: theme.card, borderRightWidth: 1, borderRightColor: theme.border,
+      padding: 20, justifyContent: 'space-between',
+    },
+    drawerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+    drawerProfile: {
+      width: '100%', alignItems: 'flex-start', gap: 8,
+      backgroundColor: 'rgba(22, 163, 74, 0.12)', borderWidth: 1, borderColor: 'rgba(22, 163, 74, 0.25)',
+      borderRadius: 14, padding: 14,
+    },
+    drawerProfileHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    drawerAvatar: {
+      width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(22, 163, 74, 0.18)',
+      borderWidth: 1, borderColor: 'rgba(22, 163, 74, 0.3)', alignItems: 'center', justifyContent: 'center',
+    },
+    drawerName: { fontSize: 15, fontWeight: '700', color: theme.text },
+    drawerRoleBadge: { backgroundColor: 'rgba(22, 163, 74, 0.18)', borderRadius: 999, paddingVertical: 3, paddingHorizontal: 10 },
+    drawerRoleBadgeText: { fontSize: 11, fontWeight: '700', color: theme.primary },
+    drawerCollege: { fontSize: 12, fontWeight: '500', color: theme.subtext },
+    availabilityRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 14,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+    },
+    availabilityLabel: { fontSize: 14, fontWeight: '700', color: theme.text },
+    // Namespaced (not `modalOverlay`/`cancelBtn`/etc.) -- this file's own
+    // `cancelBtn`/`cancelBtnText` are already the red "Cancel Request" button
+    // on the document-cancel card, a different shape/color than
+    // QueueReasonModal needs, so these avoid stepping on that.
+    availModalOverlay: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      padding: 24,
+    },
+    availConfirmModalCard: {
+      width: '100%',
+      maxWidth: 340,
+      alignItems: 'center',
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 20,
+      padding: 24,
+    },
+    availConfirmIconCircle: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+    availConfirmTitle: { fontSize: 18, fontWeight: '800', color: theme.text, marginBottom: 8, textAlign: 'center' },
+    availConfirmDescription: { fontSize: 13, color: theme.subtext, textAlign: 'center', lineHeight: 19, marginBottom: 16 },
+    availReasonInput: {
+      width: '100%',
+      minHeight: 64,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      padding: 12,
+      fontSize: 13,
+      color: theme.text,
+      backgroundColor: theme.background,
+      textAlignVertical: 'top',
+      marginBottom: 16,
+    },
+    availConfirmActionsRow: { flexDirection: 'row', gap: 12, width: '100%' },
+    availCancelBtn: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+    },
+    availCancelBtnText: { fontSize: 14, fontWeight: '700', color: theme.text },
+    availConfirmBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12 },
+    availConfirmBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+    availFormSubmitBtnDisabled: { opacity: 0.6 },
+    drawerNav: { flex: 1, marginTop: 28, gap: 4 },
+    drawerNavItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 12, borderRadius: 10 },
+    drawerNavItemActive: { backgroundColor: theme.primary },
+    drawerNavLabel: { fontSize: 14, fontWeight: '600', color: theme.subtext },
+    drawerNavLabelActive: { color: '#ffffff' },
+    drawerLogout: {
+      flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 12,
+      borderRadius: 10, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)', backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    },
+    drawerLogoutText: { fontSize: 14, fontWeight: '700', color: '#ef4444' },
+
+    // Shared modal look
+    logoutOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: 24 },
+    logoutModalCard: {
+      width: '100%', maxWidth: 340, alignItems: 'center', backgroundColor: theme.card,
+      borderWidth: 1, borderColor: theme.border, borderRadius: 20, padding: 24,
+    },
+    logoutIconCircle: {
+      width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center',
+      backgroundColor: 'rgba(239, 68, 68, 0.15)', marginBottom: 16,
+    },
+    logoutModalTitle: { fontSize: 18, fontWeight: '800', color: theme.text, marginBottom: 8 },
+    logoutModalDescription: { fontSize: 13, color: theme.subtext, textAlign: 'center', lineHeight: 19, marginBottom: 20 },
+    logoutModalActions: { flexDirection: 'row', gap: 12, width: '100%' },
+    logoutCancelBtn: {
+      flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
+      borderWidth: 1, borderColor: theme.border, borderRadius: 12,
+    },
+    logoutCancelBtnText: { fontSize: 14, fontWeight: '700', color: theme.text },
+    logoutConfirmBtn: {
+      flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+      paddingVertical: 12, borderRadius: 12, backgroundColor: '#ef4444',
+      paddingHorizontal: 10,
+    },
+    logoutConfirmBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff', flexShrink: 1, textAlign: 'center' },
+  });
+}

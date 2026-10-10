@@ -1,0 +1,56 @@
+services:
+  db:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: Akosimatt123
+      MYSQL_DATABASE: oams_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./server/oams_db.sql:/docker-entrypoint-initdb.d/01_oams_db.sql
+      - ./server/db/mock/ccs_mock_data.sql:/docker-entrypoint-initdb.d/02_ccs_mock_data.sql
+      - ./server/db/mock/secretary_services.sql:/docker-entrypoint-initdb.d/03_secretary_services.sql
+      - ./server/db/mock/secretary_documents.sql:/docker-entrypoint-initdb.d/04_secretary_documents.sql
+    healthcheck:
+      test: ["CMD", "mysql", "-u", "root", "-pAkosimatt123", "-e", "SELECT 1 FROM oams_db.users LIMIT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  server:
+    build: ./server
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - TZ=Asia/Manila
+      - DB_HOST=db
+      - DB_USER=root
+      - DB_PASSWORD=Akosimatt123
+      - DB_NAME=oams_db
+      - JWT_SECRET=your_jwt_secret_here
+      - JWT_EXPIRES_IN=24h
+    depends_on:
+      db:
+        condition: service_healthy
+
+  client:
+    build: ./client
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:5000/api
+    depends_on:
+      - server
+
+volumes:
+  mysql_data:

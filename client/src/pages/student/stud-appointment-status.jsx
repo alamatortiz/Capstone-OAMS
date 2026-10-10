@@ -1,0 +1,831 @@
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate, useLocation, Link } from "react-router-dom";
+import {
+  ChevronLeft,
+  ChevronRight,
+  GraduationCap,
+  Calendar,
+  XCircle,
+  Loader2,
+  AlertCircle,
+  LayoutList,
+  Clock,
+  CheckCircle2,
+  MessageSquare,
+} from "lucide-react";
+import ActionConfirmModal from "../../components/ActionConfirmModal";
+import QueueReasonModal from "../../components/QueueReasonModal";
+import { toast } from "sonner";
+import api from "../../utils/api";
+import { getCollegeLogo } from "../../data/collegeLogo";
+import StudentPageShell from "../../components/StudentPageShell";
+import PageHeader from "../../components/PageHeader";
+import RefreshButton from "../../components/RefreshButton";
+import AppointmentListItem from "../../components/AppointmentListItem";
+import { formatManilaDate, formatManilaTime } from "../../utils/dateTime";
+import { getAppointmentActions, isAutoRejected } from "../../utils/appointmentActions";
+import { filterByRange } from "../../utils/dateRange";
+import { connectSocket } from "../../utils/socket";
+import { useAuth } from "../../context/AuthContext";
+import "./stud-appointment-status.css";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const getStatusMeta = (status) => {
+  switch (status) {
+    case "pending":   return { label: "Pending",   cls: "apst-badge-pending" };
+    case "approved":  return { label: "Approved",  cls: "apst-badge-approved" };
+    case "completed": return { label: "Completed", cls: "apst-badge-completed" };
+    case "rejected":  return { label: "Rejected",  cls: "apst-badge-rejected" };
+    case "cancelled": return { label: "Cancelled", cls: "apst-badge-cancelled" };
+    default:          return { label: status,      cls: "apst-badge-pending" };
+  }
+};
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return "—";
+  return formatManilaDate(dateStr, {
+    weekday: "long", month: "long", day: "numeric", year: "numeric",
+  });
+};
+const formatDateShort = (dateStr) => {
+  if (!dateStr) return "—";
+  return formatManilaDate(dateStr, {
+    month: "short", day: "numeric", year: "numeric",
+  });
+};
+
+// Read-only display of the shared appointment comment -- the professor is
+// the only party who can write it (see prof-appointments.jsx's CommentBlock,
+// which edits the same field via /professor/appointments/:id/comment). The
+// student has no write path to this field at all, not just a hidden one, so
+// this is genuinely view-only rather than cosmetically so.
+function CommentCard({ appt }) {
+  return (
+    <div className="apst-card apst-comment-card">
+      <div className="apst-card-header">
+        <h3 className="apst-card-title apst-comment-title">
+          <MessageSquare style={{ width: "1.25rem", height: "1.25rem", color: "#3b82f6" }} />
+          Actions Taken
+        </h3>
+      </div>
+      <div className="apst-card-content">
+        {appt.sharedComment ? (
+          <>
+            <p className="apst-detail-value apst-comment-text">{appt.sharedComment}</p>
+            {appt.commentUpdatedAt && (
+              <p className="apst-comment-meta">
+                Last updated by {appt.commentUpdatedBy === "faculty" ? "the professor" : "you"} on{" "}
+                {formatDateShort(appt.commentUpdatedAt)}
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="apst-comment-empty">No actions taken recorded yet.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// The student's own say on how the appointment went (2026-09-30 panel:
+// "evaluation/feedback after appointment"). Optional, available any time
+// once the appointment is completed, and submittable exactly once -- the
+// DB enforces that via a PK on appointment_id, so this form closing is a
+// reflection of the rule rather than the rule itself.
+function FeedbackCard({ appt }) {
+  const [state, setState] = useState(null); // { canSubmit, feedback }
+  const [text, setText] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .get(`/student/appointments/${appt.id}/feedback`)
+      .then(({ data }) => { if (active) setState(data); })
+      .catch(() => { if (active) setState({ canSubmit: false, feedback: null }); });
+    return () => { active = false; };
+  }, [appt.id]);
+
+  const submit = async () => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    setSaving(true);
+    try {
+      await api.post(`/student/appointments/${appt.id}/feedback`, { feedback: trimmed });
+      setState({ canSubmit: false, feedback: { text: trimmed, createdAt: new Date().toISOString() } });
+      toast.success("Thanks for your feedback.");
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? "Couldn't send your feedback. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Nothing to show until the appointment is finished and we know whether
+  // they've already spoken.
+  if (!state || (!state.canSubmit && !state.feedback)) return null;
+
+  return (
+    <div className="apst-card">
+      <div className="apst-card-header">
+        <h3 className="apst-card-title">
+          <MessageSquare style={{ width: "1.25rem", height: "1.25rem", color: "#a855f7" }} />
+          Your Feedback
+        </h3>
+      </div>
+      <div className="apst-card-content">
+        {state.feedback ? (
+          <>
+            <p className="apst-detail-value apst-comment-text">{state.feedback.text}</p>
+            <p className="apst-comment-meta">
+              Submitted on {formatDateShort(state.feedback.createdAt)} — thanks for sharing.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="apst-feedback-intro">
+              Optional, and you can only send it once.
+            </p>
+            <textarea
+              className="apst-feedback-input"
+              placeholder="How's the appointment/service?"
+              value={text}
+              maxLength={2000}
+              rows={4}
+              onChange={(e) => setText(e.target.value)}
+            />
+            <div className="apst-feedback-actions">
+              <span className="apst-feedback-count">{text.length}/2000</span>
+              <button
+                type="button"
+                className="apst-feedback-submit"
+                onClick={submit}
+                disabled={!text.trim() || saving}
+              >
+                {saving ? "Sending…" : "Send Feedback"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Detail View ──────────────────────────────────────────────────────────────
+function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, completing, onReportNotServed, reporting, backLabel = "My Appointments" }) {
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+  const [showReportDialog, setShowReportDialog] = useState(false);
+  const { label: statusLabel, cls: statusCls } = getStatusMeta(appt.status);
+  const { canCancel, canComplete, canReportNotServed } = getAppointmentActions(appt);
+
+  return (
+    <div className="apst-status-container">
+      <PageHeader
+        breadcrumb={
+          <button type="button" className="breadcrumb-link" onClick={onBack}>
+            <ChevronLeft className="breadcrumb-icon" />
+            {backLabel}
+          </button>
+        }
+        icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
+        iconClassName="apst-title-icon"
+        title="Appointment Details"
+        subtitle="Your appointment details and status."
+        headerClassName="apst-header"
+        breadcrumbClassName="page-breadcrumb"
+        titleSectionClassName="apst-title-section"
+        titleClassName="apst-title"
+        subtitleClassName="apst-subtitle"
+      />
+
+      {/* Hero */}
+      <div className="apst-hero-card">
+        <div className="apst-hero-content">
+          <div className="apst-hero-logo">
+            <img src={getCollegeLogo(appt.college)} alt={appt.college} />
+          </div>
+          <div className="apst-hero-text">
+            <div className="apst-hero-header">
+              <div className="apst-hero-title">
+                <p className="apst-hero-service-name">{appt.person}</p>
+                <p>{appt.college}</p>
+              </div>
+              {appt.trackingNumber && (
+                <div className="apst-hero-badge">{appt.trackingNumber}</div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Detail grid */}
+      <div className="apst-detail-grid">
+        <div className="apst-detail-main">
+          <div className="apst-card">
+            <div className="apst-card-header">
+              <h3 className="apst-card-title">
+                <Calendar style={{ width: "1.25rem", height: "1.25rem" }} />
+                Appointment Details
+              </h3>
+              <span className={`apst-badge ${statusCls}`}>{statusLabel}</span>
+            </div>
+            <div className="apst-card-content">
+              <div className="apst-detail-row">
+                <p className="apst-detail-label">Professor</p>
+                <p className="apst-detail-value">{appt.person}</p>
+              </div>
+              {appt.appointmentType && (
+                <div className="apst-detail-row">
+                  <p className="apst-detail-label">Appointment Type</p>
+                  <p className="apst-detail-value">{appt.appointmentType}</p>
+                </div>
+              )}
+              <div className="apst-detail-row">
+                <p className="apst-detail-label">Date</p>
+                <p className="apst-detail-value">{formatDate(appt.date)}</p>
+              </div>
+              <div className="apst-detail-row">
+                <p className="apst-detail-label">Time Slot</p>
+                <p className="apst-detail-value">{appt.windowStart && appt.windowEnd ? `${appt.windowStart} – ${appt.windowEnd}` : "—"}</p>
+              </div>
+              <div className="apst-detail-row">
+                <p className="apst-detail-label">Location</p>
+                <p className="apst-detail-value">{appt.location}</p>
+              </div>
+              {appt.slotNote && (
+                <div className="apst-detail-row">
+                  <p className="apst-detail-label">Note</p>
+                  <p className="apst-detail-value">
+                    {/^https?:\/\/\S+$/i.test(appt.slotNote.trim()) ? (
+                      <a href={appt.slotNote.trim()} target="_blank" rel="noopener noreferrer">{appt.slotNote.trim()}</a>
+                    ) : (
+                      appt.slotNote
+                    )}
+                  </p>
+                </div>
+              )}
+              {appt.purpose && (
+                <div className="apst-detail-row">
+                  <p className="apst-detail-label">Purpose</p>
+                  <p className="apst-detail-value">{appt.purpose}</p>
+                </div>
+              )}
+              {appt.status === "rejected" && appt.rejectionReason && (
+                <div className="apst-reject-notice">
+                  <XCircle style={{ width: "1.25rem", height: "1.25rem" }} />
+                  <div>
+                    <p>
+                      {isAutoRejected(appt)
+                        ? "This appointment request was automatically rejected."
+                        : "This appointment request was rejected."}
+                    </p>
+                    <p className="apst-reject-reason">Reason: {appt.rejectionReason}</p>
+                  </div>
+                </div>
+              )}
+              {appt.status === "cancelled" && appt.cancelledBy === "student_no_show" && (
+                <div className="apst-reject-notice">
+                  <AlertCircle style={{ width: "1.25rem", height: "1.25rem" }} />
+                  <div>
+                    <p>You reported that this appointment was not served.</p>
+                    {appt.cancelReason && (
+                      <p className="apst-reject-reason">Details: {appt.cancelReason}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              {appt.status === "cancelled" && appt.cancelledBy === "system_not_entertained" && (
+                <div className="apst-reject-notice">
+                  <AlertCircle style={{ width: "1.25rem", height: "1.25rem" }} />
+                  <div>
+                    <p>This appointment was automatically cancelled because it wasn't marked as served in time.</p>
+                    {appt.cancelReason && (
+                      <p className="apst-reject-reason">Details: {appt.cancelReason}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <CommentCard appt={appt} />
+          {/* Renders itself only once the appointment is completed and
+              they haven't already spoken -- see FeedbackCard. */}
+          <FeedbackCard appt={appt} />
+        </div>
+
+        <div className="apst-detail-sidebar">
+          <div className="apst-card apst-timeline-card">
+            <div className="apst-card-header">
+              <h3 className="apst-card-title">
+                <Clock style={{ width: "1.25rem", height: "1.25rem" }} />
+                Timeline
+              </h3>
+            </div>
+            <div className="apst-card-content">
+              <p className="apst-timeline-date">
+                <Calendar style={{ width: "0.9rem", height: "0.9rem" }} /> {formatDate(appt.date)}
+              </p>
+              {(appt.approvedAtRaw || appt.completedAtRaw) && (
+                <div className="apst-datetime-row">
+                  {appt.approvedAtRaw && (
+                    <span className="apst-quick-meta-item">Approved: {formatManilaTime(appt.approvedAtRaw)}</span>
+                  )}
+                  {appt.completedAtRaw && (
+                    <span className="apst-quick-meta-item">Completed: {formatManilaTime(appt.completedAtRaw)}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {canComplete && (
+            <div className="apst-card apst-complete-card">
+              <div className="apst-card-header">
+                <h3 className="apst-card-title apst-complete-title">
+                  <CheckCircle2 style={{ width: "1.25rem", height: "1.25rem", color: "#22c55e" }} />
+                  Mark as Completed
+                </h3>
+              </div>
+              <div className="apst-card-content">
+                <p className="apst-cancel-desc">
+                  If your concern has already been addressed and the professor hasn't closed this
+                  out yet, you can mark it completed yourself.
+                </p>
+                <button
+                  className="apst-complete-btn"
+                  onClick={() => setShowCompleteDialog(true)}
+                  disabled={completing === appt.id}
+                >
+                  <CheckCircle2 style={{ width: "1rem", height: "1rem" }} />
+                  {completing === appt.id ? "Marking…" : "Mark Appointment as Completed"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {canCancel && (
+            <div className="apst-card apst-cancel-card">
+              <div className="apst-card-header">
+                <h3 className="apst-card-title apst-cancel-title">
+                  <XCircle style={{ width: "1.25rem", height: "1.25rem", color: "#ef4444" }} />
+                  Cancel Appointment
+                </h3>
+              </div>
+              <div className="apst-card-content">
+                <p className="apst-cancel-desc">
+                  Cancelling will permanently remove this appointment. You will need to book a new one if you change your mind.
+                </p>
+                <button
+                  className="apst-cancel-btn"
+                  onClick={() => setShowCancelDialog(true)}
+                  disabled={cancelling === appt.id}
+                >
+                  <XCircle style={{ width: "1rem", height: "1rem" }} />
+                  {cancelling === appt.id ? "Cancelling…" : "Cancel Appointment"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {canReportNotServed && (
+            <div className="apst-card apst-report-card">
+              <div className="apst-card-header">
+                <h3 className="apst-card-title apst-report-title">
+                  <AlertCircle style={{ width: "1.25rem", height: "1.25rem", color: "#f59e0b" }} />
+                  Report as Not Served
+                </h3>
+              </div>
+              <div className="apst-card-content">
+                <p className="apst-cancel-desc">
+                  If the professor never actually saw you for this appointment, let them know. This cancels the appointment and notifies the professor.
+                </p>
+                <button
+                  className="apst-report-btn"
+                  onClick={() => setShowReportDialog(true)}
+                  disabled={reporting === appt.id}
+                >
+                  <AlertCircle style={{ width: "1rem", height: "1rem" }} />
+                  {reporting === appt.id ? "Reporting…" : "Report as Not Served"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <ActionConfirmModal
+        show={showCancelDialog}
+        onCancel={() => setShowCancelDialog(false)}
+        onConfirm={() => { setShowCancelDialog(false); onCancel(appt.id); }}
+        title="Cancel Appointment?"
+        message={
+          <>
+            You are about to cancel your appointment with <strong>{appt.person}</strong> on{" "}
+            <strong>{formatDate(appt.date)}</strong>. This will permanently remove it — you'll need to book a new one if you change your mind.
+          </>
+        }
+        icon={<XCircle width={22} height={22} />}
+        cancelText="Keep Appointment"
+        confirmText="Cancel Appointment"
+      />
+
+      <ActionConfirmModal
+        show={showCompleteDialog}
+        variant="success"
+        onCancel={() => setShowCompleteDialog(false)}
+        onConfirm={() => { setShowCompleteDialog(false); onComplete(appt.id); }}
+        title="Mark Appointment as Completed?"
+        message={
+          <>
+            Mark your appointment with <strong>{appt.person}</strong> on{" "}
+            <strong>{formatDate(appt.date)}</strong> as completed? Use this only if your concern
+            has already been addressed.
+          </>
+        }
+        icon={<CheckCircle2 width={22} height={22} />}
+        cancelText="Not Yet"
+        confirmText="Mark as Completed"
+      />
+
+      <QueueReasonModal
+        show={showReportDialog}
+        variant="warning"
+        onCancel={() => setShowReportDialog(false)}
+        onConfirm={(reason) => { setShowReportDialog(false); onReportNotServed(appt.id, reason); }}
+        title="Report as Not Served?"
+        message={
+          <>
+            Report that <strong>{appt.person}</strong> did not serve you for your appointment on{" "}
+            <strong>{formatDate(appt.date)}</strong>? This will cancel the appointment and notify the professor.
+          </>
+        }
+        confirmText={reporting === appt.id ? "Please wait…" : "Report as Not Served"}
+        cancelText="Never Mind"
+        submitting={reporting === appt.id}
+        icon={<AlertCircle width={22} height={22} />}
+        required={false}
+        placeholder="Add details (optional)..."
+      />
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+export default function AppointmentStatusPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { token } = useAuth();
+  const navState = location.state ?? {};
+  const fromBookings = navState.fromBookings ?? false;
+
+  const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedId, setSelectedId] = useState(navState.appointmentId ?? null);
+  const [cancelling, setCancelling] = useState(null);
+  const [completing, setCompleting] = useState(null);
+  const [reporting, setReporting] = useState(null);
+  const [activeTab, setActiveTab] = useState("all");
+  const [allRange, setAllRange] = useState("today");
+
+  // Mirrors `appointments` for the catch block below, without making
+  // fetchAppointments depend on (and change identity with) the state itself.
+  const appointmentsRef = useRef(appointments);
+  useEffect(() => { appointmentsRef.current = appointments; }, [appointments]);
+
+  const fetchAppointments = useCallback(async () => {
+    setError(null);
+    try {
+      const { data } = await api.get("/student/appointments");
+      setAppointments(data.appointments ?? []);
+    } catch {
+      // Only take over the whole view with a blocking error on the true
+      // first load. A background refresh (poll/socket) failing shouldn't
+      // wipe out an already-good, visible list -- just note it quietly.
+      if (appointmentsRef.current.length === 0) {
+        setError("Could not load your appointments. Please try again.");
+      } else {
+        toast.error("Could not refresh your appointments.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
+
+  // ── Live updates: refetch when an appointment's status changes ────────────
+  useEffect(() => {
+    if (!token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const handleStatusUpdate = (payload) => {
+      if (payload?.reason === "schedule_removed" || payload?.reason === "schedule_changed") {
+        toast.error("An appointment was cancelled because the professor changed their schedule. Please book a new time.");
+      } else if (payload?.reason === "slot_adjusted") {
+        toast.message("A professor adjusted one of your appointment slots — check the new time and location.");
+      }
+      fetchAppointments();
+    };
+
+    socket.on("appointment:status-updated", handleStatusUpdate);
+
+    // A professor's comment is otherwise only picked up by the 30s fallback
+    // poll below -- this makes it show up immediately for a student who
+    // already has this page open.
+    const handleCommentUpdate = (payload) => {
+      toast.message("Your professor added actions taken for an appointment.", {
+        id: `appt-comment-${payload?.appointmentId}`,
+      });
+      fetchAppointments();
+    };
+
+    socket.on("appointment:comment-updated", handleCommentUpdate);
+
+    return () => {
+      socket.off("appointment:status-updated", handleStatusUpdate);
+      socket.off("appointment:comment-updated", handleCommentUpdate);
+    };
+  }, [fetchAppointments, token]);
+
+  // Fallback poll: a missed/reconnecting socket event shouldn't leave this
+  // page stale until the next manual reload.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      fetchAppointments();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [fetchAppointments]);
+
+  const handleCancel = async (id) => {
+    setCancelling(id);
+    try {
+      await api.delete(`/student/appointments/${id}`);
+      toast.success("Appointment cancelled successfully.");
+      setSelectedId(null);
+      await fetchAppointments();
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? "Failed to cancel the appointment.");
+    } finally {
+      setCancelling(null);
+    }
+  };
+
+  const handleComplete = async (id) => {
+    setCompleting(id);
+    try {
+      await api.patch(`/student/appointments/${id}/complete`);
+      toast.success("Appointment marked as completed.");
+      await fetchAppointments();
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? "Failed to mark the appointment as completed.");
+    } finally {
+      setCompleting(null);
+    }
+  };
+
+  const handleReportNotServed = async (id, reason) => {
+    setReporting(id);
+    try {
+      await api.patch(`/student/appointments/${id}/report-not-served`, reason ? { reason } : {});
+      toast.success("Appointment reported as not served.");
+      await fetchAppointments();
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? "Failed to report the appointment.");
+    } finally {
+      setReporting(null);
+    }
+  };
+
+  // Defaults to "Today" across every tab -- the range control below lets a
+  // student switch to "This Week"/"Next Week"/"All Time" to see everything
+  // else.
+  const rangeFilteredAppointments = filterByRange(appointments, allRange);
+  const byStatus = (status) => rangeFilteredAppointments.filter((a) => a.status === status);
+  const tabLists = {
+    all:       rangeFilteredAppointments,
+    pending:   byStatus("pending"),
+    approved:  byStatus("approved"),
+    completed: byStatus("completed"),
+    rejected:  byStatus("rejected"),
+    cancelled: byStatus("cancelled"),
+  };
+
+  const RANGE_LABELS = { today: "Today", week: "This Week", nextWeek: "Next Week", all: "All Time" };
+
+  const TAB_ICON_MAP = {
+    all:       LayoutList,
+    pending:   Clock,
+    approved:  CheckCircle2,
+    completed: CheckCircle2,
+    rejected:  XCircle,
+    cancelled: XCircle,
+  };
+
+  const TABS = [
+    { key: "all",       label: "All" },
+    { key: "pending",   label: "Pending" },
+    { key: "approved",  label: "Approved" },
+    { key: "completed", label: "Completed" },
+    { key: "rejected",  label: "Rejected" },
+    { key: "cancelled", label: "Cancelled" },
+  ];
+
+  const selectedAppt = appointments.find((a) => a.id === selectedId) ?? null;
+
+  return (
+    <StudentPageShell
+      outerClassName="apst-with-sidebar"
+      mainClassName="apst-main"
+    >
+        {selectedAppt ? (
+          <AppointmentDetail
+            appt={selectedAppt}
+            backLabel={fromBookings ? "Appointments" : "My Appointments"}
+            onBack={() => fromBookings ? navigate("/student/appointments", { state: { activeTab: "bookings" } }) : setSelectedId(null)}
+            onCancel={handleCancel}
+            cancelling={cancelling}
+            onComplete={handleComplete}
+            completing={completing}
+            onReportNotServed={handleReportNotServed}
+            reporting={reporting}
+          />
+        ) : (
+          <div className="apst-status-container">
+            {/* Header */}
+            <div className="refresh-header-row">
+              <PageHeader
+                breadcrumb={
+                  <Link
+                    to="/student/dashboard"
+                    className="breadcrumb-link"
+                  >
+                    <ChevronLeft className="breadcrumb-icon" />
+                    Home
+                  </Link>
+                }
+                icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
+                iconClassName="apst-title-icon"
+                title="My Appointments"
+                subtitle="Track all of your appointments."
+                headerClassName="apst-header"
+                breadcrumbClassName="page-breadcrumb"
+                titleSectionClassName="apst-title-section"
+                titleClassName="apst-title"
+                subtitleClassName="apst-subtitle"
+              />
+              <RefreshButton
+                onClick={fetchAppointments}
+                loading={loading}
+                label="Refresh appointments"
+              />
+            </div>
+
+            {/* Professor Schedules card */}
+            <Link
+              to="/student/professor-schedules"
+              state={{ from: "/student/appointment-status", fromLabel: "My Appointments" }}
+              className="apst-prof-sched-card"
+            >
+              <div className="apst-prof-sched-card-icon">
+                <GraduationCap />
+              </div>
+              <div className="apst-prof-sched-card-text">
+                <span className="apst-prof-sched-card-title">Professor Schedules</span>
+                <span className="apst-prof-sched-card-subtitle">Check professor consultation hours and availability across all departments.</span>
+              </div>
+              <ChevronRight style={{ width: "1.375rem", height: "1.375rem", color: "#a855f7", opacity: 0.7, flexShrink: 0 }} />
+            </Link>
+
+            {error && (
+              <div className="apst-empty-state" style={{ borderColor: "rgba(239,68,68,0.3)" }}>
+                <AlertCircle className="apst-empty-icon" style={{ color: "#ef4444" }} />
+                <p className="apst-empty-text">{error}</p>
+              </div>
+            )}
+
+            {loading && (
+              <div className="apst-empty-state">
+                <Loader2 className="apst-empty-icon" style={{ animation: "spin 1s linear infinite" }} />
+                <p className="apst-empty-text">Loading your appointments…</p>
+              </div>
+            )}
+
+            {!loading && !error && (
+              <div className="apst-tabs-container">
+                <div className="apst-tabs-scrollable">
+                  <div className="apst-tabs-list">
+                    {TABS.map(({ key, label }) => {
+                      const TabIcon = TAB_ICON_MAP[key];
+
+                      // The "All" tab doubles as the Today/This Week/Next
+                      // Week/All Time range control, governing every tab --
+                      // same placement/pattern as prof-appointments.jsx's
+                      // Appointment Manager, so the two pages look and behave
+                      // consistently.
+                      if (key === "all") {
+                        return (
+                          <div
+                            key={key}
+                            role="button"
+                            tabIndex={0}
+                            className={`apst-tab ${activeTab === key ? "active" : ""}`}
+                            onClick={() => setActiveTab("all")}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") setActiveTab("all");
+                            }}
+                          >
+                            {TabIcon && <TabIcon className="apst-tab-icon" />}
+                            <select
+                              className="apst-range-select"
+                              value={allRange}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => {
+                                setAllRange(e.target.value);
+                                setActiveTab("all");
+                              }}
+                            >
+                              {Object.entries(RANGE_LABELS).map(([value, label]) => (
+                                <option key={value} value={value}>{label}</option>
+                              ))}
+                            </select>
+                            <span className="apst-tab-count">{tabLists[key].length}</span>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <button
+                          key={key}
+                          className={`apst-tab ${activeTab === key ? "active" : ""}`}
+                          onClick={() => setActiveTab(key)}
+                        >
+                          {TabIcon && <TabIcon className="apst-tab-icon" />}
+                          {label}
+                          <span className="apst-tab-count">{tabLists[key].length}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="apst-list-container">
+                  {tabLists[activeTab].length > 0 ? (
+                    tabLists[activeTab].map((appt) => (
+                      <AppointmentListItem
+                        key={appt.id}
+                        appointment={appt}
+                        formatDate={formatDateShort}
+                        onClick={() => setSelectedId(appt.id)}
+                      />
+                    ))
+                  ) : (
+                    <div className="apst-empty-state">
+                      <Calendar className="apst-empty-icon" />
+                      <h3 className="apst-empty-title">
+                        {activeTab === "all" ? "No Appointments Booked" : `No ${TABS.find(t => t.key === activeTab)?.label} Appointments`}
+                        {allRange !== "all" ? ` ${RANGE_LABELS[allRange]}` : ""}
+                      </h3>
+                      <p className="apst-empty-text">
+                        {allRange !== "all"
+                          ? `Nothing in this range — switch to "All Time" to see all your appointments.`
+                          : activeTab === "all"
+                            ? "You have no active appointments yet."
+                            : activeTab === "pending"
+                              ? "You have no records of pending appointments."
+                              : `You have no records of ${activeTab} appointments.`}
+                      </p>
+                      {(activeTab === "all" || activeTab === "pending") && (
+                        <button
+                          onClick={() => navigate("/student/appointments")}
+                          style={{
+                            marginTop: "0.5rem",
+                            background: "linear-gradient(135deg, #a855f7, #9333ea)",
+                            color: "white",
+                            border: "none",
+                            padding: "0.75rem 1.5rem",
+                            borderRadius: "0.75rem",
+                            cursor: "pointer",
+                            fontSize: "0.875rem",
+                            fontWeight: 600,
+                          }}
+                        >
+                          Book an Appointment
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+    </StudentPageShell>
+  );
+}

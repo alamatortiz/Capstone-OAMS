@@ -1,0 +1,661 @@
+/* Queue Analytics — reworked lean summary screen. Laid out like
+   adm-transactions.css (stat grid → filters card → list), blue-themed.
+   Self-contained token block so the page renders correctly regardless of
+   which admin page loaded first into Vite's global bundle. */
+:root,
+[data-theme="dark"] {
+  --primary-color: #22c55e;
+  --background: #0a0f0a;
+  --card: #111612;
+  --foreground: #f0fdf4;
+  --muted-foreground: #94a3b8;
+  --border: #1e3a23;
+  --input-background: #0f1e12;
+  --destructive: #ef4444;
+
+  --dark-bg: var(--background);
+  --card-bg: var(--card);
+  --card-border: var(--border);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--foreground);
+  --text-tertiary: var(--muted-foreground);
+
+  --sidebar-width: 14rem;
+
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: var(--destructive);
+  --blue: #3b82f6;
+}
+
+[data-theme="light"] {
+  --primary-color: #15803d;
+  --background: #f8fafc;
+  --card: #ffffff;
+  --foreground: #1e293b;
+  --muted-foreground: #64748b;
+  --border: #e2e8f0;
+  --input-background: #f8fafc;
+  --destructive: #dc2626;
+
+  --dark-bg: var(--background);
+  --card-bg: var(--card);
+  --card-border: var(--border);
+  --text-primary: var(--foreground);
+  --text-secondary: #334155;
+  --text-tertiary: var(--muted-foreground);
+
+  --success: #059669;
+  --warning: #d97706;
+  --danger: var(--destructive);
+  --blue: #2563eb;
+}
+
+html, body {
+  font-family: "Inter", sans-serif;
+}
+
+/* ── Layout ─────────────────────────────────────────────────────── */
+.aqa-layout {
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--dark-bg);
+  color: var(--text-primary);
+  font-family: "Inter", sans-serif;
+  transition: background-color 0.3s ease;
+}
+
+.aqa-main {
+  flex: 1;
+  margin-left: var(--sidebar-width, 14rem);
+  padding: 1.5rem;
+  min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  .aqa-main {
+    margin-left: 0;
+    padding: 1rem;
+    padding-top: 5rem;
+  }
+}
+
+.aqa-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ── Breadcrumb ─────────────────────────────────────────────────── */
+.aqa-content .page-breadcrumb {
+  display: flex;
+  align-items: center;
+}
+.aqa-content .page-breadcrumb-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  padding: 0.5rem 0.875rem 0.5rem 0;
+  border-radius: 0.5rem;
+  color: var(--text-tertiary);
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.aqa-content .page-breadcrumb-link:hover {
+  color: var(--blue);
+  background: rgba(59, 130, 246, 0.1);
+}
+.aqa-content .page-breadcrumb-link svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke: currentColor;
+  flex-shrink: 0;
+}
+
+/* ── Page Header (blue title icon) ──────────────────────────────── */
+.aqa-page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.aqa-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.aqa-title-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  color: #fff;
+}
+
+.aqa-title-icon svg {
+  width: 1.75rem;
+  height: 1.75rem;
+  stroke: #fff;
+  color: #fff;
+  fill: currentColor;
+}
+
+.aqa-page-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.aqa-page-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-tertiary);
+  margin: 0.25rem 0 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+/* ── Stat cards ─────────────────────────────────────────────────── */
+.aqa-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+@media (min-width: 1024px) {
+  .aqa-stats-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+.aqa-stat-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 0.875rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.aqa-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.45);
+}
+
+.aqa-stat-icon-box {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+  flex-shrink: 0;
+}
+
+.aqa-stat-icon-box svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke: currentColor;
+}
+
+.aqa-icon-box-blue {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.08) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: var(--blue);
+}
+
+.aqa-icon-box-amber {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.08) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  color: var(--warning);
+}
+
+.aqa-icon-box-red {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.08) 100%);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: var(--danger);
+}
+
+.aqa-stat-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 0.375rem;
+  transition: color 0.3s ease;
+}
+
+.aqa-stat-value {
+  font-size: 2.25rem;
+  font-weight: 800;
+  line-height: 1;
+  margin: 0;
+  color: var(--text-primary);
+  transition: color 0.3s ease;
+}
+
+.aqa-stat-value-text {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.aqa-val-blue  { color: var(--blue); }
+.aqa-val-amber { color: var(--warning); }
+.aqa-val-red   { color: var(--danger); }
+
+.aqa-stat-sub {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  margin: 0.4rem 0 0;
+  transition: color 0.3s ease;
+}
+
+/* ── Filters card ──────────────────────────────────────────────── */
+.aqa-filters-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 1rem;
+  padding: 1rem 1.5rem 1.5rem;
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.1);
+  transition: all 0.3s ease;
+}
+
+.aqa-filters-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.aqa-filters-header-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.aqa-filters-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.aqa-filters-description {
+  font-size: 0.9rem;
+  color: var(--text-tertiary);
+  margin: 0.35rem 0 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.aqa-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.aqa-export-btn:hover:not(:disabled) {
+  border-color: rgba(59, 130, 246, 0.4);
+  color: var(--blue);
+}
+
+.aqa-export-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.aqa-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .aqa-filters-grid { gap: 1.5rem; }
+}
+
+@media (max-width: 640px) {
+  .aqa-filters-grid { grid-template-columns: 1fr; }
+}
+
+/* FilterSelect internals — scoped (these class names aren't global). */
+.aqa-filters-card .filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.aqa-filters-card .filter-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.aqa-filters-card .filter-select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.aqa-filters-card .filter-select {
+  width: 100%;
+  padding: 0.75rem 2.75rem 0.75rem 1.25rem;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.aqa-filters-card .filter-select:hover { border-color: rgba(59, 130, 246, 0.3); }
+.aqa-filters-card .filter-select:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.aqa-filters-card .filter-select option {
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.aqa-filters-card .filter-chevron {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.15rem;
+  height: 1.15rem;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  transition: color 0.2s ease;
+}
+
+.aqa-filters-card .filter-chevron svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
+  stroke-width: 2;
+  stroke: currentColor;
+}
+
+.aqa-filters-card .filter-select:focus + .filter-chevron { color: var(--blue); }
+
+/* Date range control (mirrors adm-transactions.css's .filter-date-* structure,
+   recolored blue to match this page instead of that page's green). */
+.aqa-filters-card .filter-date-range {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.aqa-filters-card .filter-date-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.75rem 0.85rem;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color-scheme: dark;
+}
+
+[data-theme="light"] .aqa-filters-card .filter-date-input {
+  color-scheme: light;
+}
+
+.aqa-filters-card .filter-date-input:hover {
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.aqa-filters-card .filter-date-input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.aqa-filters-card .filter-date-sep {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.aqa-filters-card .filter-date-clear {
+  flex-shrink: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.aqa-filters-card .filter-date-clear:hover {
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+
+.aqa-range-label {
+  margin: 0.75rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--blue);
+  text-align: left;
+}
+
+/* ── Per-queue-instance breakdown list ─────────────────────────── */
+.aqa-svc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.aqa-svc-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 0.875rem;
+  padding: 1.1rem 1.25rem;
+  transition: all 0.3s ease;
+}
+
+.aqa-svc-card:hover {
+  border-color: rgba(59, 130, 246, 0.4);
+  box-shadow: 0 6px 18px rgba(59, 130, 246, 0.1);
+}
+
+.aqa-svc-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.aqa-svc-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.aqa-queue-status-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  border-radius: 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.aqa-queue-status--completed {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--primary-color);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.aqa-queue-status--closed {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.aqa-svc-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .aqa-svc-metrics { grid-template-columns: repeat(2, 1fr); }
+}
+
+.aqa-svc-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.6rem;
+}
+
+.aqa-svc-metric-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.aqa-svc-metric-value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.aqa-load-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.25rem;
+}
+
+.aqa-load-more-btn {
+  padding: 0.6rem 1.5rem;
+  border-radius: 0.625rem;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  background: transparent;
+  color: var(--blue);
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.aqa-load-more-btn:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.6);
+}
+
+.aqa-load-more-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Empty / loading / error state ─────────────────────────────── */
+.aqa-empty-state {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.aqa-empty-state svg {
+  width: 2.25rem;
+  height: 2.25rem;
+  color: var(--text-tertiary);
+  fill: currentColor;
+  margin-bottom: 0.25rem;
+}
+
+.aqa-empty-state h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.aqa-empty-state p {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+@media (max-width: 380px) {
+  .aqa-stats-grid,
+  .aqa-svc-metrics { grid-template-columns: 1fr; }
+}

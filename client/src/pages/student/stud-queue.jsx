@@ -1,0 +1,969 @@
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+
+import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Loader2, ChevronDown, HelpCircle, MapPin, FileText, QrCode } from 'lucide-react';
+import { toast } from 'sonner';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+
+import ActionConfirmModal from "../../components/ActionConfirmModal";
+import QueueConcernModal from "../../components/QueueConcernModal";
+import QueueJoinScanner from "../../components/QueueJoinScanner";
+import StudentPageShell from "../../components/StudentPageShell";
+import FilterSelect from "../../components/FilterSelect";
+import PageHeader from "../../components/PageHeader";
+import { QueueIconNav } from "../../components/StudentSidebar";
+import { useQueue } from '../../contexts/QueueContext';
+import { useAuth } from '../../context/AuthContext';
+import { getCollegeLogo } from '../../data/collegeLogo';
+import { UNIVERSAL_QUEUE_INFO } from '../../data/universalQueue';
+import { formatCollegeLabel } from '../../utils/formatCollege';
+import api from '../../utils/api';
+
+import './stud-queue.css';
+
+export default function QueuePage() {
+  const {
+    queues,
+    availableSlots,
+    isLoading,
+    activeQueuesError,
+    availableSlotsError,
+    joinQueue,
+    leaveQueue,
+    isAlreadyInQueue,
+  } = useQueue();
+
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Track which slot/queue buttons are in-flight to prevent double-clicks
+  const [joiningSlotId, setJoiningSlotId] = useState(null);
+  const [leavingQueueId, setLeavingQueueId] = useState(null);
+
+  // ── Tabs ──────────────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState(
+    location.state?.activeTab === 'active' ? 'active' : 'available',
+  );
+
+  // Detail view state
+  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [servicesData, setServicesData] = useState([]);
+  const [concernModal, setConcernModal] = useState(null); // { slotId, serviceName }
+
+
+  // ── Filters ───────────────────────────────────────────────────────────────
+  // selectedCollege holds a department ABBREVIATION (e.g. "CCS"), matching the
+  // pattern stud-appointments.jsx uses, so it can be seeded straight from
+  // user.departmentAbbrev. 'all' == "All Colleges".
+  const [selectedCollege, setSelectedCollege] = useState('all');
+  const [selectedService, setSelectedService] = useState('all');
+  const [hasUserSetCollege, setHasUserSetCollege] = useState(false);
+
+  // Default the college filter to the student's own college once auth resolves
+  // -- same approach as stud-appointments.jsx. Only applies until the student
+  // picks a college themselves.
+  useEffect(() => {
+    if (!hasUserSetCollege && user?.departmentAbbrev) {
+      setSelectedCollege(user.departmentAbbrev);
+    }
+  }, [user?.departmentAbbrev, hasUserSetCollege]);
+
+  // Every department in the system, keyed by abbreviation. A cross-college
+  // service still belongs to one owning department, so it appears under that
+  // department's filter -- viewing a different college shows only its
+  // department-wide (cross-college) services, handled in serviceOptions /
+  // filteredSlots below.
+  const collegeOptions = useMemo(() => {
+    const seen = new Map();
+    for (const dept of servicesData) {
+      if (dept.departmentAbbrev && !seen.has(dept.departmentAbbrev)) {
+        seen.set(dept.departmentAbbrev, dept.departmentName);
+      }
+    }
+    return [...seen.entries()]
+      .map(([abbrev, name]) => ({ abbrev, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [servicesData]);
+
+  // Service names scoped to the selected college. The /services/by-department
+  // payload already contains only this student's in-scope services per dept
+  // (own dept -> all of them; other dept -> only its cross-college ones), so
+  // matching on departmentAbbrev alone gives the right set.
+  const serviceOptions = useMemo(() => {
+    const names = [
+      ...new Set(
+        servicesData.flatMap((dept) =>
+          (dept.services ?? [])
+            .filter(
+              (s) =>
+                selectedCollege === 'all' ||
+                dept.departmentAbbrev === selectedCollege,
+            )
+            .map((s) => s.serviceName),
+        ),
+      ),
+    ].sort();
+    return names;
+  }, [servicesData, selectedCollege]);
+
+  // Reset service filter when college changes
+  useEffect(() => {
+    setSelectedService('all');
+  }, [selectedCollege]);
+
+  // Sync selectedSlot from live availableSlots on each poll.
+  // If the student just joined this slot it will appear in queues, so
+  // navigate back to the list immediately instead of re-asserting the slot.
+  useEffect(() => {
+    if (!selectedSlot) return;
+    if (isAlreadyInQueue(selectedSlot.slotId)) {
+      setSelectedSlot(null);
+      return;
+    }
+    const fresh = availableSlots.find((s) => s.slotId === selectedSlot.slotId);
+    if (fresh) {
+      setSelectedSlot(fresh);
+    } else {
+      // The slot dropped out of the available list entirely (e.g. its hours
+      // just ended) while the student was reading its details -- tell them
+      // why instead of silently snapping back to the list.
+      toast.message('This queue is no longer available.');
+      setSelectedSlot(null);
+    }
+  }, [availableSlots, selectedSlot, isAlreadyInQueue]);
+
+  // Filter available slots client-side. The /queues/available payload is
+  // already scoped server-side to this student's own department OR any
+  // cross-college service, so matching departmentAbbrev alone yields:
+  // own college -> all its live queues; other college -> only its
+  // department-wide (cross-college) live queues.
+  const filteredSlots = useMemo(
+    () =>
+      availableSlots.filter((slot) => {
+        const collegeMatch =
+          selectedCollege === 'all' ||
+          slot.departmentAbbrev === selectedCollege;
+        const serviceMatch =
+          selectedService === 'all'
+            ? true
+            : selectedService === '__universal__'
+              ? slot.isUniversal
+              : slot.serviceName === selectedService;
+        const notAlreadyJoined = !isAlreadyInQueue(slot.slotId);
+        return collegeMatch && serviceMatch && notAlreadyJoined;
+      }),
+    [availableSlots, selectedCollege, selectedService, isAlreadyInQueue],
+  );
+
+  // ── Fetch services data for requirements lookup ───────────────────────────
+  // Refetched every time a queue's detail view is opened (not just on mount)
+  // so newly created services/requirements show up immediately instead of
+  // relying on a stale mount-time snapshot.
+  const [servicesLoading, setServicesLoading] = useState(true);
+
+  const fetchServices = useCallback(async () => {
+    setServicesLoading(true);
+    try {
+      const { data } = await api.get('/student/services/by-department');
+      setServicesData(data.departments ?? []);
+    } catch (err) {
+      // requirements fall back to generic defaults, but still log for debuggability
+      console.error('Fetch services error:', err);
+    } finally {
+      setServicesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchServices();
+  }, [fetchServices]);
+
+  // Match a joined service by its stable id -- for a Universal Service Queue
+  // card the display name is a synthetic label that never name-matches.
+  const findSvc = (serviceId) => {
+    for (const dept of servicesData) {
+      const svc = dept.services?.find((s) => s.serviceId === serviceId);
+      if (svc) return svc;
+    }
+    return null;
+  };
+  const isServiceKnown = (serviceId) => !!findSvc(serviceId);
+
+  // For a Universal Service Queue card, attach each pickable service's real
+  // requirements/steps (from the already-fetched /services/by-department data)
+  // so the join popup can preview them. Non-universal card -> null (an empty
+  // array would flip the modal into "must pick a service" mode).
+  const buildUniversalServices = (slot) =>
+    slot.isUniversal
+      ? (slot.universalServices ?? []).map((u) => {
+          const m = findSvc(u.serviceId);
+          return { ...u, requirements: m?.requirements ?? [], procedureSteps: m?.procedureSteps ?? [] };
+        })
+      : null;
+
+  // ── Actions ───────────────────────────────────────────────────────────────
+  // Refs (not just the mirroring state below) so a fast double-click can't
+  // slip past the guard before React re-renders with the disabled button --
+  // state reads inside a callback can be one render stale, refs can't.
+  const joiningSlotIdRef = useRef(null);
+  const leavingQueueIdRef = useRef(null);
+
+  // Scanning is now the only way in (2026-09-30 panel review). `scanTarget`
+  // carries whatever had to be decided BEFORE the camera opens, so that the
+  // scan itself can commit instantly with no extra confirmation:
+  //   - a Universal Service Queue needs the specific service picked, since
+  //     the server rejects a universal join without one
+  //   - notes stay optional and can also be edited later from the status page
+  // null = scanner closed.
+  const [scanTarget, setScanTarget] = useState(null); // { serviceId, notes }
+  const [scanError, setScanError] = useState('');
+
+  // No-show strike state. Fetched up-front so a blocked student is told here
+  // rather than discovering it at the counter after walking over.
+  const [blockStatus, setBlockStatus] = useState(null);
+  const refreshBlockStatus = useCallback(async () => {
+    try {
+      const res = await api.get('/student/queues/block-status');
+      setBlockStatus(res.data);
+    } catch {
+      // Non-fatal -- the server still enforces the block on join, so a
+      // failed status read just means we show no warning.
+    }
+  }, []);
+  useEffect(() => { refreshBlockStatus(); }, [refreshBlockStatus]);
+  const joiningRef = useRef(false);
+
+  const openScanner = useCallback((serviceId = null, notes = '') => {
+    setScanError('');
+    setScanTarget({ serviceId, notes });
+  }, []);
+
+  // The slot is NOT chosen here -- it's whatever queue the scanned code
+  // belongs to, resolved server-side. That's the point: a student can only
+  // join the queue whose screen they are physically standing in front of.
+  const performJoin = useCallback(
+    async (qrToken) => {
+      if (joiningRef.current) return;
+      joiningRef.current = true;
+      setJoiningSlotId('scanning');
+      setScanError('');
+      try {
+        await joinQueue(qrToken, scanTarget?.notes, scanTarget?.serviceId ?? null);
+        toast.success('Successfully joined the queue!');
+        setScanTarget(null);
+        setSelectedSlot(null);
+        setConcernModal(null);
+      } catch (err) {
+        // Shown inside the scanner sheet (not just a toast) so the student
+        // can read it while still holding the phone up to the code.
+        setScanError(err.message ?? 'Failed to join the queue. Please try again.');
+        // A refused join may itself be the block kicking in -- resync so the
+        // banner appears immediately instead of after a reload.
+        refreshBlockStatus();
+      } finally {
+        joiningRef.current = false;
+        setJoiningSlotId(null);
+      }
+    },
+    [joinQueue, scanTarget, refreshBlockStatus],
+  );
+
+  const handleLeaveQueue = useCallback(
+    async (queueId) => {
+      if (leavingQueueIdRef.current === queueId) return;
+      leavingQueueIdRef.current = queueId;
+      setLeavingQueueId(queueId);
+      try {
+        await leaveQueue(queueId);
+        toast.info('You have left the queue.');
+      } catch (err) {
+        toast.error(err.message);
+      } finally {
+        leavingQueueIdRef.current = null;
+        setLeavingQueueId(null);
+      }
+    },
+    [leaveQueue],
+  );
+
+  // ── Service detail helpers ────────────────────────────────────────────────
+  const getServiceRequirements = (serviceId) => findSvc(serviceId)?.requirements ?? [];
+  const getProcedureSteps = (serviceId) => findSvc(serviceId)?.procedureSteps ?? [];
+
+
+  // A slot is only actually joinable while it's 'open', has a free spot,
+  // and the current time falls within its posted hours -- checked in this
+  // order so the label names the real blocker instead of defaulting to
+  // "Queue Full" for a merely paused queue (hasCapacity is false for any
+  // non-open status, not just a full one).
+  const detailJoinBtnLabel = () => {
+    if (!selectedSlot) return 'Scan QR to Join';
+    if (blockStatus?.blocked) return 'Joining Paused Today';
+    if (isAlreadyInQueue(selectedSlot.slotId)) return 'Already in Queue';
+    if (selectedSlot.status === 'paused') return 'Queue Paused';
+    if (!selectedSlot.isWithinHours) return 'Currently Closed';
+    if (!selectedSlot.hasCapacity) return 'Queue Full';
+    return 'Scan QR to Join';
+  };
+
+  const detailJoinBtnDisabled = () => {
+    if (!selectedSlot) return true;
+    if (blockStatus?.blocked) return true;
+    if (isAlreadyInQueue(selectedSlot.slotId)) return true;
+    if (selectedSlot.status === 'paused') return true;
+    if (!selectedSlot.isWithinHours) return true;
+    if (!selectedSlot.hasCapacity) return true;
+    return false;
+  };
+
+  const [leaveConfirmQueue, setLeaveConfirmQueue] = useState(null);
+
+  return (
+    <StudentPageShell
+      outerClassName="qpage-with-sidebar"
+      mainClassName="qpage-main"
+      overlay={
+        <>
+          <ActionConfirmModal
+            show={leaveConfirmQueue !== null}
+            onCancel={() => setLeaveConfirmQueue(null)}
+            onConfirm={async () => { await handleLeaveQueue(leaveConfirmQueue.queueId); setLeaveConfirmQueue(null); }}
+            title="Leave Queue?"
+            message={
+              leaveConfirmQueue?.status === "serving" ? (
+                <>
+                  {leaveConfirmQueue?.arrivedAt ? (
+                    <>You are currently being served for <strong>{leaveConfirmQueue?.serviceName}</strong>.</>
+                  ) : (
+                    <>You've been called for <strong>{leaveConfirmQueue?.serviceName}</strong>.</>
+                  )}{' '}
+                  Leaving now ends your turn immediately — the staff will move on to the next student.
+                </>
+              ) : (
+                <>
+                  You are about to leave the <strong>{leaveConfirmQueue?.serviceName}</strong> queue.
+                  Leaving will permanently remove your spot — you will need to rejoin
+                  and wait from the back of the line if you change your mind.
+                </>
+              )
+            }
+            icon={<XCircle width={22} height={22} />}
+            cancelText="Stay in Queue"
+            confirmText={leavingQueueId === leaveConfirmQueue?.queueId ? "Leaving…" : "Leave Queue"}
+            confirmDisabled={leavingQueueId === leaveConfirmQueue?.queueId}
+            accentTheme="blue"
+          />
+          {/* Only shown for a Universal Service Queue now, where picking the
+              specific service is mandatory before the scan. A normal queue
+              goes straight to the camera -- see openScanner. */}
+          <QueueConcernModal
+            show={concernModal !== null}
+            onCancel={() => setConcernModal(null)}
+            onConfirm={(notes, serviceId) => {
+              setConcernModal(null);
+              openScanner(serviceId, notes);
+            }}
+            universalServices={concernModal?.isUniversal ? (concernModal?.universalServices ?? null) : null}
+            title="What's your concern?"
+            message={
+              concernModal?.isUniversal ? (
+                <>
+                  Joining the <strong>Universal Service Queue</strong>. Pick the specific service
+                  you need, then let the staff know why you're here. You'll scan the office's QR
+                  code next.
+                </>
+              ) : (
+                <>
+                  Joining the queue for <strong>{concernModal?.serviceName}</strong>. Let the staff know why you're here — this step is optional.
+                </>
+              )
+            }
+            confirmText="Continue to Scan"
+            submitting={false}
+          />
+          <QueueJoinScanner
+            open={scanTarget !== null}
+            onClose={() => { setScanTarget(null); setScanError(''); }}
+            onScanned={performJoin}
+            submitting={joiningSlotId === 'scanning'}
+            errorMessage={scanError}
+          />
+        </>
+      }
+    >
+        <div className="queue-page">
+
+          {/* Header */}
+          <PageHeader
+            breadcrumb={
+              selectedSlot ? (
+                <button className="breadcrumb-link" onClick={() => setSelectedSlot(null)}>
+                  <ChevronLeft className="breadcrumb-icon" />
+                  Queues
+                </button>
+              ) : (
+                <Link to="/student/dashboard" className="breadcrumb-link">
+                  <ChevronLeft className="breadcrumb-icon" />
+                  Home
+                </Link>
+              )
+            }
+            icon={<Users className="icon" />}
+            title={selectedSlot ? 'Queue Details' : 'Queues'}
+            subtitle="Join queues and track your position in real-time."
+            headerClassName="queue-header"
+            breadcrumbClassName="page-breadcrumb"
+            titleSectionClassName="queue-title-section"
+            iconClassName="queue-title-icon"
+            titleClassName="queue-title"
+            subtitleClassName="queue-subtitle"
+          />
+
+          {/* Told here rather than at the counter: a student who walks to the
+              office only to be refused has wasted a trip. */}
+          {blockStatus?.blocked && (
+            <div className="queue-block-banner" role="alert">
+              <AlertCircle className="queue-block-banner-icon" />
+              <div>
+                <strong>Queue joining is paused for today.</strong>
+                <p>
+                  You were marked as a no-show {blockStatus.strikes} times today. Ask the staff
+                  at the counter to lift this if you need to join a queue.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ── DETAIL VIEW ── */}
+          {selectedSlot && (
+            <div className="avail-services-details-section">
+              {/* Hero */}
+              <div className="avail-services-service-hero">
+                <div className="avail-services-hero-content">
+                  <div className="avail-services-hero-logo">
+                    <img
+                      src={getCollegeLogo(selectedSlot.departmentName)}
+                      alt={selectedSlot.departmentName}
+                    />
+                  </div>
+                  <div className="avail-services-hero-text">
+                    <div className="avail-services-hero-title">
+                      <p className="avail-services-hero-service-name">{selectedSlot.serviceName}</p>
+                      <p>{selectedSlot.departmentName}</p>
+                    </div>
+                    <div className="avail-services-hero-meta-row">
+                      <div className="avail-services-service-hero-meta">
+                        <Users className="avail-services-service-hero-icon" />
+                        <span>{selectedSlot.waitingCount} currently waiting</span>
+                      </div>
+                      {selectedSlot.location && (
+                        <div className="avail-services-service-hero-meta">
+                          <MapPin className="avail-services-service-hero-icon" />
+                          <span>{selectedSlot.location}</span>
+                        </div>
+                      )}
+                      {selectedSlot.voidTimeoutMinutes != null && (
+                        <div className="avail-services-service-hero-meta">
+                          <AlertCircle className="avail-services-service-hero-icon" />
+                          <span>Void after {selectedSlot.voidTimeoutMinutes} min if you don't show up when called.</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* CTA */}
+              <div className="avail-services-cta-card">
+                <div className="avail-services-cta-content">
+                  <h3>Ready to join this queue?</h3>
+                  <p>Make sure you have all the requirements before joining the queue.</p>
+                </div>
+                <button
+                  className="avail-services-queue-btn"
+                  onClick={() =>
+                    selectedSlot.isUniversal
+                      ? setConcernModal({ slotId: selectedSlot.slotId, serviceName: selectedSlot.serviceName, isUniversal: true, universalServices: buildUniversalServices(selectedSlot) })
+                      : openScanner()
+                  }
+                  disabled={detailJoinBtnDisabled()}
+                >
+                  <QrCode className="avail-services-queue-btn-icon" />
+                  {detailJoinBtnLabel()}
+                </button>
+              </div>
+
+              {/* About this Service */}
+              {(selectedSlot.isUniversal || selectedSlot.description) && (
+                <div className="avail-services-details-card">
+                  <div className="avail-services-details-card-header">
+                    <h3 className="avail-services-details-card-title">
+                      <FileText className="avail-services-details-card-icon" /> About this Service
+                    </h3>
+                  </div>
+                  <div className="avail-services-details-card-content">
+                    <p className="avail-services-details-card-text">
+                      {selectedSlot.isUniversal ? UNIVERSAL_QUEUE_INFO.description : selectedSlot.description}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Requirements + Procedure */}
+              <div className="avail-services-details-grid">
+                {/* Requirements */}
+                <div className="avail-services-details-card">
+                  <div className="avail-services-details-card-header">
+                    <h3 className="avail-services-details-card-title">
+                      <CheckCircle2 className="avail-services-details-card-icon" /> Requirements
+                    </h3>
+                  </div>
+                  <div className="avail-services-details-card-content">
+                    {(() => {
+                      const reqs = selectedSlot.isUniversal
+                        ? UNIVERSAL_QUEUE_INFO.requirements
+                        : getServiceRequirements(selectedSlot.serviceId);
+                      if (reqs.length === 0 && servicesLoading && !isServiceKnown(selectedSlot.serviceId)) {
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
+                            <Loader2 style={{ width: '1.125rem', height: '1.125rem', animation: 'spin 1s linear infinite' }} />
+                            Loading requirements…
+                          </div>
+                        );
+                      }
+                      return reqs.length > 0 ? (
+                        <ul className="avail-services-requirements-list">
+                          {reqs.map((req) => (
+                            <li key={req.id} className="avail-services-requirement-item">
+                              <CheckCircle2 className="avail-services-requirement-icon" />
+                              <div>
+                                <div className="avail-services-requirement-name-row">
+                                  <span>{req.name}</span>
+                                  <span className={`avail-services-requirement-badge ${req.isMandatory ? 'is-mandatory' : 'is-optional'}`}>
+                                    {req.isMandatory ? 'Required' : 'Optional'}
+                                  </span>
+                                </div>
+                                {req.description && (
+                                  <p style={{ fontSize: '0.75rem', opacity: 0.65, marginTop: '2px' }}>
+                                    {req.description}
+                                  </p>
+                                )}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p style={{ fontSize: '0.9rem', color: 'var(--text-tertiary)', margin: 0 }}>
+                          No specific requirements have been defined for this service yet. Contact the office for details.
+                        </p>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* Procedure */}
+                <div className="avail-services-details-card">
+                  <div className="avail-services-details-card-header">
+                    <h3 className="avail-services-details-card-title">
+                      <HelpCircle className="avail-services-details-card-icon" /> Procedure
+                    </h3>
+                  </div>
+                  <div className="avail-services-details-card-content">
+                    {(() => {
+                      const steps = selectedSlot.isUniversal
+                        ? UNIVERSAL_QUEUE_INFO.procedureSteps
+                        : getProcedureSteps(selectedSlot.serviceId);
+                      if (steps.length === 0 && servicesLoading && !isServiceKnown(selectedSlot.serviceId)) {
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
+                            <Loader2 style={{ width: '1.125rem', height: '1.125rem', animation: 'spin 1s linear infinite' }} />
+                            Loading procedure…
+                          </div>
+                        );
+                      }
+                      return steps.length > 0 ? (
+                        <ol className="avail-services-procedure-list">
+                          {steps.map((step) => (
+                            <li key={step.id} className="avail-services-procedure-item">
+                              <span className="avail-services-procedure-number">{step.stepNumber}</span>
+                              <div>
+                                <span className="avail-services-procedure-title">{step.title}</span>
+                                {step.description && (
+                                  <p style={{ fontSize: '0.75rem', opacity: 0.65, marginTop: '2px' }}>
+                                    {step.description}
+                                  </p>
+                                )}
+                              </div>
+                            </li>
+                          ))}
+                        </ol>
+                      ) : (
+                        <p style={{ fontSize: '0.9rem', color: 'var(--text-tertiary)', margin: 0 }}>
+                          No procedure steps have been defined for this service yet. Contact the office for details.
+                        </p>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── LIST VIEW ── */}
+          {!selectedSlot && (
+            <>
+              {/* Global loading / error states */}
+              {isLoading && (
+                <div className="no-queues-card">
+                  <Loader2 className="no-queues-icon" style={{ animation: 'spin 1s linear infinite' }} />
+                  <p className="no-queues-description">Loading queues…</p>
+                </div>
+              )}
+
+              {/* Tabs */}
+              {!isLoading && (
+                <div className="qp-tabs-navigation">
+                  <div className="qp-tabs-list">
+                    <button
+                      type="button"
+                      className={`qp-tab ${activeTab === 'available' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('available')}
+                    >
+                      <Users className="qp-tab-icon" /> Queues
+                      <span className="qp-tab-count">{filteredSlots.length}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`qp-tab ${activeTab === 'active' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('active')}
+                    >
+                      <Clock className="qp-tab-icon" /> Participating Queues
+                      <span className="qp-tab-count">{queues.length}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* My Active Queues */}
+              {!isLoading && activeTab === 'active' && (
+                <>
+                  {activeQueuesError ? (
+                    <div className="no-queues-card">
+                      <AlertCircle className="no-queues-icon" />
+                      <h3 className="no-queues-title">Something went wrong</h3>
+                      <p className="no-queues-description">{activeQueuesError}</p>
+                    </div>
+                  ) : queues.length > 0 ? (
+                    <div className="queues-list">
+                      {queues.map((queue) => (
+                      <div
+                        key={queue.queueId}
+                        className="queue-card active-queue-card"
+                        onClick={() => navigate('/student/queue-status', { state: { queueId: queue.queueId, fromQueue: true } })}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <div className="qp-card-content">
+                          <div className="qp-left">
+                            <img
+                              src={getCollegeLogo(queue.departmentName)}
+                              alt={queue.departmentName}
+                              className="qp-college-logo"
+                            />
+                            <div className="qp-info">
+                              <div className="qp-header-row">
+                                <div>
+                                  <h3 className="qp-service-name">{queue.serviceName}</h3>
+                                  <p className="qp-college-name">{queue.departmentName}</p>
+                                </div>
+                                <span className="qp-number-badge">{queue.queueNumberBadge}</span>
+                              </div>
+                              {queue.slotStatus === "paused" && (
+                                <div
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "0.35rem",
+                                    background: "rgba(245, 158, 11, 0.12)",
+                                    border: "1px solid rgba(245, 158, 11, 0.4)",
+                                    color: "#f59e0b",
+                                    borderRadius: "999px",
+                                    padding: "0.2rem 0.65rem",
+                                    fontSize: "0.75rem",
+                                    fontWeight: 600,
+                                    margin: "0.5rem 0",
+                                  }}
+                                >
+                                  <AlertCircle style={{ width: "0.9rem", height: "0.9rem" }} />
+                                  Paused{queue.slotPauseReason ? `: ${queue.slotPauseReason}` : ""}
+                                </div>
+                              )}
+                              {queue.slotStatus === "full" && (
+                                <div
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "0.35rem",
+                                    background: "rgba(59, 130, 246, 0.1)",
+                                    border: "1px solid rgba(59, 130, 246, 0.35)",
+                                    color: "#3b82f6",
+                                    borderRadius: "999px",
+                                    padding: "0.2rem 0.65rem",
+                                    fontSize: "0.75rem",
+                                    fontWeight: 600,
+                                    margin: "0.5rem 0",
+                                  }}
+                                >
+                                  <AlertCircle style={{ width: "0.9rem", height: "0.9rem" }} />
+                                  Queue Full: No longer accepting students but students within the queue will still be served.
+                                </div>
+                              )}
+                              <div className="qp-stats-grid">
+                                <div className="qp-stat">
+                                  <p className="qp-stat-label">Your Position</p>
+                                  <p className="qp-stat-value">
+                                    {queue.status === 'serving'
+                                      ? (queue.arrivedAt ? 'Being Served' : 'Called')
+                                      : queue.position}
+                                  </p>
+                                </div>
+                                <div className="qp-stat">
+                                  <p className="qp-stat-label">Total Waiting</p>
+                                  <p className="qp-stat-value">{queue.totalWaiting}</p>
+                                </div>
+                                <div
+                                  className={`qp-stat${
+                                    queue.status === 'serving' ? ' qp-stat--serving' : ''
+                                  }`}
+                                >
+                                  <p className="qp-stat-label">Est. Wait Time</p>
+                                  <p className="qp-stat-value-sm">{queue.estimatedWait}</p>
+                                </div>
+                                <div className="qp-stat">
+                                  <p className="qp-stat-label">Joined At</p>
+                                  <p className="qp-stat-value-sm">{queue.joinedAt}</p>
+                                </div>
+                              </div>
+                              <button
+                                className="queue-leave-btn"
+                                onClick={(e) => { e.stopPropagation(); setLeaveConfirmQueue({ queueId: queue.queueId, serviceName: queue.serviceName, status: queue.status, arrivedAt: queue.arrivedAt }); }}
+                                disabled={leavingQueueId === queue.queueId}
+                                title="Leave this queue"
+                                type="button"
+                                aria-label={`Leave queue for ${queue.serviceName}`}
+                              >
+                                {leavingQueueId === queue.queueId ? (
+                                  <Loader2 className="icon" style={{ animation: 'spin 1s linear infinite' }} />
+                                ) : (
+                                  <XCircle className="icon" />
+                                )}
+                                <span className="leave-text">
+                                  {leavingQueueId === queue.queueId ? 'Leaving…' : 'Leave Queue'}
+                                </span>
+                              </button>
+                              {queue.voidTimeoutMinutes != null && !(queue.status === 'serving' && queue.arrivedAt) && (
+                                <div className="qp-void-warning">
+                                  <AlertCircle className="qp-void-warning-icon" />
+                                  <span>
+                                    {queue.status === 'serving'
+                                      ? `Arrive within ${queue.voidTimeoutMinutes} min of being called or your ticket will be voided.`
+                                      : `If called, arrive within ${queue.voidTimeoutMinutes} min or your ticket will be voided.`}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    </div>
+                  ) : (
+                    <div className="no-queues-card">
+                      <CheckCircle2 className="no-queues-icon" />
+                      <h3 className="no-queues-title">Not Participating in Any Queues</h3>
+                      <p className="no-queues-description">
+                        You are not participating in any active queues.
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Filters + Available Queues */}
+              {!isLoading && activeTab === 'available' && (
+                <>
+                  {availableSlotsError && (
+                    <div className="no-queues-card">
+                      <AlertCircle className="no-queues-icon" />
+                      <h3 className="no-queues-title">Something went wrong</h3>
+                      <p className="no-queues-description">{availableSlotsError}</p>
+                    </div>
+                  )}
+                  <div className="filters-card">
+                    <div className="filters-header">
+                      <h3 className="filters-title">Queues Filter</h3>
+                      <p className="filters-description">
+                        Select a queue to view service details and join.
+                      </p>
+                    </div>
+                    <div className="filters-grid">
+                      <FilterSelect
+                        id="college-select"
+                        label="College"
+                        value={selectedCollege}
+                        onChange={(e) => { setSelectedCollege(e.target.value); setHasUserSetCollege(true); }}
+                        ariaLabel="Filter by college"
+                        options={[{ value: "all", label: "All Colleges" }, ...collegeOptions.map((college) => ({
+                          value: college.abbrev,
+                          label: formatCollegeLabel(college.abbrev, college.name),
+                        }))]}
+                        chevronIcon={<ChevronDown className="filter-chevron" />}
+                      />
+                      <FilterSelect
+                        id="service-select"
+                        label="Service"
+                        value={selectedService}
+                        onChange={(e) => setSelectedService(e.target.value)}
+                        ariaLabel="Filter by service"
+                        options={[
+                          { value: "all", label: "All Services" },
+                          { value: "__universal__", label: "Universal Service Queue" },
+                          ...serviceOptions.map((service) => ({ value: service, label: service })),
+                        ]}
+                        chevronIcon={<ChevronDown className="filter-chevron" />}
+                      />
+                    </div>
+                  </div>
+
+                  {filteredSlots.length > 0 ? (
+                    <div className="available-queues-list">
+                      {filteredSlots.map((slot) => {
+                        // No per-card "joining" state any more -- the scanner
+                        // overlay owns that, since the slot isn't known until
+                        // the code is decoded.
+                        const isPaused = slot.status === 'paused';
+                        const atCapacity = !slot.hasCapacity;
+                        const outsideHours = !slot.isWithinHours;
+
+                        return (
+                          <div
+                            key={slot.slotId}
+                            className="queue-card available-queue-card"
+                            onClick={() => { setSelectedSlot(slot); fetchServices(); }}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <div className="qp-card-content">
+                              <div className="qp-left">
+                                <div className="qp-logo-wrapper">
+                                  <img
+                                    src={getCollegeLogo(slot.departmentName)}
+                                    alt={slot.departmentName}
+                                    className="qp-college-logo-sm"
+                                  />
+                                </div>
+                                <div className="qp-info">
+                                  <div className="qp-header-row">
+                                    <div>
+                                      <h3 className="qp-service-name">{slot.serviceName}</h3>
+                                      <p className="qp-college-name">{slot.departmentName}</p>
+                                    </div>
+                                    <span className={`queue-status-badge ${isPaused ? 'queue-status-badge--paused' : atCapacity ? 'queue-status-badge--full' : ''}`}>
+                                      {isPaused ? 'Paused' : outsideHours ? 'Closed' : atCapacity ? 'Full' : 'Open'}
+                                    </span>
+                                  </div>
+                                  <div className="queue-details-grid">
+                                    <div className="queue-detail-item">
+                                      <div className="detail-icon waiting">
+                                        <Users className="icon" />
+                                      </div>
+                                      <div>
+                                        <p className="detail-label">Waiting</p>
+                                        <p className="detail-value">{slot.waitingCount}</p>
+                                      </div>
+                                    </div>
+                                    <div className="queue-detail-item">
+                                      <div className="detail-icon time">
+                                        <Clock className="icon" />
+                                      </div>
+                                      <div>
+                                        <p className="detail-label">Avg Wait</p>
+                                        <p className="detail-value">{slot.avgWaitTime}</p>
+                                      </div>
+                                    </div>
+                                    <div className="queue-detail-item">
+                                      <div className="detail-icon serving">
+                                        <CheckCircle2 className="icon" />
+                                      </div>
+                                      <div>
+                                        <p className="detail-label">Now Serving</p>
+                                        <p className="detail-value">{slot.currentlyServing}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              <button
+                                className={`queue-join-btn ${(isPaused || outsideHours || atCapacity) ? 'disabled' : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // Universal queues still need the service
+                                  // picked first; everything else goes
+                                  // straight to the camera.
+                                  if (slot.isUniversal) {
+                                    setConcernModal({ slotId: slot.slotId, serviceName: slot.serviceName, isUniversal: true, universalServices: buildUniversalServices(slot) });
+                                  } else {
+                                    openScanner();
+                                  }
+                                }}
+                                disabled={isPaused || outsideHours || atCapacity || !!blockStatus?.blocked}
+                                type="button"
+                                aria-label={
+                                  isPaused
+                                    ? `Queue for ${slot.serviceName} is paused`
+                                    : outsideHours
+                                    ? `Queue for ${slot.serviceName} is closed for today`
+                                    : atCapacity
+                                    ? `Queue for ${slot.serviceName} is full`
+                                    : `Scan QR to join the queue for ${slot.serviceName}`
+                                }
+                              >
+                                {blockStatus?.blocked ? (
+                                  'Joining Paused Today'
+                                ) : isPaused ? (
+                                  'Queue Paused'
+                                ) : outsideHours ? (
+                                  'Currently Closed'
+                                ) : atCapacity ? (
+                                  'Queue Full'
+                                ) : (
+                                  <>
+                                    <QrCode className="queue-join-btn-icon" />
+                                    Scan QR to Join
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="no-queues-card">
+                      <div className="no-queues-icon">
+                        <QueueIconNav />
+                      </div>
+                      <h3 className="no-queues-title">No Active Queues</h3>
+                      <p className="no-queues-description">
+                        {(selectedCollege !== 'all' || selectedService !== 'all')
+                          ? 'Try adjusting your filters.'
+                          : 'There are no open queues yet.'}
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </div>
+    </StudentPageShell>
+  );
+}

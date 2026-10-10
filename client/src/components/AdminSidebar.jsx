@@ -1,0 +1,386 @@
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import {
+  Megaphone as LucideMegaphone,
+  FileText as LucideFileText,
+  Lightbulb,
+} from "lucide-react";
+
+import { useAuth } from "../context/AuthContext";
+import LogoutConfirmModal from "./LogoutConfirmModal";
+import TutorialTour from "./TutorialTour";
+import { applyTheme, getSavedTheme } from "../utils/theme";
+import useEdgeSwipeOpen from "../hooks/useEdgeSwipeOpen";
+import NotificationBell from "./NotificationBell";
+
+import ucLogo from "../assets/Pnc-Logo.png";
+import oamsLogo from "../assets/oams_logo.png";
+
+import "./AdminSidebar.css";
+import { loginPathForRole } from "../utils/loginPaths";
+
+// ─── Sidebar Icons ────────────────────────────────────────────────────────────
+const HomeIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+  </svg>
+);
+const QueueIconNav = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+    <circle cx="9" cy="7" r="4"></circle>
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+  </svg>
+);
+const CalendarIconNav = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+    <line x1="16" y1="2" x2="16" y2="6"></line>
+    <line x1="8" y1="2" x2="8" y2="6"></line>
+    <line x1="3" y1="10" x2="21" y2="10"></line>
+  </svg>
+);
+const FileTextNavIcon = () => <LucideFileText />;
+const MegaphoneNavIcon = () => <LucideMegaphone />;
+const HistoryIconNav = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+    <line x1="8" y1="11" x2="16" y2="11"></line>
+    <line x1="8" y1="15" x2="12" y2="15"></line>
+  </svg>
+);
+const LogOutIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+    <polyline points="16 17 21 12 16 7"></polyline>
+    <line x1="21" y1="12" x2="9" y2="12"></line>
+  </svg>
+);
+const MenuIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="3" y1="6" x2="21" y2="6"></line>
+    <line x1="3" y1="12" x2="21" y2="12"></line>
+    <line x1="3" y1="18" x2="21" y2="18"></line>
+  </svg>
+);
+const CloseIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+);
+const UserIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+    <circle cx="12" cy="7" r="4"></circle>
+  </svg>
+);
+const SunIcon = () => (
+  <svg className="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="5"></circle>
+    <line x1="12" y1="1" x2="12" y2="3"></line>
+    <line x1="12" y1="21" x2="12" y2="23"></line>
+    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+    <line x1="1" y1="12" x2="3" y2="12"></line>
+    <line x1="21" y1="12" x2="23" y2="12"></line>
+    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+  </svg>
+);
+const MoonIcon = () => (
+  <svg className="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+  </svg>
+);
+
+// Where a clicked notification should land, by its `type`.
+const NOTIFICATION_TYPE_PATHS = {
+  queue: "/admin/queue",
+  document: "/admin/document-processing",
+  appointment: "/admin/appointments",
+  announcement: "/admin/announcements",
+};
+
+const navItems = [
+  { icon: HomeIcon, label: "Home", path: "/admin/dashboard" },
+  {
+    icon: MegaphoneNavIcon,
+    label: "Announcements",
+    path: "/admin/announcements",
+    tourId: "nav-announcements",
+  },
+  { icon: QueueIconNav, label: "Queue", path: "/admin/queue", tourId: "nav-queue" },
+  {
+    icon: CalendarIconNav,
+    label: "Appointments",
+    path: "/admin/appointments",
+    tourId: "nav-appointments",
+  },
+  {
+    icon: FileTextNavIcon,
+    label: "Documents",
+    path: "/admin/document-processing",
+    tourId: "nav-documents",
+  },
+  {
+    icon: HistoryIconNav,
+    label: "Transactions",
+    path: "/admin/transactions",
+    tourId: "nav-transactions",
+  },
+];
+
+// Sidebar-only walkthrough, same approach as the student one -- spotlights
+// each nav link in place rather than actually navigating through its page.
+const ADMIN_TOUR_STEPS = [
+  {
+    title: "Welcome to OAMS!",
+    description:
+      "Let's take a quick look at what you can do here, it'll only take a few seconds.",
+  },
+  {
+    selector: '[data-tour="nav-announcements"]',
+    title: "Post Announcements",
+    description:
+      "Publish department-wide announcements, and manage the FAQs students see on their own Announcements page.",
+  },
+  {
+    selector: '[data-tour="nav-queue"]',
+    title: "Host Queues",
+    description:
+      "Open queue lines for your department's services, and manage students waiting in real-time.",
+  },
+  {
+    selector: '[data-tour="nav-appointments"]',
+    title: "Manage Appointments",
+    description:
+      "Review, approve, and track appointment requests between students and faculty.",
+  },
+  {
+    selector: '[data-tour="nav-documents"]',
+    title: "Process Documents",
+    description:
+      "Handle incoming document requests, generate files, and track their status through to release.",
+  },
+  {
+    selector: '[data-tour="nav-transactions"]',
+    title: "Track Everything",
+    description:
+      "See the full history of every queue, appointment, and document transaction in your department.",
+  },
+];
+
+export default function AdminSidebar() {
+  const { user: authUser, logout } = useAuth();
+  const user = authUser
+    ? {
+        ...authUser,
+        college: authUser.departmentName ?? "N/A College",
+        departmentAbbrev: authUser.departmentAbbrev ?? "N/A Abbreviation",
+      }
+    : {
+        name: "Admin",
+        college: "",
+        departmentAbbrev: "",
+      };
+
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
+
+  useEdgeSwipeOpen(() => setSidebarOpen(true), !sidebarOpen);
+
+  // On mobile the nav items the tour spotlights live in the off-canvas
+  // drawer, translated out of view until opened -- see the same note in
+  // StudentSidebar.jsx. Closing the drawer again on tour-close is a no-op
+  // on desktop.
+  const startTour = () => {
+    setSidebarOpen(true);
+    setTourOpen(true);
+  };
+  const closeTour = () => {
+    setTourOpen(false);
+    setSidebarOpen(false);
+  };
+
+  useEffect(() => {
+    applyTheme(isDark ? "dark" : "light");
+  }, [isDark]);
+
+  const handleLogout = () => setShowLogoutConfirm(true);
+  const confirmLogout = () => {
+    logout();
+    navigate(loginPathForRole("admin"));
+  };
+
+  const toggleDarkMode = () => {
+    setIsDark((prev) => {
+      const next = !prev;
+      applyTheme(next ? "dark" : "light");
+      return next;
+    });
+  };
+
+  return (
+    <>
+      {/* Sidebar */}
+      <aside className={`admin-sidebar ${sidebarOpen ? "open" : ""}`}>
+        <div className="sidebar-inner">
+          <div className="sidebar-logo">
+            <Link
+              to="/admin/dashboard"
+              className="logo-container"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <img src={ucLogo} alt="UC Logo" className="logo-img" />
+              <img
+                src={oamsLogo}
+                alt="OAMS Logo"
+                className="logo-img coams-logo-img"
+              />
+            </Link>
+            <button
+              className="theme-toggle-btn"
+              onClick={toggleDarkMode}
+              aria-label="Toggle dark mode"
+              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+              {isDark ? <SunIcon /> : <MoonIcon />}
+            </button>
+            <NotificationBell
+              endpointBase="admin"
+              viewAllPath="/admin/notifications"
+              typePaths={NOTIFICATION_TYPE_PATHS}
+            />
+          </div>
+
+          <div className="sidebar-user-section">
+            <div className="user-top-row">
+              <div className="user-avatar-large">
+                <UserIcon />
+              </div>
+              <div className="user-info-content">
+                <p className="user-name-large">{user?.name ?? "Admin"}</p>
+                <span className="user-role-badge">Administrator</span>
+              </div>
+            </div>
+            <div className="user-college-wrapper">
+              <p className="user-college-text">
+                {user?.college} ({user?.departmentAbbrev})
+              </p>
+            </div>
+          </div>
+
+          <nav className="sidebar-nav">
+            <div className="nav-items">
+              {navItems.map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => setSidebarOpen(false)}
+                  className={`nav-item ${location.pathname === item.path ? "active" : ""}`}
+                  title={item.label}
+                  {...(item.tourId ? { "data-tour": item.tourId } : {})}
+                >
+                  <item.icon className="nav-icon-medium" />
+                  <span className={`nav-label ${item.smallLabel ? "nav-label-sm" : ""}`}>
+                    {item.label}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </nav>
+
+          <div className="sidebar-logout">
+            <button className="logout-btn" onClick={handleLogout}>
+              <LogOutIcon />
+              <span>Logout</span>
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* Mobile Header */}
+      <header className="mobile-header">
+        <div className="mobile-header-content">
+          <Link to="/admin/dashboard" className="mobile-logo">
+            <img src={ucLogo} alt="UC Logo" className="logo-img" />
+            <img
+              src={oamsLogo}
+              alt="OAMS Logo"
+              className="logo-img coams-logo-img"
+            />
+          </Link>
+          <div className="mobile-header-actions">
+            <button
+              className="theme-toggle-btn"
+              onClick={toggleDarkMode}
+              aria-label="Toggle dark mode"
+              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+              {isDark ? <SunIcon /> : <MoonIcon />}
+            </button>
+            <div className="mobile-tutorial-trigger">
+              <button
+                className="theme-toggle-btn"
+                onClick={startTour}
+                aria-label="Start a short tutorial"
+              >
+                <Lightbulb size={18} />
+              </button>
+              <span className="tutorial-trigger-tooltip">Want a short tutorial?</span>
+            </div>
+            <NotificationBell
+              endpointBase="admin"
+              viewAllPath="/admin/notifications"
+              onOpen={() => setSidebarOpen(false)}
+              typePaths={NOTIFICATION_TYPE_PATHS}
+            />
+            <button
+              className="sidebar-toggle"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              aria-label="Toggle sidebar"
+            >
+              {sidebarOpen ? <CloseIcon /> : <MenuIcon />}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Overlay (Mobile) */}
+      {sidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      {/* Floating, not squeezed into .sidebar-logo -- see the same note in
+          StudentSidebar.jsx (that row has no room to spare and a 4th icon
+          there pushed the notification bell out of view). Desktop-only. */}
+      <div className="tutorial-trigger-wrap">
+        <button
+          className="tutorial-trigger-btn"
+          onClick={startTour}
+          aria-label="Start a short tutorial"
+        >
+          <Lightbulb size={18} />
+        </button>
+        <span className="tutorial-trigger-tooltip">Want a short tutorial?</span>
+      </div>
+
+      <LogoutConfirmModal
+        show={showLogoutConfirm}
+        onConfirm={confirmLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
+
+      <TutorialTour steps={ADMIN_TOUR_STEPS} isOpen={tourOpen} onClose={closeTour} />
+    </>
+  );
+}

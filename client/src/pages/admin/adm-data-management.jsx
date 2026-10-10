@@ -1,0 +1,1216 @@
+import { useState, useEffect, useCallback } from "react";
+import { useAuth } from "../../context/AuthContext";
+import { Link } from "react-router-dom";
+import { ChevronLeft, FileText, RotateCcw } from "lucide-react";
+import "./adm-dashboard.css";
+import "./adm-data-management.css";
+import { toast } from "sonner";
+import api from "../../utils/api";
+import AdminPageShell from "../../components/AdminPageShell";
+import PageHeader from "../../components/PageHeader";
+import ActionConfirmModal from "../../components/ActionConfirmModal";
+import useLockBodyScroll from "../../hooks/useLockBodyScroll";
+const CloseIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
+// ── Page-specific icons ───────────────────────────────────────────────────────
+const DatabaseIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <ellipse cx="12" cy="5" rx="9" ry="3" />
+    <path d="M21 5v6c0 1.66-4.03 3-9 3S3 12.66 3 11V5" />
+    <path d="M21 11v6c0 1.66-4.03 3-9 3S3 18.66 3 17v-6" />
+  </svg>
+);
+const ServiceClockIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12 6 12 12 16 14" />
+  </svg>
+);
+const PlusIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+);
+const UsersIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+);
+const EditSvgIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+  </svg>
+);
+const TrashIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <path d="M10 11v6M14 11v6" />
+    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+  </svg>
+);
+const CheckIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
+
+// ── Form defaults ─────────────────────────────────────────────────────────────
+const emptyDocForm = () => ({
+  name: "",
+  description: "",
+  processingTime: "",
+  status: "active",
+  isCrossCollege: false,
+  recipientType: "students",
+  requiresCoding: false,
+});
+
+const emptyServiceForm = () => ({
+  name: "",
+  description: "",
+  isCrossCollege: false,
+  locationId: "",
+  otherLocationName: "",
+});
+
+const emptyReqForm = () => ({ name: "", description: "", isMandatory: true });
+
+// ── Main Component ────────────────────────────────────────────────────────────
+export default function AdminDataManagement() {
+  const { user: authUser } = useAuth();
+  const user = authUser
+    ? {
+        ...authUser,
+        college: authUser.departmentName ?? "N/A College",
+        departmentAbbrev: authUser.departmentAbbrev ?? "",
+      }
+    : { name: "Admin", role: "admin", college: "", departmentAbbrev: "" };
+
+  // Tabs
+  const [activeTab, setActiveTab] = useState("documents");
+
+  // ── Document Types ─────────────────────────────────────────
+  const [documentTypes, setDocumentTypes] = useState([]);
+  const [docLoading, setDocLoading] = useState(false);
+  const [docStatusFilter, setDocStatusFilter] = useState("all");
+  const [showDocModal, setShowDocModal] = useState(false);
+  useLockBodyScroll(showDocModal);
+  const [editingDoc, setEditingDoc] = useState(null);
+  const [docForm, setDocForm] = useState(emptyDocForm());
+  const [docSaving, setDocSaving] = useState(false);
+
+  // Requirements (inside doc modal)
+  const [requirements, setRequirements] = useState([]);
+  const [reqForm, setReqForm] = useState(emptyReqForm());
+  const [reqLoading, setReqLoading] = useState(false);
+  // True once the requirements list has been populated for the current modal
+  // (immediately for "add", after a successful fetch for "edit"). Submitting
+  // before this is true would send an empty list and wipe the real one.
+  const [reqLoaded, setReqLoaded] = useState(false);
+
+  // ── Service Settings ───────────────────────────────────────
+  const [serviceSettings, setServiceSettings] = useState([]);
+  const [serviceLoading, setServiceLoading] = useState(false);
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  useLockBodyScroll(showServiceModal);
+  const [editingService, setEditingService] = useState(null);
+  const [serviceForm, setServiceForm] = useState(emptyServiceForm());
+  const [serviceSaving, setServiceSaving] = useState(false);
+
+  // ── Service assignment (which faculty the office may pass this service's
+  // students to) ─────────────────────────────────────────────────────────
+  // Kept next to Service Settings because "who handles this service" is part
+  // of configuring the service, not a separate concern.
+  const [delegationsByService, setDelegationsByService] = useState({});
+  const [facultyList, setFacultyList] = useState([]);
+  const [assignTarget, setAssignTarget] = useState(null); // { serviceId, serviceName }
+  const [assignFacultyId, setAssignFacultyId] = useState("");
+  const [assignSaving, setAssignSaving] = useState(false);
+  useLockBodyScroll(!!assignTarget);
+
+  const fetchDelegations = useCallback(async () => {
+    try {
+      const res = await api.get("/admin/queue-delegations");
+      const map = {};
+      (res.data.services ?? []).forEach((s) => { map[s.serviceId] = s.delegates ?? []; });
+      setDelegationsByService(map);
+      setFacultyList(res.data.faculty ?? []);
+    } catch {
+      // Non-fatal: the services list is still usable without the assignment
+      // column, so don't block the tab on it.
+    }
+  }, []);
+
+  // Requirements & steps (inside service modal)
+  const [serviceRequirements, setServiceRequirements] = useState([]);
+  const [serviceSteps, setServiceSteps] = useState([]);
+  const [svcReqForm, setSvcReqForm] = useState({ name: "", description: "", isMandatory: true });
+  const [svcStepForm, setSvcStepForm] = useState({ title: "", description: "" });
+  const [svcReqLoading, setSvcReqLoading] = useState(false);
+  // As reqLoaded above, but covers both requirements and steps for the service
+  // modal (they load together).
+  const [svcDetailsLoaded, setSvcDetailsLoaded] = useState(false);
+
+  // Fixed premises fetched once for the Location dropdown
+  const [locations, setLocations] = useState([]);
+
+  // ── Delete confirmations ────────────────────────────────────
+  const [deleteDocTarget, setDeleteDocTarget] = useState(null);
+  const [deleteServiceTarget, setDeleteServiceTarget] = useState(null);
+
+  // ── Effects ────────────────────────────────────────────────
+  const fetchDocumentTypes = useCallback(async (status = "all") => {
+    setDocLoading(true);
+    try {
+      const params = status !== "all" ? { status } : {};
+      const { data } = await api.get("/admin/data-management/document-types", { params });
+      setDocumentTypes(data.documentTypes || []);
+    } catch {
+      toast.error("Failed to load document types.");
+    } finally {
+      setDocLoading(false);
+    }
+  }, []);
+
+  const fetchServiceTypes = useCallback(async () => {
+    setServiceLoading(true);
+    try {
+      const { data } = await api.get("/admin/data-management/service-types");
+      setServiceSettings(data.serviceTypes || []);
+    } catch {
+      toast.error("Failed to load service types.");
+    } finally {
+      setServiceLoading(false);
+    }
+  }, []);
+
+  const fetchLocations = useCallback(async () => {
+    try {
+      const { data } = await api.get("/admin/locations");
+      setLocations(data.locations || []);
+    } catch {
+      toast.error("Failed to load locations.");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "documents") fetchDocumentTypes(docStatusFilter);
+  }, [activeTab, docStatusFilter, fetchDocumentTypes]);
+
+  useEffect(() => {
+    if (activeTab === "services") {
+      fetchServiceTypes();
+      fetchLocations();
+      fetchDelegations();
+    }
+  }, [activeTab, fetchServiceTypes, fetchLocations, fetchDelegations]);
+
+  // ── Handlers: Queue delegation ─────────────────────────────
+  const handleAssignFaculty = async () => {
+    if (!assignTarget || !assignFacultyId) return;
+    setAssignSaving(true);
+    try {
+      await api.post("/admin/queue-delegations", {
+        serviceId: assignTarget.serviceId,
+        facultyId: Number(assignFacultyId),
+      });
+      toast.success("Service assigned");
+      setAssignFacultyId("");
+      await fetchDelegations();
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? "Could not assign the service");
+    } finally {
+      setAssignSaving(false);
+    }
+  };
+
+  const handleRevokeFaculty = async (delegationId) => {
+    try {
+      await api.delete(`/admin/queue-delegations/${delegationId}`);
+      toast.success("Assignment removed");
+      await fetchDelegations();
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? "Could not remove the assignment");
+    }
+  };
+
+  // ── Handlers: Document Types ───────────────────────────────
+  const openAddDocModal = () => {
+    setEditingDoc(null);
+    setDocForm(emptyDocForm());
+    setRequirements([]);
+    setReqForm(emptyReqForm());
+    setReqLoaded(true);
+    setShowDocModal(true);
+  };
+
+  const openEditDocModal = async (doc) => {
+    setEditingDoc(doc);
+    setDocForm({
+      name: doc.name,
+      description: doc.description,
+      processingTime: doc.processingTime,
+      status: doc.status,
+      isCrossCollege: !!doc.isCrossCollege,
+      recipientType: doc.recipientType || "students",
+      requiresCoding: !!doc.requiresCoding,
+    });
+    setRequirements([]);
+    setReqForm(emptyReqForm());
+    setReqLoaded(false);
+    setShowDocModal(true);
+
+    setReqLoading(true);
+    try {
+      const { data } = await api.get(`/admin/data-management/document-types/${doc.id}/requirements`);
+      setRequirements(data.requirements || []);
+      setReqLoaded(true);
+    } catch {
+      toast.error("Failed to load requirements.");
+    } finally {
+      setReqLoading(false);
+    }
+  };
+
+  const closeDocModal = () => {
+    setShowDocModal(false);
+    setEditingDoc(null);
+    setDocForm(emptyDocForm());
+    setRequirements([]);
+    setReqForm(emptyReqForm());
+    setReqLoaded(false);
+  };
+
+  const addRequirement = () => {
+    if (!reqForm.name.trim()) { toast.error("Requirement name is required."); return; }
+    setRequirements((prev) => [...prev, { ...reqForm, _tempId: Date.now() }]);
+    setReqForm(emptyReqForm());
+  };
+
+  const removeRequirement = (index) => {
+    setRequirements((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateRequirementMandatory = (index, isMandatory) => {
+    setRequirements((prev) => prev.map((r, i) => (i === index ? { ...r, isMandatory } : r)));
+  };
+
+  const handleDocSubmit = async () => {
+    const { name, description, processingTime } = docForm;
+    if (!name) {
+      toast.error("Please enter a document type name.");
+      return;
+    }
+    if (!description) {
+      toast.error("Please enter a description.");
+      return;
+    }
+    if (!processingTime) {
+      toast.error("Please enter a processing time.");
+      return;
+    }
+    setDocSaving(true);
+    try {
+      const payload = {
+        name,
+        description,
+        processingTime,
+        status: docForm.status,
+        isCrossCollege: docForm.isCrossCollege,
+        recipientType: docForm.recipientType,
+        requiresCoding: docForm.requiresCoding,
+      };
+      // Only send the requirements list once it's trustworthy (loaded from the
+      // server on edit, or always on add). Omitting the key tells the server to
+      // leave the existing rows alone rather than wiping them.
+      if (reqLoaded || !editingDoc) {
+        payload.requirements = requirements.map((r) => ({
+          name: r.name,
+          description: r.description || "",
+          isMandatory: r.isMandatory !== false,
+        }));
+      }
+
+      if (editingDoc) {
+        await api.put(`/admin/data-management/document-types/${editingDoc.id}`, payload);
+        toast.success("Document type updated.");
+      } else {
+        await api.post("/admin/data-management/document-types", payload);
+        toast.success("Document type created.");
+      }
+      closeDocModal();
+      fetchDocumentTypes(docStatusFilter);
+    } catch (err) {
+      toast.error(err?.response?.data?.error || "Failed to save document type.");
+    } finally {
+      setDocSaving(false);
+    }
+  };
+
+  const handleDeleteDoc = async (doc) => {
+    try {
+      const { data } = await api.patch(`/admin/data-management/document-types/${doc.id}/deactivate`);
+      toast.success(
+        data?.declinedCount
+          ? `Document type set inactive. ${data.declinedCount} in-progress request(s) declined.`
+          : "Document type set inactive.",
+      );
+      fetchDocumentTypes(docStatusFilter);
+    } catch (err) {
+      toast.error(err?.response?.data?.error || "Failed to set the document type inactive.");
+    } finally {
+      setDeleteDocTarget(null);
+    }
+  };
+
+  const handleReactivateDoc = async (doc) => {
+    try {
+      await api.patch(`/admin/data-management/document-types/${doc.id}/reactivate`);
+      toast.success("Document type reactivated.");
+      fetchDocumentTypes(docStatusFilter);
+    } catch (err) {
+      toast.error(err?.response?.data?.error || "Failed to reactivate the document type.");
+    }
+  };
+
+  // ── Handlers: Service Settings ─────────────────────────────
+  const openAddServiceModal = () => {
+    setEditingService(null);
+    setServiceForm(emptyServiceForm());
+    setServiceRequirements([]);
+    setServiceSteps([]);
+    setSvcReqForm({ name: "", description: "", isMandatory: true });
+    setSvcStepForm({ title: "", description: "" });
+    setSvcDetailsLoaded(true);
+    setShowServiceModal(true);
+  };
+
+  const openEditServiceModal = async (s) => {
+    setEditingService(s);
+    setServiceForm({
+      name: s.name,
+      description: s.description || "",
+      isCrossCollege: !!s.isCrossCollege,
+      locationId: s.locationId ? String(s.locationId) : "",
+      otherLocationName: "",
+    });
+    setServiceRequirements([]);
+    setServiceSteps([]);
+    setSvcReqForm({ name: "", description: "", isMandatory: true });
+    setSvcStepForm({ title: "", description: "" });
+    setSvcDetailsLoaded(false);
+    setShowServiceModal(true);
+
+    setSvcReqLoading(true);
+    try {
+      const [reqRes, stepRes] = await Promise.all([
+        api.get(`/admin/data-management/service-types/${s.id}/requirements`),
+        api.get(`/admin/data-management/service-types/${s.id}/steps`),
+      ]);
+      setServiceRequirements(reqRes.data.requirements || []);
+      setServiceSteps(stepRes.data.steps || []);
+      setSvcDetailsLoaded(true);
+    } catch {
+      toast.error("Failed to load service details.");
+    } finally {
+      setSvcReqLoading(false);
+    }
+  };
+
+  const closeServiceModal = () => {
+    setShowServiceModal(false);
+    setEditingService(null);
+    setServiceForm(emptyServiceForm());
+    setServiceRequirements([]);
+    setServiceSteps([]);
+    setSvcReqForm({ name: "", description: "", isMandatory: true });
+    setSvcStepForm({ title: "", description: "" });
+    setSvcDetailsLoaded(false);
+  };
+
+  const addServiceRequirement = () => {
+    if (!svcReqForm.name.trim()) { toast.error("Requirement name is required."); return; }
+    setServiceRequirements((prev) => [...prev, { ...svcReqForm, _tempId: Date.now() }]);
+    setSvcReqForm({ name: "", description: "", isMandatory: true });
+  };
+
+  const removeServiceRequirement = (index) => {
+    setServiceRequirements((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const addServiceStep = () => {
+    if (!svcStepForm.title.trim()) { toast.error("Step title is required."); return; }
+    setServiceSteps((prev) => [...prev, { ...svcStepForm, stepNumber: prev.length + 1, _tempId: Date.now() }]);
+    setSvcStepForm({ title: "", description: "" });
+  };
+
+  const removeServiceStep = (index) => {
+    setServiceSteps((prev) =>
+      prev.filter((_, i) => i !== index).map((s, i) => ({ ...s, stepNumber: i + 1 }))
+    );
+  };
+
+  const handleServiceSubmit = async () => {
+    const { name } = serviceForm;
+    if (!name) {
+      toast.error("Service name is required.");
+      return;
+    }
+    if (serviceForm.locationId === "__other__" && !serviceForm.otherLocationName.trim()) {
+      toast.error("Please type a location name.");
+      return;
+    }
+    setServiceSaving(true);
+    try {
+      let locationId = serviceForm.locationId || null;
+      if (locationId === "__other__") {
+        const { data } = await api.post("/admin/locations", {
+          name: serviceForm.otherLocationName.trim(),
+        });
+        locationId = data.id;
+        setLocations((prev) => [...prev, data]);
+      }
+
+      const payload = {
+        name: serviceForm.name,
+        description: serviceForm.description,
+        isCrossCollege: serviceForm.isCrossCollege,
+        locationId,
+      };
+
+      let serviceId;
+      if (editingService) {
+        await api.put(`/admin/data-management/service-types/${editingService.id}`, payload);
+        serviceId = editingService.id;
+        toast.success("Service updated.");
+      } else {
+        const { data } = await api.post("/admin/data-management/service-types", payload);
+        serviceId = data.id;
+        toast.success("Service created.");
+      }
+
+      // Only replace requirements/steps once they've actually loaded (on edit)
+      // -- otherwise the modal's brief empty state would blow away the real
+      // rows. On add there's nothing to lose, so always send.
+      if (svcDetailsLoaded || !editingService) {
+        await Promise.all([
+          api.put(`/admin/data-management/service-types/${serviceId}/requirements`, {
+            requirements: serviceRequirements.map((r) => ({
+              name: r.name,
+              description: r.description || "",
+              isMandatory: r.isMandatory !== false,
+            })),
+          }),
+          api.put(`/admin/data-management/service-types/${serviceId}/steps`, {
+            steps: serviceSteps.map((s) => ({
+              stepNumber: s.stepNumber,
+              title: s.title,
+              description: s.description || "",
+            })),
+          }),
+        ]);
+      }
+
+      closeServiceModal();
+      fetchServiceTypes();
+    } catch (err) {
+      toast.error(err?.response?.data?.error || "Failed to save service.");
+    } finally {
+      setServiceSaving(false);
+    }
+  };
+
+  const handleDeleteService = async (s) => {
+    try {
+      await api.delete(`/admin/data-management/service-types/${s.id}`);
+      toast.success("Service deleted.");
+      fetchServiceTypes();
+    } catch (err) {
+      toast.error(err?.response?.data?.error || "Failed to delete service.");
+    } finally {
+      setDeleteServiceTarget(null);
+    }
+  };
+
+  // ── Filter constants ───────────────────────────────────────
+  const STATUS_FILTERS = [
+    { value: "all", label: "All" },
+    { value: "active", label: "Active" },
+    { value: "inactive", label: "Inactive" },
+  ];
+
+  // ── Render ─────────────────────────────────────────────────
+  return (
+    <AdminPageShell
+      outerClassName="admin-dashboard-with-sidebar"
+      mainClassName="admin-dashboard-main"
+      overlay={
+        <>
+          {/* ── Document Type Modal ── */}
+          {showDocModal && (
+            <div className="adm-modal-overlay">
+              <div className="adm-modal adm-modal-wide" onClick={(e) => e.stopPropagation()}>
+                <div className="adm-modal-header">
+                  <div>
+                    <h3 className="adm-modal-title">{editingDoc ? "Edit Document Type" : "Add Document Type"}</h3>
+                    <p className="adm-modal-subtitle">
+                      {editingDoc ? "Update document type details and requirements" : "Create a new document type for your department"}
+                    </p>
+                  </div>
+                  <button className="adm-modal-close-btn" onClick={closeDocModal} aria-label="Close">
+                    <CloseIcon />
+                  </button>
+                </div>
+                <div className="adm-modal-body">
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">Document Name *</label>
+                    <input
+                      className="adm-form-input"
+                      placeholder="e.g., Certificate of Grades"
+                      value={docForm.name}
+                      onChange={(e) => setDocForm((p) => ({ ...p, name: e.target.value }))}
+                    />
+                  </div>
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">Description *</label>
+                    <textarea
+                      className="adm-form-textarea"
+                      placeholder="Brief description of the document"
+                      rows={3}
+                      value={docForm.description}
+                      onChange={(e) => setDocForm((p) => ({ ...p, description: e.target.value }))}
+                    />
+                  </div>
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">Processing Time *</label>
+                    <input
+                      className="adm-form-input"
+                      placeholder="e.g., 3-5 business days"
+                      value={docForm.processingTime}
+                      onChange={(e) => setDocForm((p) => ({ ...p, processingTime: e.target.value }))}
+                    />
+                  </div>
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">Status *</label>
+                    <select
+                      className="adm-form-select"
+                      value={docForm.status}
+                      onChange={(e) => setDocForm((p) => ({ ...p, status: e.target.value }))}
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+
+                  <div className="adm-form-grid-2">
+                    <div className="adm-form-group">
+                      <label className="adm-form-label">Availability</label>
+                      <label className="adm-checkbox-wrapper">
+                        <input
+                          type="checkbox"
+                          checked={docForm.isCrossCollege}
+                          onChange={(e) => setDocForm((p) => ({ ...p, isCrossCollege: e.target.checked }))}
+                        />
+                        <span className="adm-checkbox-label">Share with all colleges</span>
+                      </label>
+                    </div>
+                    <div className="adm-form-group">
+                      <label className="adm-form-label">Available To</label>
+                      <select
+                        className="adm-form-select"
+                        value={docForm.recipientType}
+                        onChange={(e) => setDocForm((p) => ({ ...p, recipientType: e.target.value }))}
+                      >
+                        <option value="students">Students</option>
+                        <option value="faculty">Faculty</option>
+                        <option value="both">Both</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="adm-form-group">
+                    <label className="adm-checkbox-wrapper">
+                      <input
+                        type="checkbox"
+                        checked={docForm.requiresCoding}
+                        onChange={(e) => setDocForm((p) => ({ ...p, requiresCoding: e.target.checked }))}
+                      />
+                      <span className="adm-checkbox-label">
+                        Requires an official code (dean-sanctioned) before release
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* ── Document Requirements ── */}
+                  <div className="adm-req-section">
+                    <div className="adm-req-header">
+                      <h4 className="adm-req-title">Document Requirements</h4>
+                      <p className="adm-req-subtitle">List what students need to submit for this document type</p>
+                    </div>
+
+                    {reqLoading && <div className="adm-loading adm-loading-sm">Loading requirements...</div>}
+
+                    {!reqLoading && requirements.length > 0 && (
+                      <div className="adm-req-list">
+                        {requirements.map((req, idx) => (
+                          <div key={req.id || req._tempId || idx} className="adm-req-item">
+                            <div className="adm-req-item-main">
+                              <div className="adm-req-item-top">
+                                <span className="adm-req-item-name">{req.name}</span>
+                                <label className="adm-checkbox-wrapper adm-checkbox-inline">
+                                  <input
+                                    type="checkbox"
+                                    checked={req.isMandatory !== false}
+                                    onChange={(e) => updateRequirementMandatory(idx, e.target.checked)}
+                                  />
+                                  <span className="adm-checkbox-label">Mandatory</span>
+                                </label>
+                              </div>
+                              {req.description && <p className="adm-req-item-desc">{req.description}</p>}
+                            </div>
+                            <button className="adm-btn-icon adm-btn-delete" onClick={() => removeRequirement(idx)} title="Remove">
+                              <TrashIcon />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add requirement inline form */}
+                    <div className="adm-req-add-form">
+                      <div className="adm-req-add-fields">
+                        <input
+                          className="adm-form-input"
+                          placeholder="Requirement name *"
+                          value={reqForm.name}
+                          onChange={(e) => setReqForm((p) => ({ ...p, name: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addRequirement(); } }}
+                        />
+                        <input
+                          className="adm-form-input"
+                          placeholder="Description (optional)"
+                          value={reqForm.description}
+                          onChange={(e) => setReqForm((p) => ({ ...p, description: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addRequirement(); } }}
+                        />
+                        <label className="adm-checkbox-wrapper">
+                          <input
+                            type="checkbox"
+                            checked={reqForm.isMandatory}
+                            onChange={(e) => setReqForm((p) => ({ ...p, isMandatory: e.target.checked }))}
+                          />
+                          <span className="adm-checkbox-label">Mandatory</span>
+                        </label>
+                      </div>
+                      <button className="adm-btn-add-req" onClick={addRequirement} type="button">
+                        <PlusIcon /> Add Requirement
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="adm-modal-footer">
+                  <button className="adm-btn-outline" onClick={closeDocModal}>Cancel</button>
+                  <button
+                    className="adm-btn-primary"
+                    onClick={handleDocSubmit}
+                    disabled={docSaving || (editingDoc && !reqLoaded)}
+                  >
+                    {docSaving ? "Saving..." : (editingDoc ? "Update" : "Create")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Service Setting Modal ── */}
+          {showServiceModal && (
+            <div className="adm-modal-overlay">
+              <div className="adm-modal adm-modal-wide" onClick={(e) => e.stopPropagation()}>
+                <div className="adm-modal-header">
+                  <div>
+                    <h3 className="adm-modal-title">{editingService ? "Edit Service" : "Add Service"}</h3>
+                    <p className="adm-modal-subtitle">
+                      {editingService ? "Update queue service configuration" : "Create a new queue service for your department"}
+                    </p>
+                  </div>
+                  <button className="adm-modal-close-btn" onClick={closeServiceModal} aria-label="Close">
+                    <CloseIcon />
+                  </button>
+                </div>
+                <div className="adm-modal-body">
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">Service Name *</label>
+                    <input
+                      className="adm-form-input"
+                      placeholder="e.g., Enrollment Assistance"
+                      value={serviceForm.name}
+                      onChange={(e) => setServiceForm((p) => ({ ...p, name: e.target.value }))}
+                    />
+                  </div>
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">Description</label>
+                    <textarea
+                      className="adm-form-textarea"
+                      placeholder="Brief description of this service"
+                      rows={3}
+                      value={serviceForm.description}
+                      onChange={(e) => setServiceForm((p) => ({ ...p, description: e.target.value }))}
+                    />
+                  </div>
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">Location</label>
+                    <select
+                      className="adm-form-select"
+                      value={serviceForm.locationId}
+                      onChange={(e) => setServiceForm((p) => ({ ...p, locationId: e.target.value }))}
+                    >
+                      <option value="">No specific location</option>
+                      {locations.map((loc) => (
+                        <option key={loc.id} value={loc.id}>
+                          {loc.name}{loc.isGlobal ? " (Shared)" : ""}
+                        </option>
+                      ))}
+                      <option value="__other__">Other (type your own)…</option>
+                    </select>
+                    {serviceForm.locationId === "__other__" && (
+                      <input
+                        className="adm-form-input"
+                        style={{ marginTop: "8px" }}
+                        placeholder="Type the location name"
+                        value={serviceForm.otherLocationName}
+                        onChange={(e) => setServiceForm((p) => ({ ...p, otherLocationName: e.target.value }))}
+                      />
+                    )}
+                  </div>
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">Availability</label>
+                    <label className="adm-checkbox-wrapper">
+                      <input
+                        type="checkbox"
+                        checked={serviceForm.isCrossCollege}
+                        onChange={(e) => setServiceForm((p) => ({ ...p, isCrossCollege: e.target.checked }))}
+                      />
+                      <span className="adm-checkbox-label">Share with all colleges</span>
+                    </label>
+                  </div>
+
+                  {/* ── Service Requirements ── */}
+                  <div className="adm-req-section">
+                    <div className="adm-req-header">
+                      <h4 className="adm-req-title">Service Requirements</h4>
+                      <p className="adm-req-subtitle">List what students need to bring or prepare</p>
+                    </div>
+
+                    {svcReqLoading && <div className="adm-loading adm-loading-sm">Loading...</div>}
+
+                    {!svcReqLoading && serviceRequirements.length > 0 && (
+                      <div className="adm-req-list">
+                        {serviceRequirements.map((req, idx) => (
+                          <div key={req.id || req._tempId || idx} className="adm-req-item">
+                            <div className="adm-req-item-main">
+                              <div className="adm-req-item-top">
+                                <span className="adm-req-item-name">{req.name}</span>
+                                {(req.isMandatory !== false) && (
+                                  <span className="adm-badge adm-badge-mandatory">Required</span>
+                                )}
+                                {req.isMandatory === false && (
+                                  <span className="adm-badge adm-badge-optional">Optional</span>
+                                )}
+                              </div>
+                              {req.description && <p className="adm-req-item-desc">{req.description}</p>}
+                            </div>
+                            <button className="adm-btn-icon adm-btn-delete" onClick={() => removeServiceRequirement(idx)} title="Remove">
+                              <TrashIcon />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="adm-req-add-form">
+                      <div className="adm-req-add-fields">
+                        <input
+                          className="adm-form-input"
+                          placeholder="Requirement name *"
+                          value={svcReqForm.name}
+                          onChange={(e) => setSvcReqForm((p) => ({ ...p, name: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addServiceRequirement(); } }}
+                        />
+                        <input
+                          className="adm-form-input"
+                          placeholder="Description (optional)"
+                          value={svcReqForm.description}
+                          onChange={(e) => setSvcReqForm((p) => ({ ...p, description: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addServiceRequirement(); } }}
+                        />
+                        <label className="adm-checkbox-wrapper">
+                          <input
+                            type="checkbox"
+                            checked={svcReqForm.isMandatory}
+                            onChange={(e) => setSvcReqForm((p) => ({ ...p, isMandatory: e.target.checked }))}
+                          />
+                          <span className="adm-checkbox-label">Mandatory</span>
+                        </label>
+                      </div>
+                      <button className="adm-btn-add-req" onClick={addServiceRequirement} type="button">
+                        <PlusIcon /> Add Requirement
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* ── Procedure Steps ── */}
+                  <div className="adm-req-section">
+                    <div className="adm-req-header">
+                      <h4 className="adm-req-title">Procedure Steps</h4>
+                      <p className="adm-req-subtitle">Step-by-step process students will follow</p>
+                    </div>
+
+                    {!svcReqLoading && serviceSteps.length > 0 && (
+                      <div className="adm-req-list">
+                        {serviceSteps.map((step, idx) => (
+                          <div key={step.id || step._tempId || idx} className="adm-req-item">
+                            <div className="adm-req-item-main">
+                              <div className="adm-req-item-top">
+                                <span className="adm-badge adm-badge-mandatory">Step {step.stepNumber}</span>
+                                <span className="adm-req-item-name">{step.title}</span>
+                              </div>
+                              {step.description && <p className="adm-req-item-desc">{step.description}</p>}
+                            </div>
+                            <button className="adm-btn-icon adm-btn-delete" onClick={() => removeServiceStep(idx)} title="Remove">
+                              <TrashIcon />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="adm-req-add-form">
+                      <div className="adm-req-add-fields">
+                        <input
+                          className="adm-form-input"
+                          placeholder="Step title *"
+                          value={svcStepForm.title}
+                          onChange={(e) => setSvcStepForm((p) => ({ ...p, title: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addServiceStep(); } }}
+                        />
+                        <input
+                          className="adm-form-input"
+                          placeholder="Description (optional)"
+                          value={svcStepForm.description}
+                          onChange={(e) => setSvcStepForm((p) => ({ ...p, description: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addServiceStep(); } }}
+                        />
+                      </div>
+                      <button className="adm-btn-add-req" onClick={addServiceStep} type="button">
+                        <PlusIcon /> Add Step
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="adm-modal-footer">
+                  <button className="adm-btn-outline" onClick={closeServiceModal}>Cancel</button>
+                  <button
+                    className="adm-btn-primary"
+                    onClick={handleServiceSubmit}
+                    disabled={serviceSaving || (editingService && !svcDetailsLoaded)}
+                  >
+                    {serviceSaving ? "Saving..." : (editingService ? "Update" : "Add Service")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Assign this service to faculty: the office can then pass
+              students who need it to them (Queue → Manage → Pass to
+              Faculty). Same modal shell as Add Service. Removing someone
+              leaves students already passed to them in their line -- the
+              office can reassign or take those back from the queue. */}
+          {assignTarget && (
+            <div className="adm-modal-overlay">
+              <div className="adm-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="adm-modal-header">
+                  <div>
+                    <h3 className="adm-modal-title">Assign Service to Faculty</h3>
+                    <p className="adm-modal-subtitle">
+                      {assignTarget.serviceName} — the office can pass students who need this
+                      service to anyone assigned here.
+                    </p>
+                  </div>
+                  <button className="adm-modal-close-btn" onClick={() => setAssignTarget(null)} aria-label="Close">
+                    <CloseIcon />
+                  </button>
+                </div>
+
+                <div className="adm-modal-body">
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">Assigned Faculty</label>
+                    {(delegationsByService[assignTarget.serviceId]?.length ?? 0) > 0 ? (
+                      <div className="adm-assign-list">
+                        {delegationsByService[assignTarget.serviceId].map((d) => (
+                          <div key={d.delegationId} className="adm-assign-row">
+                            <span className="adm-assign-name">
+                              <UsersIcon />
+                              {d.facultyName}
+                            </span>
+                            <button
+                              type="button"
+                              className="adm-btn-icon adm-btn-delete"
+                              title="Remove assignment"
+                              onClick={() => handleRevokeFaculty(d.delegationId)}
+                            >
+                              <TrashIcon />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="adm-assign-empty">No faculty assigned to this service yet.</p>
+                    )}
+                  </div>
+
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">Add a Faculty Member</label>
+                    <select
+                      className="adm-form-select"
+                      value={assignFacultyId}
+                      onChange={(e) => setAssignFacultyId(e.target.value)}
+                    >
+                      <option value="">Select faculty…</option>
+                      {facultyList
+                        .filter((f) => !(delegationsByService[assignTarget.serviceId] ?? [])
+                          .some((d) => d.facultyId === f.faculty_id))
+                        .map((f) => (
+                          <option key={f.faculty_id} value={f.faculty_id}>{f.faculty_name}</option>
+                        ))}
+                    </select>
+                    {facultyList.length === 0 && (
+                      <p className="adm-assign-empty">No faculty are listed under this department yet.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="adm-modal-footer">
+                  <button className="adm-btn-outline" onClick={() => setAssignTarget(null)}>
+                    Close
+                  </button>
+                  <button
+                    className="adm-btn-primary"
+                    onClick={handleAssignFaculty}
+                    disabled={!assignFacultyId || assignSaving}
+                  >
+                    {assignSaving ? "Assigning..." : "Assign"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <ActionConfirmModal
+            show={!!deleteDocTarget}
+            onCancel={() => setDeleteDocTarget(null)}
+            onConfirm={() => handleDeleteDoc(deleteDocTarget)}
+            title="Set Document Type Inactive?"
+            message={deleteDocTarget && (
+              <>
+                Set <strong>{deleteDocTarget.name}</strong> inactive? Any in-progress request for
+                it will be declined, and it will be hidden from the request form. Finished records
+                keep their details, and you can reactivate it later.
+              </>
+            )}
+            confirmText="Set Inactive"
+          />
+          <ActionConfirmModal
+            show={!!deleteServiceTarget}
+            onCancel={() => setDeleteServiceTarget(null)}
+            onConfirm={() => handleDeleteService(deleteServiceTarget)}
+            title="Delete Service?"
+            message={deleteServiceTarget && <>Delete <strong>{deleteServiceTarget.name}</strong>?</>}
+            confirmText="Delete"
+          />
+        </>
+      }
+    >
+        <div className="admin-dashboard">
+
+          <PageHeader
+            breadcrumb={<Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link>}
+            icon={<DatabaseIcon />}
+            iconClassName="adm-title-icon"
+            title="Data Management"
+            subtitle={`${user?.college} (${user?.departmentAbbrev}) — Configure document types and queue services.`}
+            headerClassName="adm-page-header"
+            breadcrumbClassName="page-breadcrumb"
+            titleSectionClassName="adm-title-section"
+            titleClassName="adm-page-title"
+            subtitleClassName="adm-page-subtitle"
+          />
+
+          {/* Tabs Container */}
+          <div className="adm-tabs-container">
+            {/* Tab Bar */}
+            <div className="adm-tabs-bar">
+              <button
+                className={`adm-tab-btn ${activeTab === "documents" ? "adm-tab-active" : ""}`}
+                onClick={() => setActiveTab("documents")}
+              >
+                <span className="adm-tab-icon"><FileText /></span>
+                Document Settings
+              </button>
+              <button
+                className={`adm-tab-btn ${activeTab === "services" ? "adm-tab-active" : ""}`}
+                onClick={() => setActiveTab("services")}
+              >
+                <span className="adm-tab-icon"><ServiceClockIcon /></span>
+                Service Settings
+              </button>
+            </div>
+
+            {/* ── Document Settings Tab ── */}
+            {activeTab === "documents" && (
+              <div className="adm-tab-content">
+                <div className="adm-card-header">
+                  <div>
+                    <h2 className="adm-card-title">Document Type Management</h2>
+                    <p className="adm-card-desc">Configure available document types and requirements for {user?.departmentAbbrev}.</p>
+                  </div>
+                  <button className="adm-btn-primary" onClick={openAddDocModal}>
+                    <PlusIcon />
+                    Add Document Type
+                  </button>
+                </div>
+
+                {/* Status filter pills */}
+                <div className="adm-filter-bar">
+                  {STATUS_FILTERS.map((f) => (
+                    <button
+                      key={f.value}
+                      className={`adm-filter-pill ${docStatusFilter === f.value ? "adm-filter-pill-active" : ""}`}
+                      onClick={() => setDocStatusFilter(f.value)}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="adm-items-list">
+                  {docLoading && <div className="adm-loading">Loading document types...</div>}
+                  {!docLoading && documentTypes.length === 0 && (
+                    <p className="adm-empty-state">No document types found. Add one to get started.</p>
+                  )}
+                  {!docLoading && documentTypes.map((doc) => (
+                    <div key={doc.id} className="adm-item">
+                      <div className="adm-item-main">
+                        <div className="adm-item-top-row">
+                          <p className="adm-item-name">{doc.name}</p>
+                          <div className="adm-item-badges">
+                            <span className="adm-badge adm-badge-dept">{doc.deptAbbrev}</span>
+                            {doc.isCrossCollege && <span className="adm-badge adm-badge-global">Cross-College</span>}
+                            <span className="adm-badge adm-badge-recipient">{doc.recipientType || "students"}</span>
+                            {doc.requiresCoding && <span className="adm-badge adm-badge-global">Requires Coding</span>}
+                            <span className={`adm-badge adm-badge-status-${doc.status}`}>{doc.status}</span>
+                          </div>
+                        </div>
+                        <p className="adm-item-desc">{doc.description}</p>
+                        <div className="adm-item-meta">
+                          <span>Processing: {doc.processingTime || "—"}</span>
+                          <span>{doc.requirementCount} requirement{doc.requirementCount !== 1 ? "s" : ""}</span>
+                        </div>
+                      </div>
+                      <div className="adm-item-actions">
+                        <button className="adm-btn-icon adm-btn-edit" onClick={() => openEditDocModal(doc)} title="Edit">
+                          <EditSvgIcon />
+                        </button>
+                        {doc.status === "inactive" ? (
+                          <button className="adm-btn-icon adm-btn-edit" onClick={() => handleReactivateDoc(doc)} title="Reactivate">
+                            <RotateCcw size={16} />
+                          </button>
+                        ) : (
+                          <button className="adm-btn-icon adm-btn-delete" onClick={() => setDeleteDocTarget(doc)} title="Set inactive">
+                            <TrashIcon />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Service Settings Tab ── */}
+            {activeTab === "services" && (
+              <div className="adm-tab-content">
+                <div className="adm-card-header">
+                  <div>
+                    <h2 className="adm-card-title">Service Configuration</h2>
+                    <p className="adm-card-desc">Manage queue services for {user?.departmentAbbrev}.</p>
+                  </div>
+                  <button className="adm-btn-primary" onClick={openAddServiceModal}>
+                    <PlusIcon />
+                    Add Service
+                  </button>
+                </div>
+
+                <div className="adm-items-list">
+                  {serviceLoading && <div className="adm-loading">Loading services...</div>}
+                  {!serviceLoading && serviceSettings.length === 0 && (
+                    <p className="adm-empty-state">No services found. Add one to get started.</p>
+                  )}
+                  {!serviceLoading && serviceSettings.map((s) => (
+                    <div key={s.id} className="adm-item">
+                      <div className="adm-item-main">
+                        <div className="adm-item-top-row">
+                          <p className="adm-item-name">{s.name}</p>
+                          <div className="adm-item-badges">
+                            <span className="adm-badge adm-badge-dept">{s.deptAbbrev}</span>
+                            {s.isCrossCollege && <span className="adm-badge adm-badge-global">Cross-College</span>}
+                          </div>
+                        </div>
+                        {s.description && <p className="adm-item-desc">{s.description}</p>}
+                      </div>
+                      <div className="adm-item-actions adm-item-actions--stacked">
+                        <div className="adm-item-actions-row">
+                          <button className="adm-btn-icon adm-btn-edit" onClick={() => openEditServiceModal(s)} title="Edit">
+                            <EditSvgIcon />
+                          </button>
+                          <button className="adm-btn-icon adm-btn-delete" onClick={() => setDeleteServiceTarget(s)} title="Delete">
+                            <TrashIcon />
+                          </button>
+                        </div>
+                        {/* Which faculty the office may pass this service's
+                            students to. A labelled button rather than a bare
+                            icon -- it's a meaningful permission and should be
+                            findable at a glance. */}
+                        <button
+                          type="button"
+                          className="adm-assign-btn"
+                          onClick={() => { setAssignTarget({ serviceId: s.id, serviceName: s.name }); setAssignFacultyId(""); }}
+                        >
+                          <UsersIcon />
+                          <span>
+                            Assign Service to Faculty
+                            {(delegationsByService[s.id]?.length ?? 0) > 0 && ` (${delegationsByService[s.id].length})`}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+    </AdminPageShell>
+  );
+}

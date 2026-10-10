@@ -1,0 +1,1123 @@
+
+/* ===== DARK MODE (DEFAULT) ===== */
+:root,
+[data-theme="dark"] {
+  /* Primary Colors */
+  --primary-color: #22c55e;
+  --primary-dark: #16a34a;
+  --primary-light: #86efac;
+
+  /* Dark green theme */
+  --background: #0a0f0a;
+  --card: #111612;
+  --sidebar: #0f1510;
+
+  --foreground: #f0fdf4;
+  --card-foreground: #f0fdf4;
+
+  --secondary: #1a3a1f;
+  --muted: #1a3a1f;
+  --muted-foreground: #94a3b8;
+
+  --border: #1e3a23;
+  --input: #1a3a1f;
+  --input-background: #0f1e12;
+
+  --accent: #16532a;
+  --accent-foreground: #dcfce7;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  /* Theme Colors */
+  --dark-bg: var(--background);
+  --card-bg: var(--card);
+  --card-border: var(--border);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--foreground);
+  --text-tertiary: #94a3b8;
+
+  --sidebar-width: 14rem;
+
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: var(--destructive);
+  --blue: #3b82f6;
+  --cyan: #06b6d4;
+  --purple: #a855f7;
+  --violet: #7c3aed;
+  --pink: #ec4899;
+}
+
+/* ===== LIGHT MODE ===== */
+[data-theme="light"] {
+  /* Primary Colors - Adjusted for light mode */
+  --primary-color: #15803d;
+  --primary-dark: #166534;
+  --primary-light: #22c55e;
+
+  /* Light backgrounds */
+  --background: #f8fafc;
+  --card: #ffffff;
+  --sidebar: #f1f5f9;
+
+  --foreground: #1e293b;
+  --card-foreground: #1e293b;
+
+  --secondary: #e2e8f0;
+  --muted: #e2e8f0;
+  --muted-foreground: #64748b;
+
+  --border: #e2e8f0;
+  --input: #f1f5f9;
+  --input-background: #f8fafc;
+
+  --accent: #d1fae5;
+  --accent-foreground: #065f46;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+
+  /* Theme Colors */
+  --dark-bg: var(--background);
+  --card-bg: var(--card);
+  --card-border: var(--border);
+  --text-primary: var(--foreground);
+  --text-secondary: #334155;
+  --text-tertiary: var(--muted-foreground);
+
+  --sidebar-width: 14rem;
+
+  --success: #059669;
+  --warning: #d97706;
+  --danger: var(--destructive);
+  --blue: #2563eb;
+  --cyan: #0891b2;
+  --purple: #9333ea;
+  --violet: #6d28d9;
+  --pink: #db2777;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--dark-bg);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ===== Transactions With Sidebar Layout ===== */
+.transactions-with-sidebar {
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--dark-bg);
+  transition: background-color 0.3s ease;
+}
+
+/* ===== Main Content ===== */
+.transactions-main {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  overflow-y: auto;
+  transition: margin-left 0.3s ease;
+}
+
+.transactions-container {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+@media (max-width: 1024px) {
+  .transactions-main {
+    margin-left: 0;
+    margin-top: 4rem;
+  }
+}
+
+/* ===== Page Header ===== */
+.tx-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.transactions-container .page-breadcrumb {
+  display: flex;
+  align-items: center;
+}
+
+.tx-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.tx-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.2;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.tx-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0.25rem 0 0 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.transactions-container .breadcrumb-link,
+.transactions-container .breadcrumb-link:visited,
+.transactions-container .breadcrumb-link:active,
+.transactions-container .breadcrumb-link:focus {
+  outline: none;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 0.5rem 0.875rem 0.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-family: inherit;
+  text-decoration: none;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.transactions-container .breadcrumb-link:hover {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: var(--primary-color);
+}
+
+.transactions-container .breadcrumb-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke: currentColor;
+}
+
+/* Self-contained so it doesn't inherit box shape from stud-queue.css */
+.tx-title-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+}
+
+.tx-title-icon svg {
+  width: 1.75rem;
+  height: 1.75rem;
+  stroke: currentColor;
+}
+
+/* ===== Stats Grid ===== */
+.tx-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  width: 100%;
+}
+
+/*
+ * All .tx-stat-card rules are scoped under .transactions-container to win over
+ * the globally-loaded student-dashboard.css which also defines .tx-stat-card
+ * with hover effects, left-alignment, and a ::before green overlay.
+ */
+.transactions-container .tx-stat-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 0.875rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transition: all 0.3s ease;
+  cursor: default;
+  position: static;
+  overflow: visible;
+}
+
+/* Suppress the dashboard ::before green-glow overlay */
+.transactions-container .tx-stat-card::before {
+  content: none;
+}
+
+/* Green hover to match the page accent */
+.transactions-container .tx-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.45);
+}
+
+[data-theme="light"] .transactions-container .tx-stat-card { border-color: rgba(21, 128, 61, 0.18); }
+[data-theme="light"] .transactions-container .tx-stat-card:hover {
+  box-shadow: 0 8px 24px rgba(21, 128, 61, 0.1);
+  border-color: rgba(21, 128, 61, 0.35);
+}
+
+.transactions-container .stat-icon-box {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 0.5rem;
+  border: 1px solid transparent;
+}
+
+.transactions-container .stat-icon-box svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke: currentColor;
+}
+
+/* Selectors combine .stat-icon-box + variant class so specificity beats the
+   base ".transactions-container .stat-icon-box { border: ... transparent }"
+   rule above -- otherwise the border-color below never actually renders. */
+.transactions-container .stat-icon-box.tx-bg-blue-50 {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.08) 100%);
+  border-color: rgba(59, 130, 246, 0.2);
+  color: var(--blue);
+}
+
+.transactions-container .stat-icon-box.tx-bg-green-50 {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.08) 100%);
+  border-color: rgba(16, 185, 129, 0.2);
+  color: var(--success);
+}
+
+.transactions-container .stat-icon-box.tx-bg-orange-50 {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(249, 115, 22, 0.08) 100%);
+  border-color: rgba(249, 115, 22, 0.2);
+  color: #f97316;
+}
+
+.transactions-container .stat-icon-box.tx-bg-purple-50 {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.08) 100%);
+  border-color: rgba(34, 197, 94, 0.2);
+  color: var(--primary-color);
+}
+
+.transactions-container .tx-stat-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 0.375rem;
+  text-align: center;
+  transition: color 0.3s ease;
+}
+
+.transactions-container .tx-stat-value {
+  font-size: 2.25rem;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  width: 100%;
+  transition: color 0.3s ease;
+}
+
+.text-blue-600 {
+  color: var(--blue);
+}
+
+.text-green-600 {
+  color: var(--success);
+}
+
+.text-orange-600 {
+  color: var(--warning);
+}
+
+.text-purple-600 {
+  color: var(--primary-color);
+}
+
+@media (max-width: 1024px) {
+  .tx-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .tx-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  .transactions-container .tx-title {
+    font-size: 1.5rem;
+  }
+}
+
+/* ===== Filters Card ===== */
+/* Scoped to .transactions-container so these generic class names don't bleed
+   into/from stud-queue.css (blue) and stud-appointments.css (purple), which
+   define the same .filters-card/.filter-* class names for their own themes.
+   Document/transaction filtering uses a green accent. */
+.transactions-container .filters-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(34, 197, 94, 0.15);
+  border-radius: 1rem;
+  padding: 1rem 1.5rem 1.5rem;
+  transition: all 0.3s ease;
+}
+
+[data-theme="dark"] .transactions-container .filters-card {
+  background: linear-gradient(135deg, rgba(17, 22, 18, 0.9) 0%, rgba(15, 21, 16, 1) 100%);
+}
+
+[data-theme="light"] .transactions-container .filters-card {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.transactions-container .filters-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.transactions-container .filters-header-text {
+  display: flex;
+  flex-direction: column;
+  grid-column: 2;
+  text-align: center;
+}
+
+/* Grid placement lives on the ExportMenu wrapper, not the button itself --
+   the button isn't a direct child of .filters-header's grid once wrapped in
+   the CSV/PDF dropdown, so grid-column/justify-self on the button alone
+   would be silently ignored by the browser. */
+.transactions-container .export-menu {
+  grid-column: 3;
+  justify-self: end;
+}
+
+.transactions-container .filters-title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  font-family: "Inter", sans-serif;
+  color: var(--text-primary);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+/* Scoped to beat queue.css which sets text-align: center on .filters-description */
+.transactions-container .filters-description {
+  font-size: 0.9375rem;
+  color: var(--text-tertiary);
+  margin: 0.4rem 0 0 0;
+  transition: color 0.3s ease;
+  text-align: center;
+}
+
+.transactions-container .filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .transactions-container .filters-grid {
+    gap: 1.5rem;
+  }
+
+  .transactions-container .filters-date-section {
+    margin-top: 1.5rem;
+  }
+}
+
+.transactions-container .filters-date-section {
+  margin-top: 1rem;
+}
+
+.tx-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid var(--card-border);
+  border-radius: 0.625rem;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tx-export-btn:hover {
+  border-color: rgba(34, 197, 94, 0.4);
+  background: rgba(34, 197, 94, 0.06);
+  color: #22c55e;
+}
+
+.tx-export-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tx-export-btn svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.transactions-container .filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.transactions-container .filter-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  transition: color 0.3s ease;
+  text-align: left;
+}
+
+.transactions-container .filter-select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+/* Search group */
+.transactions-container .filter-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.transactions-container .filter-search-wrapper svg {
+  position: absolute;
+  left: 0.875rem;
+  width: 1rem;
+  height: 1rem;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  stroke: currentColor;
+  z-index: 1;
+}
+
+.transactions-container .filter-search-input {
+  width: 100%;
+  padding: 0.75rem 1.25rem 0.75rem 2.5rem;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: "Inter", sans-serif;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.transactions-container .filter-search-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.transactions-container .filter-search-input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.1);
+}
+
+[data-theme="light"] .transactions-container .filter-search-input {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #1e293b;
+}
+
+/* Select inputs */
+.transactions-container .filter-select {
+  width: 100%;
+  padding: 0.75rem 1.25rem;
+  padding-right: 2.75rem;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: "Inter", sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  outline: none;
+}
+
+.transactions-container .filter-select:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.1);
+}
+
+.transactions-container .filter-select option {
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .transactions-container .filter-select {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #1e293b;
+}
+
+[data-theme="light"] .transactions-container .filter-select option {
+  background: white;
+  color: #1e293b;
+}
+
+.transactions-container .filter-date-range {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.transactions-container .filter-date-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.75rem 0.85rem;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color-scheme: dark;
+}
+
+[data-theme="light"] .transactions-container .filter-date-input {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #1e293b;
+  color-scheme: light;
+}
+
+.transactions-container .filter-date-input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.1);
+}
+
+.transactions-container .filter-date-sep {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.transactions-container .filter-date-clear {
+  flex-shrink: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--card-border);
+  border-radius: 0.5rem;
+  color: var(--text-tertiary);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.transactions-container .filter-date-clear:hover {
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+
+.transactions-container .filter-chevron {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.transactions-container .filter-chevron svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
+  stroke-width: 2;
+  stroke: currentColor;
+}
+
+.transactions-container .filter-select:focus + .filter-chevron {
+  color: var(--primary-color);
+}
+
+@media (max-width: 768px) {
+  .transactions-container .filters-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+}
+
+/* ===== Transactions List ===== */
+.transactions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.tx-empty-state {
+  background: var(--card-bg);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 1rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.tx-empty-state svg {
+  width: 3rem;
+  height: 3rem;
+  color: var(--text-tertiary);
+  margin: 0 auto 1rem;
+  transition: color 0.3s ease;
+}
+
+.tx-empty-state h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+  transition: color 0.3s ease;
+}
+
+.tx-empty-state p {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+/* ===== Transaction Item ===== */
+.transaction-item {
+  background: var(--card-bg);
+  border: 1px solid rgba(34, 197, 94, 0.15);
+  border-radius: 0.875rem;
+  padding: 0.9rem;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.75rem;
+  align-items: start;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: default;
+  position: relative;
+  overflow: hidden;
+}
+
+.transaction-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.transaction-item:hover {
+  transform: translateY(-2px);
+}
+
+.transaction-item:hover::before {
+  opacity: 1;
+}
+
+/* Queue — blue */
+.transaction-type-queue::before {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.06) 0%, transparent 100%);
+}
+.transaction-type-queue:hover {
+  border-color: rgba(59, 130, 246, 0.3);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.1);
+}
+
+/* Document — orange */
+.transaction-type-document::before {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.06) 0%, transparent 100%);
+}
+.transaction-type-document:hover {
+  border-color: rgba(249, 115, 22, 0.3);
+  box-shadow: 0 8px 24px rgba(249, 115, 22, 0.1);
+}
+
+/* Appointment — violet/purple (matches stud-appointments.jsx theme) */
+.transaction-type-appointment::before {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.06) 0%, transparent 100%);
+}
+.transaction-type-appointment:hover {
+  border-color: rgba(168, 85, 247, 0.3);
+  box-shadow: 0 8px 24px rgba(168, 85, 247, 0.1);
+}
+
+.transaction-icon {
+  position: relative;
+  z-index: 1;
+}
+
+.icon-wrapper {
+  width: 2.15rem;
+  height: 2.15rem;
+  border-radius: 0.625rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+}
+
+.icon-wrapper svg {
+  width: 1rem;
+  height: 1rem;
+  stroke: currentColor;
+  fill: none;
+}
+
+.tx-badge-queue {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.08) 100%);
+  color: var(--blue);
+}
+
+.tx-badge-appointment {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.08) 100%);
+  color: var(--purple);
+}
+
+.tx-badge-document {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(249, 115, 22, 0.08) 100%);
+  color: #fb923c;
+}
+
+.transaction-content {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.transaction-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.transaction-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  margin: 0;
+  transition: color 0.3s ease;
+  word-break: break-word;
+}
+
+.transaction-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.txn-tracking-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: rgba(249, 115, 22, 0.12);
+  color: #fb923c;
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  font-family: "Inter", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+}
+
+[data-theme="light"] .txn-tracking-pill {
+  background: rgba(234, 88, 12, 0.08);
+  color: #9a3412;
+  border-color: rgba(234, 88, 12, 0.2);
+}
+
+.tx-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+}
+
+.tx-badge-completed {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+  border: 0.5px solid rgba(16, 185, 129, 0.3);
+}
+
+.tx-badge-ongoing {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--blue);
+  border: 0.5px solid rgba(59, 130, 246, 0.3);
+}
+
+.tx-badge-cancelled {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+  border: 0.5px solid rgba(239, 68, 68, 0.3);
+}
+
+.tx-badge-default {
+  background: rgba(107, 114, 128, 0.15);
+  color: #9ca3af;
+  border: 0.5px solid rgba(107, 114, 128, 0.3);
+}
+
+.transaction-college {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin: 0 0 0.3rem 0;
+  transition: color 0.3s ease;
+  text-align: left;
+}
+
+.transaction-details {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0;
+  transition: color 0.3s ease;
+  line-height: 1.4;
+  text-align: left;
+}
+
+/* ── Shared appointment comment (faculty/student consultation notes) ──── */
+.transaction-comment {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-top: 0.3rem;
+  padding: 0.5rem 0.625rem;
+  background: rgba(168, 85, 247, 0.06);
+  border-left: 2px solid rgba(168, 85, 247, 0.35);
+  border-radius: 0.375rem;
+}
+
+.transaction-comment-text {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.4;
+  text-align: left;
+  white-space: pre-wrap;
+  transition: color 0.3s ease;
+}
+
+.transaction-comment-meta {
+  font-size: 0.68rem;
+  color: var(--text-tertiary);
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.transaction-timeline {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  column-gap: 0.75rem;
+  row-gap: 0.15rem;
+  margin-top: 0.3rem;
+}
+
+.transaction-timeline-row {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.transaction-timeline-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.transaction-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.375rem;
+  position: relative;
+  z-index: 1;
+}
+
+.transaction-date,
+.transaction-time {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+
+.transaction-date svg,
+.transaction-time svg {
+  width: 0.75rem;
+  height: 0.75rem;
+  stroke: currentColor;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .transaction-item {
+    grid-template-columns: auto 1fr;
+    gap: 0.75rem;
+  }
+
+  .transaction-meta {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    text-align: left;
+    margin-top: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--card-border);
+  }
+
+  .transaction-date,
+  .transaction-time {
+    font-size: 0.7rem;
+  }
+}
+
+
+/* ===== Responsive ===== */
+@media (max-width: 1024px) {
+  .transactions-main {
+    padding-left: 0;
+    padding-top: 0;
+  }
+
+  .transactions-container {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .transactions-container {
+    padding: 0.75rem;
+    gap: 1rem;
+  }
+
+  .transactions-container .filters-header {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 0.75rem;
+  }
+
+  .transactions-container .filters-header-text {
+    grid-column: 1;
+  }
+
+  .transactions-container .export-menu {
+    grid-column: 1;
+    justify-self: center;
+  }
+}
+
+@media (max-width: 640px) {
+  /* This rule is later in the file than the 768px block above, so it wins
+     the cascade -- keep it explicit or padding grows as the screen shrinks. */
+  .transactions-container {
+    padding: 0.75rem;
+    gap: 0.75rem;
+  }
+
+  .tx-empty-state {
+    padding: 2rem 1rem;
+  }
+
+  .transactions-container .tx-title {
+    font-size: 1.5rem;
+  }
+
+  .tx-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  .transactions-container .filters-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 380px) {
+  .tx-stats-grid { grid-template-columns: 1fr; }
+}
+
+/* Clear-filters button shown in the filtered-empty state */
+.tx-clear-btn {
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--primary-color);
+  background: transparent;
+  color: var(--primary-color);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}

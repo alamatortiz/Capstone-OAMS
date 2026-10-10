@@ -1,0 +1,37 @@
+{
+  "cli": {
+    "version": ">= 21.1.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease -PreactNativeArchitectures=arm64-v8a"
+      }
+    },
+    "preview-student": {
+      "extends": "preview",
+      "env": { "APP_VARIANT": "student", "EXPO_PUBLIC_APP_VARIANT": "student" }
+    },
+    "preview-faculty": {
+      "extends": "preview",
+      "env": { "APP_VARIANT": "faculty", "EXPO_PUBLIC_APP_VARIANT": "faculty" }
+    },
+    "preview-admin": {
+      "extends": "preview",
+      "env": { "APP_VARIANT": "admin", "EXPO_PUBLIC_APP_VARIANT": "admin" }
+    },
+    "production": {
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

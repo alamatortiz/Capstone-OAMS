@@ -1,0 +1,41 @@
+.qrm-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 4.5rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--card-border, #1e3a23);
+  background: var(--input-background, rgba(255, 255, 255, 0.03));
+  color: var(--text-primary, #f0fdf4);
+  font-size: 0.875rem;
+  font-family: inherit;
+}
+
+.qrm-textarea:focus {
+  outline: none;
+  border-color: rgba(34, 197, 94, 0.5);
+}
+
+.qrm-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.qrm-textarea--blue {
+  border-color: rgba(59, 130, 246, 0.25);
+}
+
+.qrm-textarea--blue:focus {
+  border-color: rgba(59, 130, 246, 0.6);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.qrm-textarea--purple {
+  border-color: rgba(168, 85, 247, 0.25);
+}
+
+.qrm-textarea--purple:focus {
+  border-color: rgba(168, 85, 247, 0.6);
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.15);
+}

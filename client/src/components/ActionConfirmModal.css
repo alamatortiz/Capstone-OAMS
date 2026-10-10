@@ -1,0 +1,227 @@
+.acm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: acm-fade-in 0.15s ease;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+@keyframes acm-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.acm-modal {
+  background: var(--card-bg, #111612);
+  border: 1px solid var(--card-border, #1e3a23);
+  border-radius: 16px;
+  padding: 2rem 2rem 1.5rem;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  animation: acm-slide-up 0.2s ease;
+}
+
+@keyframes acm-slide-up {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.acm-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+}
+
+.acm-icon--danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.acm-icon--success {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.acm-icon--neutral {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.acm-icon--primary {
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+}
+
+.acm-icon--warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.acm-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary, #f0fdf4);
+  margin: 0 0 0.5rem;
+}
+
+.acm-message {
+  font-size: 0.875rem;
+  color: var(--muted-foreground, #94a3b8);
+  margin: 0 0 1.5rem;
+  line-height: 1.5;
+  text-align: justify;
+}
+
+.acm-message--centered {
+  text-align: center;
+}
+
+.acm-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.acm-cancel {
+  flex: 1;
+  padding: 0.625rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--card-border, #1e3a23);
+  background: transparent;
+  color: var(--text-primary, #f0fdf4);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.acm-cancel:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.05);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.acm-cancel--primary:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.06);
+  border-color: rgba(168, 85, 247, 0.3);
+}
+
+.acm-cancel--hover-blue:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: var(--blue, #3b82f6);
+}
+
+.acm-cancel--hover-purple:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.08);
+  border-color: rgba(168, 85, 247, 0.35);
+  color: #a855f7;
+}
+
+.acm-cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.acm-confirm {
+  flex: 1;
+  padding: 0.625rem 1rem;
+  border-radius: 8px;
+  border: none;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  transition: background 0.15s;
+}
+
+.acm-confirm--danger {
+  background: #ef4444;
+}
+
+.acm-confirm--danger:hover:not(:disabled) {
+  background: #dc2626;
+}
+
+.acm-confirm--success {
+  background: #22c55e;
+}
+
+.acm-confirm--success:hover:not(:disabled) {
+  background: #16a34a;
+}
+
+.acm-confirm--neutral {
+  background: #3b82f6;
+}
+
+.acm-confirm--neutral:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.acm-confirm--primary {
+  background: #a855f7;
+}
+
+.acm-confirm--primary:hover:not(:disabled) {
+  background: #9333ea;
+}
+
+.acm-confirm--warning {
+  background: #f59e0b;
+}
+
+.acm-confirm--warning:hover:not(:disabled) {
+  background: #d97706;
+}
+
+.acm-confirm:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────
+   The modal had no height ceiling, so a long message (e.g. a rejection
+   reason) ran past the bottom of the viewport with no way to scroll to the
+   buttons — most visible on a phone in landscape. Cap it to the visible
+   viewport and let the body scroll instead. */
+.acm-modal {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+}
+
+@media (max-width: 480px) {
+  .acm-overlay { padding: 0.75rem; }
+
+  .acm-modal {
+    padding: 1.5rem 1.25rem 1.25rem;
+    max-height: calc(100dvh - 1.5rem);
+  }
+
+  .acm-icon { width: 46px; height: 46px; }
+  .acm-title { font-size: 1.05rem; }
+  .acm-message { margin-bottom: 1.25rem; }
+}
+
+/* Side-by-side actions get too cramped for labels like
+   "Confirm Rejection" once the modal is ~256px of usable width. */
+@media (max-width: 380px) {
+  .acm-modal { padding: 1.25rem 1rem 1rem; }
+
+  .acm-actions { flex-direction: column-reverse; gap: 0.5rem; }
+  .acm-cancel,
+  .acm-confirm { width: 100%; }
+}

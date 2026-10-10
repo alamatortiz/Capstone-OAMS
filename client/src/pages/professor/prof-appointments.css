@@ -1,0 +1,1012 @@
+
+html, body {
+  font-family: 'Inter', sans-serif;
+}
+
+/* ── Page layout ─────────────────────────────────────────── */
+.appt-page-content {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.3rem;
+}
+
+/* ── Page header ─────────────────────────────────────────── */
+.appt-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.appt-page-content .page-breadcrumb {
+  display: flex;
+  align-items: center;
+}
+
+.appt-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.appt-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.2;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.appt-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0.25rem 0 0 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.appt-title-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+  color: #fff;
+}
+
+.appt-title-icon svg {
+  width: 1.75rem;
+  height: 1.75rem;
+  stroke: #fff;
+  color: #fff;
+}
+
+/* ── Schedule Availability card ──────────────────────────── */
+.appt-sched-avail-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(168, 85, 247, 0.08) 100%);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 0.875rem;
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.1);
+}
+
+.appt-sched-avail-card:hover {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.2) 0%, rgba(168, 85, 247, 0.14) 100%);
+  border-color: rgba(168, 85, 247, 0.55);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.22);
+  transform: translateY(-2px);
+  color: var(--text-primary);
+}
+
+.appt-sched-avail-card-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.625rem;
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.35);
+}
+
+.appt-sched-avail-card-icon svg {
+  width: 1.375rem;
+  height: 1.375rem;
+  color: white;
+  stroke: white;
+}
+
+.appt-sched-avail-card-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  min-width: 0;
+  text-align: left;
+}
+
+.appt-sched-avail-card-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #a855f7;
+}
+
+.appt-sched-avail-card-subtitle {
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
+
+.appt-sched-avail-card-chevron {
+  width: 1.375rem;
+  height: 1.375rem;
+  flex-shrink: 0;
+  color: #a855f7;
+  stroke: #a855f7;
+  opacity: 0.7;
+}
+
+[data-theme="light"] .appt-sched-avail-card {
+  background: linear-gradient(135deg, rgba(109, 40, 217, 0.07) 0%, rgba(147, 51, 234, 0.04) 100%);
+  border-color: rgba(147, 51, 234, 0.25);
+}
+
+[data-theme="light"] .appt-sched-avail-card:hover {
+  background: linear-gradient(135deg, rgba(109, 40, 217, 0.13) 0%, rgba(147, 51, 234, 0.09) 100%);
+  border-color: rgba(147, 51, 234, 0.45);
+}
+
+[data-theme="light"] .appt-sched-avail-card-title {
+  color: #6d28d9;
+}
+
+/* ── Tabs ────────────────────────────────────────────────── */
+.appt-tabs-nav {
+  margin-bottom: 0.5rem;
+}
+
+.appt-tabs-list {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid var(--card-border);
+  flex-wrap: wrap;
+  transition: border-color 0.3s ease;
+  padding: 0;
+}
+
+.appt-tab-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.2s ease;
+  position: relative;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+.appt-tab-trigger:hover:not(.active) { color: #a855f7; }
+
+.appt-tab-trigger.active {
+  color: #a855f7;
+  font-weight: 600;
+  background: transparent;
+  box-shadow: none;
+  cursor: default;
+  pointer-events: none;
+}
+
+.appt-tab-trigger.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #a855f7;
+}
+
+[data-theme="light"] .appt-tab-trigger:hover:not(.active) { color: #9333ea; }
+[data-theme="light"] .appt-tab-trigger.active { color: #9333ea; }
+[data-theme="light"] .appt-tab-trigger.active::after { background: #9333ea; }
+
+.appt-tab-icon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
+/* ── "All" tab dropdown (This Week / This Month / All Time) ─ */
+.appt-tab-trigger--dropdown.active {
+  /* Override .appt-tab-trigger.active's pointer-events: none so the
+     embedded <select> stays clickable while this tab is active. */
+  pointer-events: auto;
+  cursor: default;
+}
+
+.appt-range-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  outline: none;
+  padding: 0 1.1rem 0 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a855f7' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right center;
+  background-size: 0.9rem;
+}
+
+[data-theme="light"] .appt-range-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239333ea' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+
+.appt-range-select:focus-visible {
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.35);
+  border-radius: 0.25rem;
+}
+
+/* ── Count pill inside each tab ──────────────────────────── */
+.appt-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+  transition: background 0.2s;
+}
+
+.appt-tab-trigger.active .appt-tab-count {
+  background: rgba(168, 85, 247, 0.25);
+}
+
+[data-theme="light"] .appt-tab-count {
+  background: rgba(147, 51, 234, 0.1);
+  color: #9333ea;
+}
+
+[data-theme="light"] .appt-tab-trigger.active .appt-tab-count {
+  background: rgba(147, 51, 234, 0.2);
+}
+
+/* ── Appointments list ───────────────────────────────────── */
+.appt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+/* Scoped to this page's container so the professor empty-state card chrome
+   does not leak onto the student appointments page, which shares the bare
+   .appt-empty-state class but deliberately keeps it plain. */
+.appt-page-content .appt-empty-state {
+  background: var(--card-bg);
+  border: 1px solid rgba(168, 85, 247, 0.15);
+  border-radius: 1rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+[data-theme="light"] .appt-page-content .appt-empty-state {
+  border-color: rgba(147, 51, 234, 0.15);
+}
+
+@media (max-width: 640px) {
+  .appt-page-content .appt-empty-state {
+    padding: 2rem 1rem;
+  }
+}
+
+.appt-empty-icon {
+  width: 3rem;
+  height: 3rem;
+  color: var(--text-tertiary);
+  margin: 0 auto 1rem;
+  stroke: currentColor;
+  transition: color 0.3s ease;
+}
+
+.appt-empty-title {
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+  transition: color 0.3s ease;
+}
+
+.appt-empty-text {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin-bottom: 0;
+  transition: color 0.3s ease;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── Individual appointment card ─────────────────────────── */
+.appt-card {
+  position: relative;
+  background: var(--card);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 1rem;
+  padding: 0.85rem;
+  transition: all 0.3s ease;
+}
+
+.appt-card:hover {
+  box-shadow: 0 12px 28px rgba(168, 85, 247, 0.15);
+  transform: translateY(-2px);
+  border-color: rgba(168, 85, 247, 0.4);
+}
+
+[data-theme="light"] .appt-card { border-color: rgba(147, 51, 234, 0.18); }
+[data-theme="light"] .appt-card:hover {
+  box-shadow: 0 12px 28px rgba(147, 51, 234, 0.1);
+  border-color: rgba(147, 51, 234, 0.35);
+}
+
+/* ── Card header row ─────────────────────────────────────── */
+.appt-card-header-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.6rem;
+}
+
+/* Name + student-number badge share one baseline-aligned row; the program
+   (course) drops onto the line below. */
+.appt-card-name-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.appt-card-icon-wrap {
+  width: 2.25rem;
+  height: 2.25rem;
+  background: rgba(168, 85, 247, 0.12);
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a855f7;
+  flex-shrink: 0;
+  transition: background 0.3s ease;
+}
+
+[data-theme="light"] .appt-card-icon-wrap {
+  background: rgba(168, 85, 247, 0.08);
+  color: #9333ea;
+}
+
+.appt-card-title-section {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+/* Location/Date/Time sit directly under the name/course as one compact,
+   wrapping row -- moved out of the header row's flex layout entirely so its
+   position is never affected by the header-actions column's height. */
+.appt-card-datetime-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.9rem;
+  margin-top: 0.35rem;
+}
+
+.appt-card-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #a855f7;
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+[data-theme="light"] .appt-card-name { color: #9333ea; }
+
+/* Student number badge — copied from prof-transactions.css .txn-student-id-badge
+   so it reads identically; --purple token doesn't exist in this file, so its
+   dark value #a855f7 is inlined and the light override is the txn badge's #7c3aed. */
+.appt-card-student-id-badge {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  background: rgba(168, 85, 247, 0.12);
+  color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+}
+
+/* Purple, matching the other badges on this card (student id, type) and
+   the appointment screens' purple theme -- same values as
+   .appt-card-student-id-badge above, light override included. */
+.appt-card-tracking-badge {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  background: rgba(168, 85, 247, 0.12);
+  color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+}
+
+[data-theme="light"] .appt-card-tracking-badge {
+  background: rgba(147, 51, 234, 0.1);
+  color: #7c3aed;
+  border-color: rgba(147, 51, 234, 0.25);
+}
+
+[data-theme="light"] .appt-card-student-id-badge {
+  background: rgba(147, 51, 234, 0.1);
+  color: #7c3aed;
+  border-color: rgba(147, 51, 234, 0.25);
+}
+
+.appt-card-sub {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin: 0.25rem 0 0;
+  transition: color 0.3s ease;
+}
+
+/* Appointment type pill — sits inline in the name row now (next to the
+   student-id badge) rather than its own labeled row below the header. */
+.appt-card-appt-type-value {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: rgba(168, 85, 247, 0.12);
+  color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  white-space: nowrap;
+}
+
+[data-theme="light"] .appt-card-appt-type-value {
+  color: #9333ea;
+  background: rgba(147, 51, 234, 0.1);
+  border-color: rgba(147, 51, 234, 0.25);
+}
+
+/* ── Status badge ────────────────────────────────────────── */
+/* Sized to match .appt-card-student-id-badge right next to it, rather than
+   standing out as the largest badge on the row. */
+.appt-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.appt-status-badge--pending {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fcd34d;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+.appt-status-badge--approved {
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+.appt-status-badge--completed {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+.appt-status-badge--rejected {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+.appt-status-badge--cancelled {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+[data-theme="light"] .appt-status-badge--pending   { background: rgba(217,119,6,0.1);   color: #92400e; border-color: rgba(217,119,6,0.3); }
+[data-theme="light"] .appt-status-badge--approved  { background: rgba(5,150,105,0.1);   color: #065f46; border-color: rgba(5,150,105,0.25); }
+[data-theme="light"] .appt-status-badge--completed { background: rgba(5,150,105,0.1);    color: #065f46; border-color: rgba(5,150,105,0.25); }
+[data-theme="light"] .appt-status-badge--rejected  { background: rgba(220,38,38,0.08);  color: #991b1b; border-color: rgba(220,38,38,0.2); }
+[data-theme="light"] .appt-status-badge--cancelled { background: rgba(220,38,38,0.08);  color: #991b1b; border-color: rgba(220,38,38,0.2); }
+
+/* Year & Program / Course Code row, then Purpose -- lives inside
+   .appt-card-title-section, below the Date/Time section. A plain vertical
+   stack (not a real grid); kept as .appt-info-grid for the shared
+   .appt-info-field/label/value styling underneath it. */
+.appt-info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.appt-info-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  text-align: left;
+}
+
+/* Year & Program, Course Code, and Purpose sit side by side on one row. */
+.appt-info-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.appt-info-row .appt-info-field {
+  flex: 1;
+  min-width: 8rem;
+}
+
+.appt-info-field label {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: color 0.3s ease;
+}
+
+.appt-info-field p {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #a855f7;
+  margin: 0;
+  line-height: 1.3;
+  transition: color 0.3s ease;
+}
+
+[data-theme="light"] .appt-info-field p { color: #9333ea; }
+
+/* Requested-at timestamp -- now lives in the header's right column (see
+   .appt-card-header-actions) instead of a dedicated footer row. */
+.appt-requested-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.appt-requested-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-tertiary);
+}
+
+.appt-requested-date,
+.appt-requested-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.appt-requested-date svg,
+.appt-requested-time svg {
+  width: 0.75rem;
+  height: 0.75rem;
+  flex-shrink: 0;
+}
+
+/* ── Header actions (Requested-at + Comment) ─────────────────────────────
+   A normal flex child of .appt-card-header-row -- Purpose and the action
+   buttons live in the left column (see .appt-info-grid/.appt-header-btn-row
+   below, nested in .appt-card-title-section), so this right column is
+   lightweight: just Requested-at, since Comments has its own section in
+   the left column above the action buttons. Shrink-to-fit width since
+   there's no 100%-width child needing a stable column width to stretch
+   into. */
+.appt-card-header-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+/* Sits directly after Comments, above the Approved/Completed timeline --
+   left-aligned like everything else over there, not right-aligned the way
+   it was when it lived in the right column. Bordered off from Comments
+   directly above it, the same separator pattern .appt-comment-section/
+   .appt-timeline-section use. */
+.appt-header-btn-row {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--card-border);
+}
+
+.appt-btn-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  flex: 1;
+  padding: 0.65rem 1rem;
+  background: transparent;
+  border: 1px solid transparent; /* each variant below sets its real color */
+  border-radius: 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: all 0.25s ease;
+}
+
+.appt-btn-sm:active:not(:disabled) { transform: translateY(0); box-shadow: none; }
+
+/* Disabled state must override the base cursor:pointer/hover rules above --
+   otherwise a disabled button (e.g. "Complete" on a future-dated
+   appointment) is visually identical to an active one and clicking it just
+   silently does nothing with no feedback. pointer-events stays enabled
+   (not "none") so the title="..." tooltip explaining why still shows on hover. */
+.appt-btn-sm:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.appt-btn-sm svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+}
+
+/* Outlined "hollow" style matching .doc-card-view-button/.doc-claim-btn
+   (stud-documents.css) -- transparent fill, colored border/text, hover tints
+   the background and lifts slightly. Each button's color matches its own
+   confirmation popup (approve/complete -> ActionConfirmModal variant
+   "success"; reject -> QueueReasonModal's danger default; cancel ->
+   ActionConfirmModal's danger default) -- green for actions that move an
+   appointment forward, red for ones that stop it. The :not(:disabled) guards
+   keep a disabled button (e.g. Complete on a future-dated appointment) from
+   showing a hover tint that implies it's clickable. */
+.appt-btn-sm-approve, .appt-btn-sm-complete {
+  color: #16a34a;
+  border-color: rgba(34, 197, 94, 0.35);
+}
+.appt-btn-sm-approve:hover:not(:disabled), .appt-btn-sm-complete:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.65);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.2);
+}
+
+.appt-btn-sm-reject, .appt-btn-sm-cancel {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+.appt-btn-sm-reject:hover:not(:disabled), .appt-btn-sm-cancel:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.65);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.2);
+}
+
+[data-theme="light"] .appt-btn-sm-approve, [data-theme="light"] .appt-btn-sm-complete { color: #065f46; }
+[data-theme="light"] .appt-btn-sm-reject, [data-theme="light"] .appt-btn-sm-cancel { color: #991b1b; }
+
+/* Location/Date/Time pill styling -- used inside .appt-card-datetime-row,
+   right under the name/course, all three fields on one compact wrapping
+   row instead of separate lines. */
+.appt-quick-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #a855f7;
+  transition: color 0.3s ease;
+}
+
+[data-theme="light"] .appt-quick-meta-item { color: #9333ea; }
+
+.appt-quick-meta-item svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .appt-page-content { padding: 1rem; }
+}
+
+@media (max-width: 640px) {
+  .appt-page-content { padding: 1rem; gap: 1rem; }
+}
+
+@media (max-width: 480px) {
+  .appt-card { padding: 1rem; }
+
+  .appt-tab-trigger {
+    font-size: 0.72rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .appt-card-header-row { gap: 0.75rem; }
+
+  .appt-card-icon-wrap {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .appt-card-name { font-size: 0.9rem; }
+
+  .appt-card-header-actions { max-width: 6.5rem; }
+
+  .appt-requested-label,
+  .appt-requested-date,
+  .appt-requested-time { font-size: 0.62rem; }
+
+  .appt-header-btn-row { flex-wrap: wrap; }
+
+  .appt-btn-sm { padding: 0.5rem 0.75rem; font-size: 0.78rem; }
+  .appt-btn-sm svg { width: 0.95rem; height: 0.95rem; }
+}
+
+
+/* ─── Comments section ────────────────────────────────────────────────────── */
+/* Its own dedicated section in the left column, above the action buttons and
+   the Approved/Completed timeline -- editing now happens in a popup (see
+   CommentBlock's QueueReasonModal usage) instead of inline, so this is
+   display-only plus a button that opens that popup. */
+.appt-comment-section {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--card-border);
+}
+
+.appt-timeline-section {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--card-border);
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.35rem 1.5rem;
+}
+
+.appt-timeline-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.appt-timeline-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-tertiary);
+  min-width: 4.5rem;
+}
+
+.appt-timeline-date,
+.appt-timeline-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.appt-timeline-date svg,
+.appt-timeline-time svg {
+  width: 0.75rem;
+  height: 0.75rem;
+  flex-shrink: 0;
+}
+
+.appt-not-served-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.08);
+  color: #f59e0b;
+  font-size: 0.8rem;
+}
+
+.appt-not-served-notice p {
+  margin: 0;
+  color: inherit;
+}
+
+.appt-not-served-reason {
+  margin-top: 0.25rem !important;
+  opacity: 0.85;
+}
+
+/* Rejected variant -- red, matching the rejected status badge. */
+.appt-not-served-notice--rejected {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+}
+[data-theme="light"] .appt-not-served-notice--rejected {
+  background: rgba(220, 38, 38, 0.06);
+  color: #991b1b;
+}
+
+.appt-comment-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.4rem;
+}
+
+.appt-comment-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.appt-comment-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  font-family: inherit;
+  min-width: 0;
+}
+
+.appt-comment-toggle:hover { color: var(--text-primary); }
+
+.appt-comment-recorded {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.5rem;
+  color: #a855f7;
+  background: rgba(168, 85, 247, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+[data-theme="light"] .appt-comment-recorded { color: #7c3aed; }
+
+.appt-comment-chevron {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+.appt-comment-chevron--open { transform: rotate(180deg); }
+
+.appt-comment-body { margin-top: 0.1rem; }
+
+.appt-comment-edit-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: none;
+  border: none;
+  color: #a855f7;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: opacity 0.2s ease;
+}
+.appt-comment-edit-link svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  flex-shrink: 0;
+}
+.appt-comment-edit-link:hover { opacity: 0.8; text-decoration: underline; }
+[data-theme="light"] .appt-comment-edit-link { color: #9333ea; }
+
+.appt-comment-empty {
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+.appt-comment-text {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.4;
+  text-align: justify;
+}
+
+.appt-comment-meta {
+  margin: 0.3rem 0 0;
+  font-size: 0.68rem;
+  font-weight: 400;
+  font-style: italic;
+  color: var(--text-tertiary);
+  opacity: 0.85;
+}
+
+/* ─── Student feedback (read-only) ────────────────────────────────────────── */
+/* Blue-tinted so it never reads as the professor's own Actions Taken note. */
+.appt-feedback-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #2563eb;
+}
+
+.appt-feedback-body {
+  margin-top: 0.5rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.55rem;
+  background: rgba(37, 99, 235, 0.07);
+  border-left: 3px solid #2563eb;
+}

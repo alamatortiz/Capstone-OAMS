@@ -1,0 +1,1809 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  Platform,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertCircle,
+  Calendar,
+  CheckCircle,
+  ChevronDown,
+  ChevronLeft,
+  Clock,
+  Eye,
+  FileText,
+  History,
+  Home as HomeIcon,
+  Search,
+  User,
+  X,
+  XCircle,
+} from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import * as DocumentPicker from 'expo-document-picker';
+import DatePickerSheet from '@/components/DatePickerSheet';
+import { toLocalYMD, fromLocalYMD, getManilaDateString } from '@/utils/date';
+import { useAuth } from '@/context/AuthContext';
+import { useAttachmentOpener } from '@/hooks/useAttachmentOpener';
+import ImagePreviewOverlay from '@/components/ImagePreviewOverlay';
+import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
+import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
+import { notify } from '@/utils/notifications';
+import NotificationBell from '@/components/NotificationBell';
+import RefreshButton from '@/components/RefreshButton';
+import QueueReasonModal from '@/components/QueueReasonModal';
+import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
+import { getHubStatusMeta, normalizeDocStatus, type DocStatus } from '@/utils/documentStatus';
+
+// Mirrors the server's limits (server/middleware/upload.js).
+const MAX_FILES = 5;
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const ATTACHMENT_TYPES = [
+  'application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain', 'text/csv', 'application/zip',
+];
+
+type LucideIconType = typeof Clock;
+
+// Mirrors adm-document-processing.jsx's getStatusMeta() icon choices exactly
+// (kept local rather than added to the shared documentStatus.ts util, since
+// that util's icon field is still Ionicons-typed and consumed by student/
+// professor screens not yet converted to lucide).
+const STATUS_ICON: Record<ReturnType<typeof normalizeDocStatus>, LucideIconType> = {
+  pending: AlertCircle,
+  processing: Clock,
+  ready: CheckCircle,
+  claimed: CheckCircle,
+  rejected: XCircle,
+  cancelled: XCircle,
+};
+
+function getStatusIcon(status: DocStatus): LucideIconType {
+  return STATUS_ICON[normalizeDocStatus(status)];
+}
+
+const pncLogo = require('@/assets/Pnc-Logo.png');
+const oamsLogo = require('@/assets/oams_logo.png');
+const darkModeIcon = require('@/assets/darkmode_icon.png');
+const sunIcon = require('@/assets/sun_icon.png');
+
+function OamsLogo({
+  style,
+  outline,
+}: {
+  style: { height: number; width: number };
+  outline: boolean;
+}) {
+  if (!outline) {
+    return <Image source={oamsLogo} style={style} resizeMode="contain" />;
+  }
+  const layerStyle = {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    width: style.width,
+    height: style.height,
+  };
+  return (
+    <View style={[style, { position: 'relative', overflow: 'hidden' }]}>
+      {[
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ].map(([dx, dy]) => (
+        <Image
+          key={`${dx}-${dy}`}
+          source={oamsLogo}
+          resizeMode="contain"
+          style={[
+            layerStyle,
+            { tintColor: '#ffffff', transform: [{ translateX: dx }, { translateY: dy }] },
+          ]}
+        />
+      ))}
+      <Image source={oamsLogo} resizeMode="contain" style={layerStyle} />
+    </View>
+  );
+}
+
+// ─── Field shapes documented here mirror what The real server routes,
+// GET /api/admin/document-processing and GET /api/admin/faculty-document-processing
+// (adminRoutes.js), are both scoped strictly to the signed-in admin's own
+// department (joined through document_services.department_id) — there is no
+// cross-college listing, so unlike the design-mockup AdminDocumentsPage.tsx
+// this mirrors the actual wired admin-document-processing.jsx: one
+// department's requests only, split by a Students/Faculty source toggle.
+// Field shapes match what those endpoints really return (trackingNumber,
+// requesterIdLabel/Value, neededBy, releasedDate, claimedDate, etc.) —
+// faculty requests have no "copies" column, so it isn't rendered for them. ───
+type RequestSource = 'student' | 'faculty' | 'submission';
+type DocumentStatus = 'pending' | 'processing' | 'ready' | 'claimed' | 'rejected' | 'cancelled';
+
+interface DocumentAttachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
+interface DocumentRequest {
+  id: string;
+  source: RequestSource;
+  trackingNumber: string;
+  requesterName: string;
+  requesterIdLabel: string;
+  requesterIdValue: string;
+  college: string;
+  documentType: string;
+  purpose: string;
+  copies?: number;
+  requestDate: string;
+  neededBy: string | null;
+  status: DocumentStatus;
+  notes: string;
+  releasedDate: string | null;
+  claimedDate: string | null;
+  requiresCoding?: boolean;
+  officialCode?: string | null;
+  claimBy?: string | null;
+  studentFiles?: DocumentAttachment[];
+  adminFiles?: DocumentAttachment[];
+  isDigitalDelivery?: boolean;
+  deliveryCode?: string | null;
+}
+
+interface NavItem {
+  key: string;
+  label: string;
+  icon: LucideIconType;
+}
+
+const navItems: NavItem[] = [
+  { key: 'dashboard', label: 'Dashboard', icon: HomeIcon },
+  { key: 'queue', label: 'Queue', icon: Clock },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: History },
+];
+
+const SOURCES: { id: RequestSource; label: string }[] = [
+  { id: 'student', label: 'Students' },
+  { id: 'faculty', label: 'Faculty' },
+  { id: 'submission', label: 'Submissions' },
+];
+
+const TABS = ['all', 'pending', 'processing', 'ready', 'claimed', 'rejected', 'cancelled'] as const;
+// Requests and submissions now share the Pending -> Processing -> Ready ->
+// Claimed lifeline, so the tab sets are identical.
+const SUBMISSION_TABS = TABS;
+type TabKey = (typeof TABS)[number];
+
+type WeekFilter = 'this-week' | 'next-week' | 'this-month' | 'all';
+const WEEK_FILTER_OPTIONS: { value: WeekFilter; label: string }[] = [
+  { value: 'this-week', label: 'This Week' },
+  { value: 'next-week', label: 'Next Week' },
+  { value: 'this-month', label: 'This Month' },
+  { value: 'all', label: 'All' },
+];
+
+const DONE_STATUSES: DocumentStatus[] = ['claimed', 'rejected', 'cancelled'];
+
+function toDateStr(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function formatDisplayDate(dateStr: string | null) {
+  if (!dateStr) return '—';
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+type ConfirmStatus = 'processing' | 'ready' | 'claimed' | 'rejected';
+
+export default function AdminDocumentProcessingScreen() {
+  const { isDarkMode, toggleTheme } = useTheme();
+  const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [documents, setDocuments] = useState<DocumentRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [source, setSource] = useState<RequestSource>('student');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<TabKey>('all');
+  const [weekFilter, setWeekFilter] = useState<WeekFilter>('all');
+  const [weekFilterModalVisible, setWeekFilterModalVisible] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<DocumentRequest | null>(null);
+  const [processingNotes, setProcessingNotes] = useState('');
+  const [officialCode, setOfficialCode] = useState('');
+  const [claimByDate, setClaimByDate] = useState('');
+  const [showClaimByPicker, setShowClaimByPicker] = useState(false);
+  const [confirmStatus, setConfirmStatus] = useState<ConfirmStatus | null>(null);
+  const [updating, setUpdating] = useState(false);
+  const [returnFiles, setReturnFiles] = useState<DocumentPicker.DocumentPickerAsset[]>([]);
+  const { openingId: downloadingFileId, previewFile, openAttachment, closePreview } = useAttachmentOpener();
+  const router = useRouter();
+  const { user, token, logout } = useAuth();
+  const adminName = user?.name ?? 'Admin';
+  const adminRole = 'Admin';
+  const adminDepartmentName = user?.departmentName ?? 'Your Department';
+  const adminDepartmentAbbrev = user?.departmentAbbrev ?? '';
+
+  const theme = isDarkMode ? darkPalette : lightPalette;
+  const styles = createStyles(theme);
+
+  const fetchDocuments = useCallback(async () => {
+    setError(null);
+    try {
+      const [studentRes, facultyRes, submissionRes] = await Promise.all([
+        api.get('/admin/document-processing'),
+        api.get('/admin/faculty-document-processing'),
+        api.get('/admin/document-submissions'),
+      ]);
+      const studentDocs: DocumentRequest[] = (studentRes.data.documents ?? []).map((d: any) => ({
+        ...d,
+        source: 'student' as RequestSource,
+      }));
+      const facultyDocs: DocumentRequest[] = (facultyRes.data.documents ?? []).map((d: any) => ({
+        ...d,
+        source: 'faculty' as RequestSource,
+      }));
+      // The server already prefixes these ids ("sub-42") so they stay
+      // collision-safe alongside student/faculty ids if ever merged into one
+      // list elsewhere -- handleUpdateStatus/file downloads strip it back
+      // off before hitting an endpoint that expects the raw submission_id.
+      const submissionDocs: DocumentRequest[] = (submissionRes.data.documents ?? []).map((d: any) => ({
+        ...d,
+        source: 'submission' as RequestSource,
+      }));
+      const merged = [...studentDocs, ...facultyDocs, ...submissionDocs].sort(
+        (a, b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime(),
+      );
+      setDocuments(merged);
+    } catch (err) {
+      console.error('Failed to load document requests:', err);
+      setError('Failed to load document requests.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
+
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+    const refetch = () => fetchDocuments();
+    const events = ['document:new-request', 'document:status-updated', 'document:cancelled'];
+    events.forEach((event) => socket.on(event, refetch));
+    const onNewRequest = () => notify('New document request', 'A new document request has come in.');
+    socket.on('document:new-request', onNewRequest);
+    return () => {
+      events.forEach((event) => socket.off(event, refetch));
+      socket.off('document:new-request', onNewRequest);
+    };
+  }, [user, token, fetchDocuments]);
+
+  const comingSoon = () =>
+    Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
+
+  const goToDashboard = () => router.push('/pages/admin/admin_dashboard');
+
+  const handleNavPress = (key: string) => {
+    setMenuOpen(false);
+    if (key === 'documents') return;
+    if (key === 'dashboard') {
+      goToDashboard();
+      return;
+    }
+    if (key === 'queue') {
+      router.push('/pages/admin/admin_queue');
+      return;
+    }
+    if (key === 'appointments') {
+      router.push('/pages/admin/admin_appointment');
+      return;
+    }
+    if (key === 'transactions') {
+      router.push('/pages/admin/admin_transactions');
+      return;
+    }
+    comingSoon();
+  };
+
+  const handleLogout = () => {
+    setMenuOpen(false);
+    setLogoutModalVisible(true);
+  };
+
+  const confirmLogout = () => {
+    setLogoutModalVisible(false);
+    logout();
+    router.replace('/login');
+  };
+
+  const handleSourceChange = (id: RequestSource) => {
+    setSource(id);
+    setActiveTab('all');
+    setSearchQuery('');
+  };
+
+  // Monday-anchored this-week/next-week windows plus a full current-month
+  // window, applied to the requester-set "Needed By" deadline — same pattern
+  // as admin-document-processing.jsx's weekDates.
+  const weekDates = useMemo(() => {
+    const today = new Date();
+    const dow = today.getDay();
+    const monday = new Date(today);
+    monday.setDate(monday.getDate() + (dow === 0 ? -6 : 1 - dow));
+    const buildWeek = (weekOffset: number) =>
+      Array.from({ length: 7 }, (_, i) => {
+        const dt = new Date(monday);
+        dt.setDate(dt.getDate() + weekOffset * 7 + i);
+        return toDateStr(dt);
+      });
+    const y = today.getFullYear();
+    const m = today.getMonth();
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const thisMonth = Array.from({ length: daysInMonth }, (_, i) => toDateStr(new Date(y, m, i + 1)));
+    return { thisWeek: buildWeek(0), nextWeek: buildWeek(1), thisMonth, todayStr: toDateStr(today) };
+  }, []);
+
+  const deadlineLabel = (dateString: string | null) => {
+    if (!dateString) return null;
+    if (weekDates.thisWeek.includes(dateString)) return 'This Week';
+    if (weekDates.nextWeek.includes(dateString)) return 'Next Week';
+    if (weekDates.thisMonth.includes(dateString)) return 'This Month';
+    return null;
+  };
+
+  const sourceDocuments = documents.filter((d) => d.source === source);
+
+  const searchFiltered = sourceDocuments.filter((doc) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      doc.trackingNumber.toLowerCase().includes(q) ||
+      doc.requesterName.toLowerCase().includes(q) ||
+      doc.requesterIdValue.toLowerCase().includes(q)
+    );
+  });
+
+  const baseFiltered = searchFiltered.filter((doc) => {
+    if (weekFilter === 'all') return true;
+    if (!doc.neededBy) return false;
+    if (weekFilter === 'this-week') return weekDates.thisWeek.includes(doc.neededBy);
+    if (weekFilter === 'next-week') return weekDates.nextWeek.includes(doc.neededBy);
+    if (weekFilter === 'this-month') return weekDates.thisMonth.includes(doc.neededBy);
+    return true;
+  });
+
+  const tabCounts: Record<TabKey, number> = {
+    all: baseFiltered.length,
+    pending: baseFiltered.filter((d) => d.status === 'pending').length,
+    processing: baseFiltered.filter((d) => d.status === 'processing').length,
+    ready: baseFiltered.filter((d) => d.status === 'ready').length,
+    claimed: baseFiltered.filter((d) => d.status === 'claimed').length,
+    rejected: baseFiltered.filter((d) => d.status === 'rejected').length,
+    cancelled: baseFiltered.filter((d) => d.status === 'cancelled').length,
+  };
+
+  const visibleDocuments = activeTab === 'all' ? baseFiltered : baseFiltered.filter((d) => d.status === activeTab);
+
+  const handleViewDetails = (doc: DocumentRequest) => {
+    setSelectedDocument(doc);
+    setProcessingNotes(doc.notes);
+    setOfficialCode(doc.officialCode || '');
+    setClaimByDate(doc.claimBy || '');
+    setReturnFiles([]);
+  };
+
+  const handleCloseDetails = () => {
+    setSelectedDocument(null);
+    setProcessingNotes('');
+    setOfficialCode('');
+    setClaimByDate('');
+    setReturnFiles([]);
+  };
+
+  const pickReturnFiles = async () => {
+    const result = await DocumentPicker.getDocumentAsync({ type: ATTACHMENT_TYPES, multiple: true });
+    if (result.canceled || !result.assets?.length) return;
+    let count = returnFiles.length;
+    let tooLarge = 0;
+    let overBudget = 0;
+    const accepted: DocumentPicker.DocumentPickerAsset[] = [];
+    for (const asset of result.assets) {
+      if (asset.size != null && asset.size > MAX_FILE_BYTES) {
+        tooLarge += 1;
+        continue;
+      }
+      if (count + 1 > MAX_FILES) {
+        overBudget += 1;
+        continue;
+      }
+      accepted.push(asset);
+      count += 1;
+    }
+    if (accepted.length > 0) setReturnFiles((prev) => [...prev, ...accepted]);
+    if (tooLarge > 0) Alert.alert('File too large', `${tooLarge} file(s) skipped — each file must be 10MB or smaller.`);
+    if (overBudget > 0) Alert.alert('Attachment limit reached', `You can attach up to ${MAX_FILES} files.`);
+  };
+  const removeReturnFile = (uri: string) => setReturnFiles((prev) => prev.filter((f) => f.uri !== uri));
+
+  // Shared opener (utils/openAttachment.ts): images preview in-app inside the
+  // details Modal, PDF/DOCX open in the phone's viewer on Android, the rest
+  // go to the Share sheet.
+  const viewDocFile = (docEndpointPath: string, cachePrefix: string, file: DocumentAttachment) =>
+    openAttachment(`${docEndpointPath}/${file.id}`, cachePrefix, file);
+
+  const handleUpdateStatus = async (newStatus: DocumentStatus) => {
+    if (!selectedDocument) return;
+    const todayStr = weekDates.todayStr;
+    const isSubmission = selectedDocument.source === 'submission';
+    // GET /admin/document-submissions prefixes ids ("sub-42") so the list
+    // stays merge-safe alongside other sources elsewhere -- but the PATCH
+    // route itself expects the raw numeric submission_id.
+    const rawId = isSubmission ? selectedDocument.id.replace(/^sub-/, '') : selectedDocument.id;
+    const endpoint = isSubmission
+      ? `/admin/document-submissions/${rawId}/status`
+      : selectedDocument.source === 'faculty'
+        ? `/admin/faculty-document-processing/${rawId}/status`
+        : `/admin/document-processing/${rawId}/status`;
+    const needsCode = newStatus === 'ready' && selectedDocument.requiresCoding;
+    // Optional office-set deadline -- only meaningful (and only accepted by
+    // the server) on the ready transition, same rule as officialCode above.
+    const trimmedClaimBy = claimByDate.trim();
+    const setsClaimBy = newStatus === 'ready' && trimmedClaimBy !== '';
+    setUpdating(true);
+    try {
+      if (isSubmission) {
+        const body = new FormData();
+        body.append('status', newStatus);
+        body.append('notes', processingNotes);
+        if (setsClaimBy) body.append('claimBy', trimmedClaimBy);
+        returnFiles.forEach((asset) => {
+          body.append('returnFiles', {
+            uri: asset.uri,
+            name: asset.name,
+            type: asset.mimeType ?? 'application/octet-stream',
+          } as any);
+        });
+        await api.patch(endpoint, body, { headers: { 'Content-Type': 'multipart/form-data' } });
+      } else if (returnFiles.length > 0) {
+        // Request + soft-copy files: multipart, field name "attachmentFiles".
+        const body = new FormData();
+        body.append('status', newStatus);
+        body.append('notes', processingNotes);
+        if (needsCode) body.append('officialCode', officialCode);
+        if (setsClaimBy) body.append('claimBy', trimmedClaimBy);
+        returnFiles.forEach((asset) => {
+          body.append('attachmentFiles', {
+            uri: asset.uri,
+            name: asset.name,
+            type: asset.mimeType ?? 'application/octet-stream',
+          } as any);
+        });
+        await api.patch(endpoint, body, { headers: { 'Content-Type': 'multipart/form-data' } });
+      } else {
+        await api.patch(endpoint, {
+          status: newStatus,
+          notes: processingNotes,
+          ...(needsCode ? { officialCode } : {}),
+          ...(setsClaimBy ? { claimBy: trimmedClaimBy } : {}),
+        });
+      }
+      setDocuments((prev) =>
+        prev.map((d) =>
+          d.id === selectedDocument.id
+            ? {
+                ...d,
+                status: newStatus,
+                notes: processingNotes,
+                claimedDate: newStatus === 'claimed' ? todayStr : d.claimedDate,
+                officialCode: needsCode ? officialCode : d.officialCode,
+                claimBy: setsClaimBy ? trimmedClaimBy : d.claimBy,
+              }
+            : d,
+        ),
+      );
+      if (!isSubmission && returnFiles.length > 0) await fetchDocuments();
+      handleCloseDetails();
+      // Local patch above doesn't know about newly-attached return files --
+      // refetch so studentFiles/adminFiles stay accurate for this source.
+      if (isSubmission) await fetchDocuments();
+    } catch {
+      Alert.alert('Error', 'Failed to update document status.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  // "Generate a QR pickup code" shortcut -- mirrors adm-document-processing.jsx's
+  // handleGenerateDocument. Only valid from 'ready' and only for actual
+  // requests (not submissions, which have no delivery-code column at all).
+  // Status stays 'ready'. Leaves the detail modal open so the returned
+  // deliveryCode can be shown immediately.
+  const handleGenerateDocument = async () => {
+    if (!selectedDocument || selectedDocument.source === 'submission') return;
+    const endpoint = selectedDocument.source === 'faculty'
+      ? `/admin/faculty-document-processing/${selectedDocument.id}/generate`
+      : `/admin/document-processing/${selectedDocument.id}/generate`;
+    setUpdating(true);
+    try {
+      const { data } = await api.patch(endpoint);
+      const patch = {
+        status: 'ready' as DocumentStatus,
+        isDigitalDelivery: true,
+        deliveryCode: data.deliveryCode as string,
+      };
+      setDocuments((prev) => prev.map((d) => (d.id === selectedDocument.id ? { ...d, ...patch } : d)));
+      setSelectedDocument((prev) => (prev ? { ...prev, ...patch } : prev));
+    } catch {
+      Alert.alert('Error', 'Failed to generate document.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleAttachReturnFiles = () => {
+    if (!selectedDocument || returnFiles.length === 0) return;
+    handleUpdateStatus(selectedDocument.status);
+  };
+
+  const runConfirmStatusChange = () => {
+    if (!confirmStatus) return;
+    handleUpdateStatus(confirmStatus);
+    setConfirmStatus(null);
+  };
+
+  // "Mark as Ready" needs a non-blank official code first when the document
+  // type requires coding — caught here before opening the generic confirm
+  // dialog, which has no room for inline field validation.
+  const handleMarkReadyClick = () => {
+    if (selectedDocument?.requiresCoding && !officialCode.trim()) {
+      Alert.alert('Missing information', 'Enter the official code before marking this document ready.');
+      return;
+    }
+    setConfirmStatus('ready');
+  };
+
+  const confirmMeta: Record<ConfirmStatus, { title: string; description: string; confirmLabel: string; icon: LucideIconType; color: string }> | null =
+    selectedDocument && {
+      processing: {
+        title: 'Start Processing?',
+        description: `Start processing the ${selectedDocument.documentType} request for ${selectedDocument.requesterName}?`,
+        confirmLabel: 'Start Processing',
+        icon: Clock,
+        color: '#3b82f6',
+      },
+      ready: {
+        title: 'Mark as Ready?',
+        description: `Mark the ${selectedDocument.documentType} ${selectedDocument.source === 'submission' ? 'submission from' : 'request for'} ${selectedDocument.requesterName} as ready for the requester to claim?`,
+        confirmLabel: 'Mark as Ready',
+        icon: CheckCircle,
+        color: '#22c55e',
+      },
+      rejected: {
+        title: 'Reject Request?',
+        description: `Reject the ${selectedDocument.documentType} request from ${selectedDocument.requesterName}? This action cannot be undone.`,
+        confirmLabel: 'Reject Request',
+        icon: XCircle,
+        color: '#ef4444',
+      },
+      claimed: {
+        title: 'Mark as Claimed?',
+        description:
+          selectedDocument.source === 'submission'
+            ? `Confirm that the ${selectedDocument.documentType} submission from ${selectedDocument.requesterName} is complete, per office procedure?`
+            : `Confirm that the ${selectedDocument.documentType} request for ${selectedDocument.requesterName} has been handed to the correct recipient, per office procedure?`,
+        confirmLabel: 'Mark as Claimed',
+        icon: CheckCircle,
+        color: '#10b981',
+      },
+    };
+
+  const activeConfirmMeta = confirmStatus && confirmMeta ? confirmMeta[confirmStatus] : null;
+
+  return (
+    <View style={styles.root}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+
+        <View style={styles.header}>
+          <View style={styles.headerBrand}>
+            <Image source={pncLogo} style={styles.headerPncLogo} resizeMode="contain" />
+            <OamsLogo style={styles.headerOamsLogo} outline={isDarkMode} />
+          </View>
+          <View style={styles.headerActions}>
+            <Pressable style={styles.iconBtn} onPress={toggleTheme} hitSlop={8}>
+              <Image
+                source={isDarkMode ? sunIcon : darkModeIcon}
+                style={styles.iconBtnImg}
+                resizeMode="contain"
+              />
+            </Pressable>
+            <RefreshButton onPress={() => fetchDocuments()} loading={loading} style={styles.iconBtn} color={theme.text} label="Refresh documents" />
+            <NotificationBell
+              endpointBase="admin"
+              theme={theme}
+              typePaths={ADMIN_NOTIFICATION_PATHS}
+              viewAllPath={ADMIN_NOTIFICATIONS_VIEW_ALL}
+            />
+            <Pressable style={styles.iconBtn} onPress={() => setMenuOpen(true)} hitSlop={8}>
+              <Ionicons name="menu-outline" size={20} color={theme.text} />
+            </Pressable>
+          </View>
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
+            <ChevronLeft size={18} color={theme.subtext} />
+            <Text style={styles.breadcrumbText}>Home</Text>
+          </Pressable>
+
+          <View style={styles.titleRow}>
+            <LinearGradient colors={['#f97316', '#ea580c']} style={styles.titleIcon}>
+              <FileText size={22} color="#ffffff" />
+            </LinearGradient>
+            <View style={styles.titleTextWrap}>
+              <Text style={styles.pageTitle}>Document Processing</Text>
+              <Text style={styles.pageSubtitle}>Process and manage document requests for {adminDepartmentName}</Text>
+            </View>
+          </View>
+
+          {/* Source toggle */}
+          <View style={styles.sourceToggle}>
+            {SOURCES.map((s) => {
+              const active = source === s.id;
+              return (
+                <Pressable
+                  key={s.id}
+                  style={[styles.sourceBtn, active && styles.sourceBtnActive]}
+                  onPress={() => handleSourceChange(s.id)}
+                >
+                  <Text style={[styles.sourceBtnText, active && styles.sourceBtnTextActive]}>{s.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Search + Week filter */}
+          <View style={styles.card}>
+            <View style={styles.searchWrapper}>
+              <Search size={16} color={theme.tertiary} style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search by tracking number, name, or ID..."
+                placeholderTextColor={theme.tertiary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+            <Pressable style={styles.filterSelect} onPress={() => setWeekFilterModalVisible(true)}>
+              <Calendar size={14} color={theme.tertiary} />
+              <Text style={styles.filterSelectText}>
+                {WEEK_FILTER_OPTIONS.find((o) => o.value === weekFilter)?.label ?? 'All'}
+              </Text>
+              <ChevronDown size={14} color={theme.tertiary} />
+            </Pressable>
+          </View>
+
+          {/* Documents */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitleText}>Document Requests</Text>
+            <Text style={styles.cardSubtitleText}>Tracking and workflow management for {adminDepartmentAbbrev}</Text>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll}>
+              <View style={styles.tabsList}>
+                {(source === 'submission' ? SUBMISSION_TABS : TABS).map((tab) => {
+                  const active = activeTab === tab;
+                  return (
+                    <Pressable
+                      key={tab}
+                      style={[styles.tabTrigger, active && styles.tabTriggerActive]}
+                      onPress={() => setActiveTab(tab)}
+                    >
+                      <Text style={[styles.tabTriggerText, active && styles.tabTriggerTextActive]}>
+                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                      </Text>
+                      <View style={[styles.tabCount, active && styles.tabCountActive]}>
+                        <Text style={[styles.tabCountText, active && styles.tabCountTextActive]}>
+                          {tabCounts[tab]}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            {loading ? (
+              <View style={styles.emptyCard}>
+                <ActivityIndicator color={theme.primary} />
+                <Text style={styles.emptyTitle}>Loading document requests…</Text>
+              </View>
+            ) : error ? (
+              <View style={styles.emptyCard}>
+                <AlertCircle size={28} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>{error}</Text>
+                <Pressable style={styles.viewProcessBtn} onPress={fetchDocuments}>
+                  <Text style={styles.viewProcessBtnText}>Retry</Text>
+                </Pressable>
+              </View>
+            ) : visibleDocuments.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <FileText size={28} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>No documents found</Text>
+              </View>
+            ) : (
+              <View style={styles.cardsList}>
+                {visibleDocuments.map((doc) => {
+                  const statusTint = getHubStatusMeta(doc.status, isDarkMode);
+                  const StatusIcon = getStatusIcon(doc.status);
+                  const isOverdue = !!doc.neededBy && !DONE_STATUSES.includes(doc.status) && doc.neededBy < weekDates.todayStr;
+                  const label = deadlineLabel(doc.neededBy);
+                  const isClaimOverdue = !!doc.claimBy && doc.status === 'ready' && doc.claimBy < weekDates.todayStr;
+                  return (
+                    <View key={doc.id} style={styles.docCard}>
+                      <View style={styles.docCardHeaderRow}>
+                        <View style={{ flex: 1, gap: 6 }}>
+                          <View style={styles.collegeBadge}>
+                            <HomeIcon size={13} color="#f97316" />
+                            <Text style={styles.collegeBadgeText}>{doc.college}</Text>
+                            <Text style={styles.trackingText}>{doc.trackingNumber}</Text>
+                          </View>
+                          <View style={styles.requesterInfoRow}>
+                            <User size={15} color={theme.tertiary} />
+                            <Text style={styles.requesterName}>{doc.requesterName}</Text>
+                            <Text style={styles.requesterId}>({doc.requesterIdValue})</Text>
+                          </View>
+                          <Text style={styles.docTypeText}>{doc.documentType}</Text>
+                        </View>
+                        <View style={[styles.statusBadge, { backgroundColor: statusTint.bg, borderColor: statusTint.border }]}>
+                          <StatusIcon size={12} color={statusTint.color} />
+                          <Text style={[styles.statusBadgeText, { color: statusTint.color }]}>
+                            {statusTint.label}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.docDetailsGrid}>
+                        <View style={styles.docDetailItem}>
+                          <Text style={styles.docDetailLabel}>Purpose</Text>
+                          <Text style={styles.docDetailValue}>{doc.purpose}</Text>
+                        </View>
+                        <View style={styles.docDetailItem}>
+                          <Text style={styles.docDetailLabel}>Requested</Text>
+                          <Text style={styles.docDetailValue}>{formatDisplayDate(doc.requestDate)}</Text>
+                        </View>
+                        {doc.neededBy && (
+                          <View style={styles.docDetailItem}>
+                            <Text style={styles.docDetailLabel}>{isOverdue ? 'Overdue' : 'Needed By'}</Text>
+                            <Text style={[styles.docDetailValue, isOverdue && { color: '#ef4444' }]}>
+                              {formatDisplayDate(doc.neededBy)}
+                              {label ? ` (${label})` : ''}
+                            </Text>
+                          </View>
+                        )}
+                        {doc.claimBy && doc.status === 'ready' && (
+                          <View style={styles.docDetailItem}>
+                            <Text style={styles.docDetailLabel}>{isClaimOverdue ? 'Claim Overdue' : 'Claim By'}</Text>
+                            <Text style={[styles.docDetailValue, isClaimOverdue && { color: '#ef4444' }]}>
+                              {formatDisplayDate(doc.claimBy)}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+
+                      <View style={styles.docCardFooter}>
+                        <Pressable style={styles.viewProcessBtn} onPress={() => handleViewDetails(doc)}>
+                          <Eye size={14} color="#ffffff" />
+                          <Text style={styles.viewProcessBtnText}>View & Process</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+
+      <NavDrawer
+        visible={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onNavPress={handleNavPress}
+        onLogout={handleLogout}
+        theme={theme}
+        styles={styles}
+        adminName={adminName}
+        adminRole={adminRole}
+        adminDepartmentName={adminDepartmentName}
+      />
+
+      {/* Week filter modal */}
+      <Modal visible={weekFilterModalVisible} animationType="fade" transparent onRequestClose={() => setWeekFilterModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.filterModalCard}>
+            <Text style={styles.confirmTitle}>Filter by Deadline</Text>
+            {WEEK_FILTER_OPTIONS.map((opt) => {
+              const selected = opt.value === weekFilter;
+              return (
+                <Pressable
+                  key={opt.value}
+                  style={[styles.filterOptionRow, selected && styles.filterOptionRowActive]}
+                  onPress={() => {
+                    setWeekFilter(opt.value);
+                    setWeekFilterModalVisible(false);
+                  }}
+                >
+                  <Text style={[styles.filterOptionText, selected && styles.filterOptionTextActive]}>{opt.label}</Text>
+                  {selected && <Ionicons name="checkmark" size={16} color={theme.primary} />}
+                </Pressable>
+              );
+            })}
+            <Pressable style={styles.cancelBtn} onPress={() => setWeekFilterModalVisible(false)}>
+              <Text style={styles.cancelBtnText}>Close</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Details / process modal */}
+      <Modal visible={!!selectedDocument} animationType="fade" transparent onRequestClose={handleCloseDetails}>
+        {selectedDocument && (
+          <View style={styles.modalOverlay}>
+            <View style={styles.detailsModalCard}>
+              <View style={styles.detailsModalHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.detailsModalTitle}>Document Request Details</Text>
+                  <Text style={styles.detailsModalSubtitle}>Review and process this request</Text>
+                </View>
+                <Pressable onPress={handleCloseDetails} hitSlop={8}>
+                  <X size={22} color={theme.text} />
+                </Pressable>
+              </View>
+
+              <ScrollView style={styles.detailsModalBody}>
+                <View style={styles.detailsStatusRow}>
+                  {(() => {
+                    const meta = getHubStatusMeta(selectedDocument.status, isDarkMode);
+                    const StatusIcon = getStatusIcon(selectedDocument.status);
+                    return (
+                      <View style={[styles.statusBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
+                        <StatusIcon size={12} color={meta.color} />
+                        <Text style={[styles.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
+                      </View>
+                    );
+                  })()}
+                  <Text style={styles.detailsTracking}>{selectedDocument.trackingNumber}</Text>
+                </View>
+
+                <View style={styles.detailsGrid}>
+                  <View style={styles.detailsField}>
+                    <Text style={styles.detailsLabel}>Name</Text>
+                    <Text style={styles.detailsValue}>{selectedDocument.requesterName}</Text>
+                  </View>
+                  <View style={styles.detailsField}>
+                    <Text style={styles.detailsLabel}>{selectedDocument.requesterIdLabel}</Text>
+                    <Text style={styles.detailsValue}>{selectedDocument.requesterIdValue}</Text>
+                  </View>
+                  <View style={styles.detailsField}>
+                    <Text style={styles.detailsLabel}>College</Text>
+                    <Text style={styles.detailsValue}>{selectedDocument.college}</Text>
+                  </View>
+                  <View style={styles.detailsField}>
+                    <Text style={styles.detailsLabel}>{selectedDocument.source === 'submission' ? 'Title' : 'Document Type'}</Text>
+                    <Text style={styles.detailsValue}>{selectedDocument.documentType}</Text>
+                  </View>
+                  {selectedDocument.copies != null && (
+                    <View style={styles.detailsField}>
+                      <Text style={styles.detailsLabel}>Copies</Text>
+                      <Text style={styles.detailsValue}>{selectedDocument.copies}</Text>
+                    </View>
+                  )}
+                  {selectedDocument.neededBy && (
+                    <View style={styles.detailsField}>
+                      <Text style={styles.detailsLabel}>Needed By</Text>
+                      <Text style={styles.detailsValue}>{formatDisplayDate(selectedDocument.neededBy)}</Text>
+                    </View>
+                  )}
+                  <View style={[styles.detailsField, styles.detailsFieldFull]}>
+                    <Text style={styles.detailsLabel}>Purpose</Text>
+                    <Text style={styles.detailsValue}>{selectedDocument.purpose}</Text>
+                  </View>
+                  <View style={styles.detailsField}>
+                    <Text style={styles.detailsLabel}>Request Date</Text>
+                    <Text style={styles.detailsValue}>{formatDisplayDate(selectedDocument.requestDate)}</Text>
+                  </View>
+                  {selectedDocument.claimedDate && (
+                    <View style={styles.detailsField}>
+                      <Text style={styles.detailsLabel}>Claimed Date</Text>
+                      <Text style={styles.detailsValue}>{formatDisplayDate(selectedDocument.claimedDate)}</Text>
+                    </View>
+                  )}
+                  {selectedDocument.officialCode && (
+                    <View style={styles.detailsField}>
+                      <Text style={styles.detailsLabel}>Official Code</Text>
+                      <Text style={styles.detailsValue}>{selectedDocument.officialCode}</Text>
+                    </View>
+                  )}
+                  {selectedDocument.claimBy && selectedDocument.status !== 'processing' && (
+                    <View style={styles.detailsField}>
+                      <Text style={styles.detailsLabel}>Claim By</Text>
+                      <Text
+                        style={[
+                          styles.detailsValue,
+                          selectedDocument.status === 'ready' && selectedDocument.claimBy < weekDates.todayStr && { color: '#ef4444' },
+                        ]}
+                      >
+                        {formatDisplayDate(selectedDocument.claimBy)}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {(() => {
+                  const isSub = selectedDocument.source === 'submission';
+                  const rawId = isSub ? selectedDocument.id.replace(/^sub-/, '') : selectedDocument.id;
+                  const filesBasePath = isSub
+                    ? `/admin/document-submissions/${rawId}/files`
+                    : selectedDocument.source === 'faculty'
+                      ? `/admin/faculty-document-processing/${rawId}/files`
+                      : `/admin/document-processing/${rawId}/files`;
+                  const openAttachedFile = (f: DocumentAttachment) =>
+                    viewDocFile(filesBasePath, `${isSub ? 'submission' : 'request'}-${rawId}`, f);
+                  // Files can be attached once processing has started (never while
+                  // Pending) -- matches the server-side guard.
+                  const canAttach = selectedDocument.status === 'processing' || selectedDocument.status === 'ready';
+                  const hasAdminFiles = !!(selectedDocument.adminFiles && selectedDocument.adminFiles.length > 0);
+                  if (!isSub && !canAttach && !hasAdminFiles) return null;
+                  return (
+                    <View style={styles.notesWrap}>
+                      {isSub && (
+                        <>
+                          <Text style={styles.detailsLabel}>Files from Student</Text>
+                          {selectedDocument.studentFiles && selectedDocument.studentFiles.length > 0 ? (
+                            <View style={{ gap: 8, marginTop: 6 }}>
+                              {selectedDocument.studentFiles.map((f) => (
+                                <Pressable key={f.id} style={styles.attachChip} onPress={() => openAttachedFile(f)} disabled={!!downloadingFileId}>
+                                  <FileText size={14} color="#f97316" />
+                                  <Text style={styles.attachChipText} numberOfLines={1}>{f.filename}</Text>
+                                </Pressable>
+                              ))}
+                            </View>
+                          ) : (
+                            <Text style={styles.detailsValue}>No files attached.</Text>
+                          )}
+                        </>
+                      )}
+
+                      <Text style={[styles.detailsLabel, isSub ? { marginTop: 12 } : undefined]}>
+                        {isSub ? 'Return Files' : 'Attached Files (Soft Copy)'} ({returnFiles.length}/{MAX_FILES})
+                      </Text>
+                      {hasAdminFiles && (
+                        <View style={{ gap: 8, marginTop: 6 }}>
+                          {selectedDocument.adminFiles!.map((f) => (
+                            <Pressable key={f.id} style={styles.attachChip} onPress={() => openAttachedFile(f)} disabled={!!downloadingFileId}>
+                              <FileText size={14} color="#f97316" />
+                              <Text style={styles.attachChipText} numberOfLines={1}>{f.filename}</Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      )}
+                      {returnFiles.length > 0 && (
+                        <View style={{ gap: 8, marginTop: 6 }}>
+                          {returnFiles.map((f) => (
+                            <View key={f.uri} style={[styles.attachChip, { justifyContent: 'space-between' }]}>
+                              <Text style={styles.attachChipText} numberOfLines={1}>{f.name}</Text>
+                              <Pressable onPress={() => removeReturnFile(f.uri)} hitSlop={8}>
+                                <X size={14} color={theme.tertiary} />
+                              </Pressable>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                      {canAttach ? (
+                        <Pressable
+                          style={[styles.filterSelect, { marginTop: 8 }]}
+                          onPress={pickReturnFiles}
+                          disabled={returnFiles.length >= MAX_FILES}
+                        >
+                          <FileText size={14} color="#f97316" />
+                          <Text style={styles.filterSelectText}>
+                            {returnFiles.length >= MAX_FILES ? 'Attachment limit reached' : 'Add files'}
+                          </Text>
+                        </Pressable>
+                      ) : (
+                        <Text style={[styles.filterSelectText, { marginTop: 8, opacity: 0.7 }]}>
+                          Start processing this document to attach files.
+                        </Text>
+                      )}
+                    </View>
+                  );
+                })()}
+
+                {selectedDocument.status === 'processing' && selectedDocument.requiresCoding && (
+                  <View style={styles.notesWrap}>
+                    <Text style={styles.detailsLabel}>Official Code *</Text>
+                    <TextInput
+                      style={styles.notesInput}
+                      placeholder="Enter the dean-sanctioned official code for this document"
+                      placeholderTextColor={theme.tertiary}
+                      value={officialCode}
+                      onChangeText={setOfficialCode}
+                    />
+                  </View>
+                )}
+
+                {selectedDocument.status === 'processing' && (
+                  <View style={styles.notesWrap}>
+                    <Text style={styles.detailsLabel}>Claim By (optional)</Text>
+                    <Pressable style={styles.filterSelect} onPress={() => setShowClaimByPicker(true)}>
+                      <Calendar size={14} color={theme.tertiary} />
+                      <Text style={claimByDate ? styles.filterSelectText : styles.filterSelectPlaceholder}>
+                        {claimByDate ? formatDisplayDate(claimByDate) : 'Set a claim-by deadline'}
+                      </Text>
+                      {claimByDate && (
+                        <Pressable onPress={() => setClaimByDate('')} hitSlop={8}>
+                          <X size={14} color={theme.tertiary} />
+                        </Pressable>
+                      )}
+                    </Pressable>
+                    <Text style={styles.formHint}>
+                      Only applies once this document is marked Ready -- the requester sees it as a pickup deadline.
+                    </Text>
+                    {showClaimByPicker && (
+                      <DatePickerSheet
+                        value={claimByDate ? fromLocalYMD(claimByDate) : fromLocalYMD(getManilaDateString())}
+                        minimumDate={fromLocalYMD(getManilaDateString())}
+                        onChange={(event, selectedDate) => {
+                          setShowClaimByPicker(false);
+                          if (event.type === 'set' && selectedDate) setClaimByDate(toLocalYMD(selectedDate));
+                        }}
+                      />
+                    )}
+                  </View>
+                )}
+
+                <View style={styles.notesWrap}>
+                  <Text style={styles.detailsLabel}>Processing Notes</Text>
+                  <TextInput
+                    style={styles.notesInput}
+                    placeholder="Add notes about the processing status..."
+                    placeholderTextColor={theme.tertiary}
+                    value={processingNotes}
+                    onChangeText={setProcessingNotes}
+                    multiline
+                    numberOfLines={4}
+                  />
+                </View>
+
+                <View style={styles.detailsActionsRow}>
+                  {selectedDocument.status === 'pending' && (
+                    <Pressable style={[styles.detailsActionBtn, styles.detailsActionBtnPrimary]} onPress={() => setConfirmStatus('processing')}>
+                      <Text style={styles.detailsActionBtnTextPrimary}>Start Processing</Text>
+                    </Pressable>
+                  )}
+                  {selectedDocument.status === 'processing' && (
+                    <Pressable style={[styles.detailsActionBtn, styles.detailsActionBtnSuccess]} onPress={handleMarkReadyClick}>
+                      <Text style={styles.detailsActionBtnTextPrimary}>Mark as Ready</Text>
+                    </Pressable>
+                  )}
+                  {selectedDocument.status === 'ready' && selectedDocument.source !== 'submission' && (
+                    <Pressable
+                      style={[styles.detailsActionBtn, styles.detailsActionBtnOutline, updating && { opacity: 0.6 }]}
+                      onPress={() =>
+                        Alert.alert(
+                          'Generate Pickup Code',
+                          'Generate a QR + text pickup code for this Ready request? It stays Ready and the requester shows the code when they collect it.',
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Generate', onPress: handleGenerateDocument },
+                          ],
+                        )
+                      }
+                      disabled={updating}
+                    >
+                      <Text style={styles.detailsActionBtnTextOutline}>Generate Pickup Code</Text>
+                    </Pressable>
+                  )}
+                  {selectedDocument.status === 'ready' && (
+                    <Pressable style={[styles.detailsActionBtn, styles.detailsActionBtnSuccess]} onPress={() => setConfirmStatus('claimed')}>
+                      <Text style={styles.detailsActionBtnTextPrimary}>Mark as Claimed</Text>
+                    </Pressable>
+                  )}
+                  {(selectedDocument.status === 'processing' || selectedDocument.status === 'ready') && (
+                    <Pressable
+                      style={[styles.detailsActionBtn, styles.detailsActionBtnPrimary]}
+                      onPress={handleAttachReturnFiles}
+                      disabled={returnFiles.length === 0}
+                    >
+                      <Text style={styles.detailsActionBtnTextPrimary}>Attach Files</Text>
+                    </Pressable>
+                  )}
+                  {(selectedDocument.status === 'pending' || selectedDocument.status === 'processing') && (
+                    <Pressable style={[styles.detailsActionBtn, styles.detailsActionBtnDanger]} onPress={() => setConfirmStatus('rejected')}>
+                      <Text style={styles.detailsActionBtnTextDanger}>Reject Request</Text>
+                    </Pressable>
+                  )}
+                </View>
+
+                {!!selectedDocument.isDigitalDelivery && !!selectedDocument.deliveryCode && (
+                  <View style={styles.deliveryCodeBox}>
+                    <Text style={styles.deliveryCodeLabel}>Digital Pickup Code</Text>
+                    <Text style={styles.deliveryCodeValue}>{selectedDocument.deliveryCode}</Text>
+                  </View>
+                )}
+              </ScrollView>
+
+              <View style={styles.detailsModalFooter}>
+                <Pressable style={styles.detailsCloseBtn} onPress={handleCloseDetails}>
+                  <Text style={styles.detailsCloseBtnText}>Close</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        )}
+        {/* Inside this Modal on purpose -- no nested native Modal. */}
+        <ImagePreviewOverlay file={previewFile} onClose={closePreview} />
+      </Modal>
+
+      {/* Status-change confirmation -- reject gets a required-reason modal
+          (matching web's adm-document-processing.jsx), reusing the same
+          `processingNotes` field already sent as `notes` for every status
+          change on this screen, not a separate reason field. */}
+      {confirmStatus === 'rejected' ? (
+        <QueueReasonModal
+          visible={!!confirmStatus}
+          title={activeConfirmMeta?.title ?? 'Reject Request?'}
+          message={activeConfirmMeta?.description ?? 'Reject this request? This action cannot be undone.'}
+          confirmText={updating ? 'Updating…' : 'Reject Request'}
+          confirmColor="#ef4444"
+          reason={processingNotes}
+          onChangeReason={setProcessingNotes}
+          onCancel={() => setConfirmStatus(null)}
+          onConfirm={runConfirmStatusChange}
+          theme={theme}
+          styles={styles}
+          submitting={updating}
+        />
+      ) : (
+        <Modal visible={!!confirmStatus} animationType="fade" transparent onRequestClose={() => setConfirmStatus(null)}>
+          <View style={styles.modalOverlay}>
+            {activeConfirmMeta && (
+              <View style={styles.confirmModalCard}>
+                <View style={[styles.confirmIconCircle, { backgroundColor: `${activeConfirmMeta.color}26` }]}>
+                  <activeConfirmMeta.icon size={26} color={activeConfirmMeta.color} />
+                </View>
+                <Text style={styles.confirmTitle}>{activeConfirmMeta.title}</Text>
+                <Text style={styles.confirmDescription}>{activeConfirmMeta.description}</Text>
+                <View style={styles.confirmActionsRow}>
+                  <Pressable style={styles.cancelBtn} onPress={() => setConfirmStatus(null)}>
+                    <Text style={styles.cancelBtnText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.confirmBtn, { backgroundColor: activeConfirmMeta.color }, updating && { opacity: 0.6 }]}
+                    onPress={runConfirmStatusChange}
+                    disabled={updating}
+                  >
+                    <Text style={styles.confirmBtnText}>{updating ? 'Updating…' : activeConfirmMeta.confirmLabel}</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+          </View>
+        </Modal>
+      )}
+
+      <LogoutModal
+        visible={logoutModalVisible}
+        onCancel={() => setLogoutModalVisible(false)}
+        onConfirm={confirmLogout}
+        styles={styles}
+      />
+    </View>
+  );
+}
+
+// ─────────────────────────── Shared sub-components ───────────────────────────
+
+function NavDrawer({
+  visible,
+  onClose,
+  onNavPress,
+  onLogout,
+  theme,
+  styles,
+  adminName,
+  adminRole,
+  adminDepartmentName,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onNavPress: (key: string) => void;
+  onLogout: () => void;
+  theme: ThemePalette;
+  styles: ReturnType<typeof createStyles>;
+  adminName: string;
+  adminRole: string;
+  adminDepartmentName: string;
+}) {
+  return (
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+      <View style={styles.drawerOverlay}>
+        <SafeAreaView style={styles.drawerPanel} edges={['top', 'bottom']}>
+          <View style={styles.drawerProfile}>
+            <View style={styles.drawerProfileHeader}>
+              <View style={styles.drawerAvatar}>
+                <Ionicons name="person-outline" size={15} color={theme.primary} />
+              </View>
+              <Text style={styles.drawerName}>{adminName}</Text>
+            </View>
+            <View style={styles.drawerRoleBadge}>
+              <Text style={styles.drawerRoleBadgeText}>{adminRole}</Text>
+            </View>
+            <Text style={styles.drawerCollege}>{adminDepartmentName}</Text>
+          </View>
+
+          <View style={styles.drawerNav}>
+            {navItems.map((item) => {
+              const active = item.key === 'documents';
+              return (
+                <Pressable
+                  key={item.key}
+                  style={[styles.drawerNavItem, active && styles.drawerNavItemActive]}
+                  onPress={() => onNavPress(item.key)}
+                >
+                  <item.icon size={18} color={active ? '#ffffff' : theme.subtext} />
+                  <Text style={[styles.drawerNavLabel, active && styles.drawerNavLabelActive]}>{item.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Pressable style={styles.drawerLogout} onPress={onLogout}>
+            <Ionicons name="log-out-outline" size={18} color="#ef4444" />
+            <Text style={styles.drawerLogoutText}>Logout</Text>
+          </Pressable>
+        </SafeAreaView>
+        <Pressable style={styles.drawerBackdrop} onPress={onClose} />
+      </View>
+    </Modal>
+  );
+}
+
+function LogoutModal({
+  visible,
+  onCancel,
+  onConfirm,
+  styles,
+}: {
+  visible: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onCancel}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.confirmModalCard}>
+          <View style={[styles.confirmIconCircle, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
+            <Ionicons name="log-out-outline" size={26} color="#ef4444" />
+          </View>
+          <Text style={styles.confirmTitle}>Confirm Logout</Text>
+          <Text style={styles.confirmDescription}>
+            Are you sure you want to log out? Any unsaved changes will be lost.
+          </Text>
+          <View style={styles.confirmActionsRow}>
+            <Pressable style={styles.cancelBtn} onPress={onCancel}>
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </Pressable>
+            <Pressable style={styles.logoutConfirmBtn} onPress={onConfirm}>
+              <Ionicons name="log-out-outline" size={16} color="#ffffff" />
+              <Text style={styles.confirmBtnText}>Log Out</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─────────────────────────── Theme ───────────────────────────
+
+type ThemePalette = {
+  background: string;
+  card: string;
+  border: string;
+  headerBg: string;
+  headerBorder: string;
+  text: string;
+  subtext: string;
+  tertiary: string;
+  primary: string;
+  iconBtnBg: string;
+  iconBtnBorder: string;
+};
+
+const darkPalette: ThemePalette = {
+  background: '#0a0f0a',
+  card: '#111612',
+  border: '#1e3a23',
+  headerBg: 'rgba(17, 22, 18, 0.95)',
+  headerBorder: 'rgba(34, 197, 94, 0.15)',
+  text: '#f0fdf4',
+  subtext: '#94a3b8',
+  tertiary: '#94a3b8',
+  primary: '#22c55e',
+  iconBtnBg: 'rgba(34, 197, 94, 0.1)',
+  iconBtnBorder: 'rgba(34, 197, 94, 0.2)',
+};
+
+const lightPalette: ThemePalette = {
+  background: '#f8fafc',
+  card: '#ffffff',
+  border: '#e2e8f0',
+  headerBg: 'rgba(255, 255, 255, 0.95)',
+  headerBorder: 'rgba(34, 197, 94, 0.15)',
+  text: '#1e293b',
+  subtext: '#64748b',
+  tertiary: '#64748b',
+  primary: '#15803d',
+  iconBtnBg: 'rgba(34, 197, 94, 0.08)',
+  iconBtnBorder: 'rgba(34, 197, 94, 0.15)',
+};
+
+function createStyles(theme: ThemePalette) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: theme.background },
+    safeArea: { flex: 1 },
+
+    // Header
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: theme.headerBg,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.headerBorder,
+    },
+    headerBrand: { flexDirection: 'row', alignItems: 'center', gap: 0 },
+    headerPncLogo: { width: 40, height: 40 },
+    headerOamsLogo: { height: 34, width: 96 },
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    iconBtn: {
+      padding: 8,
+      borderRadius: 10,
+      backgroundColor: theme.iconBtnBg,
+      borderWidth: 1,
+      borderColor: theme.iconBtnBorder,
+    },
+    iconBtnImg: { width: 18, height: 18 },
+
+    scrollContent: { padding: 16, gap: 18, paddingBottom: 40 },
+
+    // Breadcrumb
+    breadcrumb: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
+    breadcrumbText: { fontSize: 14, fontWeight: '600', color: theme.subtext },
+
+    // Title
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+    titleIcon: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    titleTextWrap: { flex: 1 },
+    pageTitle: { fontSize: 20, fontWeight: '800', color: theme.text, letterSpacing: -0.3 },
+    pageSubtitle: { fontSize: 12, color: theme.subtext, marginTop: 3 },
+
+    // Source toggle
+    sourceToggle: {
+      flexDirection: 'row',
+      gap: 4,
+      alignSelf: 'flex-start',
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      padding: 4,
+    },
+    sourceBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 9 },
+    sourceBtnActive: { backgroundColor: '#f97316' },
+    sourceBtnText: { fontSize: 13, fontWeight: '700', color: theme.subtext },
+    sourceBtnTextActive: { color: '#ffffff' },
+
+    // Generic card
+    card: {
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 16,
+      padding: 16,
+      gap: 14,
+    },
+    cardTitleText: { fontSize: 15, fontWeight: '700', color: theme.text },
+    cardSubtitleText: { fontSize: 12, color: theme.subtext, marginTop: -8 },
+
+    // Search + filter
+    searchWrapper: { position: 'relative', justifyContent: 'center' },
+    searchIcon: { position: 'absolute', left: 12, zIndex: 1 },
+    searchInput: {
+      paddingVertical: 12,
+      paddingLeft: 36,
+      paddingRight: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.background,
+      color: theme.text,
+      fontSize: 13,
+    },
+    filterSelect: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      alignSelf: 'flex-start',
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    filterSelectText: { fontSize: 12.5, fontWeight: '600', color: theme.text },
+    filterSelectPlaceholder: { fontSize: 12.5, fontWeight: '600', color: theme.tertiary },
+    formHint: { fontSize: 11, color: theme.tertiary, marginTop: 6, lineHeight: 15 },
+
+    // Tabs
+    tabsScroll: { flexGrow: 0 },
+    tabsList: { flexDirection: 'row', gap: 16, borderBottomWidth: 1, borderBottomColor: theme.border },
+    tabTrigger: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingBottom: 12 },
+    tabTriggerActive: { borderBottomWidth: 2, borderBottomColor: '#f97316' },
+    tabTriggerText: { fontSize: 13, fontWeight: '600', color: theme.subtext },
+    tabTriggerTextActive: { color: '#f97316' },
+    tabCount: {
+      minWidth: 20,
+      height: 20,
+      paddingHorizontal: 5,
+      borderRadius: 999,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(249, 115, 22, 0.15)',
+    },
+    tabCountActive: { backgroundColor: 'rgba(249, 115, 22, 0.25)' },
+    tabCountText: { fontSize: 10, fontWeight: '700', color: '#f97316' },
+    tabCountTextActive: { color: '#f97316' },
+
+    // Document cards
+    cardsList: { gap: 10 },
+    emptyCard: { alignItems: 'center', gap: 8, paddingVertical: 24 },
+    emptyTitle: { fontSize: 13, color: theme.tertiary },
+    docCard: {
+      backgroundColor: 'rgba(249, 115, 22, 0.05)',
+      borderWidth: 1.5,
+      borderColor: 'rgba(249, 115, 22, 0.3)',
+      borderRadius: 14,
+      padding: 11,
+      gap: 10,
+    },
+    docCardHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
+    collegeBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+    collegeBadgeText: { fontSize: 11, fontWeight: '700', color: '#f97316' },
+    trackingText: { fontSize: 10, fontWeight: '700', color: theme.tertiary },
+    requesterInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+    requesterName: { fontSize: 13.5, fontWeight: '700', color: theme.text },
+    requesterId: { fontSize: 11, color: theme.tertiary },
+    docTypeText: { fontSize: 11, fontWeight: '500', color: theme.subtext },
+    statusBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingVertical: 3,
+      paddingHorizontal: 8,
+      borderRadius: 8,
+      borderWidth: 0.5,
+    },
+    statusBadgeText: { fontSize: 9.5, fontWeight: '700', textTransform: 'capitalize' },
+
+    docDetailsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      padding: 10,
+      backgroundColor: 'rgba(249, 115, 22, 0.06)',
+      borderRadius: 10,
+    },
+    docDetailItem: { width: '46%', gap: 2 },
+    docDetailLabel: { fontSize: 9.5, fontWeight: '600', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.3 },
+    docDetailValue: { fontSize: 12, fontWeight: '600', color: theme.text },
+
+    docCardFooter: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      paddingTop: 9,
+      borderTopWidth: 1,
+      borderTopColor: 'rgba(249, 115, 22, 0.2)',
+    },
+    viewProcessBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 9,
+      paddingHorizontal: 16,
+      borderRadius: 10,
+      backgroundColor: '#f97316',
+    },
+    viewProcessBtnText: { fontSize: 12, fontWeight: '700', color: '#ffffff' },
+
+    // Details modal
+    detailsModalCard: {
+      width: '100%',
+      maxWidth: 420,
+      maxHeight: '88%',
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: 'rgba(249, 115, 22, 0.25)',
+      borderRadius: 16,
+    },
+    detailsModalHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      padding: 18,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    detailsModalTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
+    detailsModalSubtitle: { fontSize: 11.5, color: theme.subtext, marginTop: 3 },
+    // flexShrink: 1 -- deliberately NOT the flex:1 shorthand, which sets
+    // flexBasis:0% and collapses this ScrollView to zero height (a column
+    // container with only maxHeight, no explicit height, sizes itself to its
+    // non-flex children only -- the flex:1 child contributes nothing to that
+    // measurement, so there's never any "extra" space left for it to grow
+    // into). flexShrink:1 instead sizes this ScrollView to its own content
+    // normally, only compressing -- and becoming internally scrollable for
+    // the overflow -- once content would push the card past its maxHeight cap.
+    detailsModalBody: { flexShrink: 1, padding: 18 },
+    detailsStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+    detailsTracking: { fontSize: 12, color: theme.subtext },
+    detailsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
+    detailsField: { width: '46%', gap: 3 },
+    detailsFieldFull: { width: '100%' },
+    detailsLabel: { fontSize: 10, fontWeight: '700', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
+    detailsValue: { fontSize: 13, color: theme.text },
+
+    attachChip: {
+      flexDirection: 'row', alignItems: 'center', gap: 8,
+      paddingVertical: 9, paddingHorizontal: 12, borderRadius: 10,
+      borderWidth: 1, borderColor: theme.border, backgroundColor: theme.background,
+    },
+    attachChipText: { flex: 1, fontSize: 12.5, color: theme.text },
+
+    notesWrap: { marginTop: 18, gap: 8 },
+    notesInput: {
+      minHeight: 90,
+      textAlignVertical: 'top',
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.background,
+      color: theme.text,
+      fontSize: 13,
+    },
+
+    detailsActionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 16 },
+    detailsActionBtn: {
+      flexGrow: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderRadius: 12,
+      minWidth: 140,
+    },
+    detailsActionBtnPrimary: { backgroundColor: '#f97316' },
+    detailsActionBtnSuccess: { backgroundColor: '#059669' },
+    detailsActionBtnDanger: { borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.4)', backgroundColor: 'rgba(239, 68, 68, 0.08)' },
+    detailsActionBtnOutline: { borderWidth: 1, borderColor: 'rgba(124, 58, 237, 0.4)', backgroundColor: 'rgba(124, 58, 237, 0.08)' },
+    detailsActionBtnTextPrimary: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
+    detailsActionBtnTextDanger: { fontSize: 13, fontWeight: '700', color: '#ef4444' },
+    detailsActionBtnTextOutline: { fontSize: 13, fontWeight: '700', color: '#7c3aed' },
+    deliveryCodeBox: {
+      marginTop: 12,
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(124, 58, 237, 0.3)',
+      backgroundColor: 'rgba(124, 58, 237, 0.08)',
+    },
+    deliveryCodeLabel: { fontSize: 11, fontWeight: '700', color: '#7c3aed', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
+    deliveryCodeValue: { fontSize: 13, fontWeight: '700', color: theme.text, fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }) },
+
+    detailsModalFooter: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      padding: 16,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+    },
+    detailsCloseBtn: {
+      paddingVertical: 10,
+      paddingHorizontal: 18,
+      borderRadius: 10,
+      backgroundColor: theme.iconBtnBg,
+      borderWidth: 1,
+      borderColor: theme.iconBtnBorder,
+    },
+    detailsCloseBtnText: { fontSize: 13, fontWeight: '700', color: theme.text },
+
+    // Filter modal
+    filterModalCard: {
+      width: '100%',
+      maxWidth: 340,
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 20,
+      padding: 20,
+      gap: 4,
+    },
+    filterOptionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+      paddingHorizontal: 10,
+      borderRadius: 10,
+    },
+    filterOptionRowActive: { backgroundColor: 'rgba(34, 197, 94, 0.1)' },
+    filterOptionText: { fontSize: 14, fontWeight: '600', color: theme.text },
+    filterOptionTextActive: { color: theme.primary },
+
+    // Nav drawer
+    drawerOverlay: { flex: 1, flexDirection: 'row' },
+    drawerPanel: {
+      width: 270,
+      backgroundColor: theme.card,
+      borderRightWidth: 1,
+      borderRightColor: theme.border,
+      padding: 20,
+      justifyContent: 'space-between',
+    },
+    drawerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+    drawerProfile: {
+      width: '100%',
+      alignItems: 'flex-start',
+      gap: 8,
+      backgroundColor: 'rgba(22, 163, 74, 0.12)',
+      borderWidth: 1,
+      borderColor: 'rgba(22, 163, 74, 0.25)',
+      borderRadius: 14,
+      padding: 14,
+    },
+    drawerProfileHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    drawerAvatar: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: 'rgba(22, 163, 74, 0.18)',
+      borderWidth: 1,
+      borderColor: 'rgba(22, 163, 74, 0.3)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    drawerName: { fontSize: 15, fontWeight: '700', color: theme.text },
+    drawerRoleBadge: { backgroundColor: 'rgba(22, 163, 74, 0.18)', borderRadius: 999, paddingVertical: 3, paddingHorizontal: 10 },
+    drawerRoleBadgeText: { fontSize: 11, fontWeight: '700', color: theme.primary },
+    drawerCollege: { fontSize: 12, fontWeight: '500', color: theme.subtext },
+    drawerNav: { flex: 1, marginTop: 28, gap: 4 },
+    drawerNavItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 12, borderRadius: 10 },
+    drawerNavItemActive: { backgroundColor: theme.primary },
+    drawerNavLabel: { fontSize: 14, fontWeight: '600', color: theme.subtext },
+    drawerNavLabelActive: { color: '#ffffff' },
+    drawerLogout: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: 'rgba(239, 68, 68, 0.3)',
+      backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    },
+    drawerLogoutText: { fontSize: 14, fontWeight: '700', color: '#ef4444' },
+
+    // Shared confirm modal chrome
+    modalOverlay: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      padding: 24,
+    },
+    confirmModalCard: {
+      width: '100%',
+      maxWidth: 340,
+      alignItems: 'center',
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 20,
+      padding: 24,
+    },
+    confirmIconCircle: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+    confirmTitle: { fontSize: 18, fontWeight: '800', color: theme.text, marginBottom: 8, textAlign: 'center' },
+    confirmDescription: { fontSize: 13, color: theme.subtext, textAlign: 'center', lineHeight: 19, marginBottom: 20 },
+    confirmActionsRow: { flexDirection: 'row', gap: 12, width: '100%' },
+    cancelBtn: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+    },
+    cancelBtnText: { fontSize: 14, fontWeight: '700', color: theme.text },
+    confirmBtn: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderRadius: 12,
+    },
+    confirmBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+    // Reject-reason modal (QueueReasonModal)
+    reasonInput: {
+      width: '100%',
+      minHeight: 64,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      padding: 12,
+      fontSize: 13,
+      color: theme.text,
+      backgroundColor: theme.background,
+      textAlignVertical: 'top',
+      marginBottom: 16,
+    },
+    formSubmitBtnDisabled: { opacity: 0.6 },
+    logoutConfirmBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 12,
+      borderRadius: 12,
+      backgroundColor: '#ef4444',
+    },
+  });
+}

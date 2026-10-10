@@ -1,0 +1,853 @@
+/* ===== SHARED SIDEBAR & LAYOUT STYLES ===== */
+
+:root,
+[data-theme="dark"] {
+  /* Primary Colors */
+  --primary-color: #22c55e;
+  --primary-dark: #16a34a;
+  --primary-light: #86efac;
+
+  /* Dark green theme */
+  --background: #0a0f0a;
+  --card: #111612;
+  --sidebar: #0f1510;
+
+  --foreground: #f0fdf4;
+  --card-foreground: #f0fdf4;
+
+  --secondary: #1a3a1f;
+  --muted: #1a3a1f;
+  --muted-foreground: #94a3b8;
+
+  --border: #1e3a23;
+  --input: #1a3a1f;
+  --input-background: #0f1e12;
+
+  --accent: #16532a;
+  --accent-foreground: #dcfce7;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  /* Theme Colors */
+  --dark-bg: var(--background);
+  --card-bg: var(--card);
+  --card-border: var(--border);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--foreground);
+  --text-tertiary: var(--muted-foreground);
+
+  --sidebar-width: 14rem;
+
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: var(--destructive);
+  --blue: #3b82f6;
+  --cyan: #06b6d4;
+  --purple: #a855f7;
+  --violet: #7c3aed;
+  --pink: #ec4899;
+
+  /* Icon Colors */
+  --icon-sun-color: #fbbf24;
+  --icon-moon-color: #64748b;
+}
+
+[data-theme="light"] {
+  /* Primary Colors - Adjusted for light mode */
+  --primary-color: #15803d;
+  --primary-dark: #166534;
+  --primary-light: #22c55e;
+
+  /* Light backgrounds */
+  --background: #f8fafc;
+  --card: #ffffff;
+  --sidebar: #f1f5f9;
+
+  --foreground: #1e293b;
+  --card-foreground: #1e293b;
+
+  --secondary: #e2e8f0;
+  --muted: #e2e8f0;
+  --muted-foreground: #64748b;
+
+  --border: #e2e8f0;
+  --input: #f1f5f9;
+  --input-background: #f8fafc;
+
+  --accent: #d1fae5;
+  --accent-foreground: #065f46;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+
+  /* Theme Colors */
+  --dark-bg: var(--background);
+  --card-bg: var(--card);
+  --card-border: var(--border);
+  --text-primary: var(--foreground);
+  --text-secondary: #334155;
+  --text-tertiary: var(--muted-foreground);
+
+  --sidebar-width: 14rem;
+
+  --success: #059669;
+  --warning: #d97706;
+  --danger: var(--destructive);
+  --blue: #2563eb;
+  --cyan: #0891b2;
+  --purple: #9333ea;
+  --violet: #6d28d9;
+  --pink: #db2777;
+
+  /* Icon Colors */
+  --icon-sun-color: #fbbf24;
+  --icon-moon-color: #1e293b;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--dark-bg);
+  color: var(--text-primary);
+  font-family: "Inter", sans-serif;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
+}
+
+/* ===== Dashboard Layout ===== */
+.psched-with-sidebar {
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--dark-bg);
+  transition: background-color 0.3s ease;
+}
+
+/* ===== Main Content ===== */
+.psched-main {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  overflow-y: auto;
+  transition: margin-left 0.3s ease;
+}
+
+.professor-schedule-page {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+@media (max-width: 1024px) {
+  .psched-main {
+    margin-left: 0;
+    margin-top: 4rem;
+  }
+}
+
+/* ===== Page Header ===== */
+.professor-schedule-page .breadcrumb-link,
+.professor-schedule-page .breadcrumb-link:visited,
+.professor-schedule-page .breadcrumb-link:active,
+.professor-schedule-page .breadcrumb-link:focus {
+  outline: none;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 0.5rem 0.875rem 0.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-family: inherit;
+  text-decoration: none;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.professor-schedule-page .breadcrumb-link:hover {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: var(--primary-color);
+}
+
+.professor-schedule-page .breadcrumb-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.professor-schedule-page .psched-retry-btn {
+  outline: none;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 0.5rem 0.875rem 0.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-family: inherit;
+  text-decoration: none;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.professor-schedule-page .psched-retry-btn:hover {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: var(--primary-color);
+}
+
+/* ===== Page Header ===== */
+.psched-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.professor-schedule-page .page-breadcrumb {
+  display: flex;
+  align-items: center;
+}
+
+.psched-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.psched-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.psched-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0.25rem 0 0 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+/* Violet accent for the professor schedule page header icon (self-contained) */
+.psched-title-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+}
+
+.psched-title-icon svg {
+  width: 2.3rem;
+  height: 2.3rem;
+  stroke: currentColor;
+}
+
+/* ===== Departments List ===== */
+.departments-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.department-card {
+  display: flex;
+  align-items: center;
+  gap: 1.3rem;
+  padding: 1.3rem 1.7rem;
+  cursor: pointer;
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.12) 0%,
+    rgba(168, 85, 247, 0.08) 100%
+  );
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 0.875rem;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.1);
+  transition: all 0.25s ease;
+}
+
+.department-card:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.2) 0%,
+    rgba(168, 85, 247, 0.14) 100%
+  );
+  border-color: rgba(168, 85, 247, 0.55);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.22);
+  transform: translateY(-2px);
+}
+
+[data-theme="light"] .department-card {
+  background: linear-gradient(
+    135deg,
+    rgba(109, 40, 217, 0.07) 0%,
+    rgba(147, 51, 234, 0.04) 100%
+  );
+  border-color: rgba(147, 51, 234, 0.25);
+}
+
+[data-theme="light"] .department-card:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(109, 40, 217, 0.13) 0%,
+    rgba(147, 51, 234, 0.09) 100%
+  );
+  border-color: rgba(147, 51, 234, 0.45);
+}
+
+/* Logo wrap */
+.card-logo-wrap {
+  width: 3.6rem;
+  height: 3.6rem;
+  flex-shrink: 0;
+  border-radius: 0.625rem;
+  background: rgba(255, 255, 255, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.35);
+}
+
+[data-theme="light"] .card-logo-wrap {
+  background: rgba(255, 255, 255, 0.97);
+}
+
+.college-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 0.4rem;
+}
+
+/* Card info — name + abbreviation */
+.card-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  min-width: 0;
+  text-align: left;
+}
+
+.psched-card-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #a855f7;
+  margin: 0;
+  line-height: 1.3;
+  word-wrap: break-word;
+  transition: color 0.3s ease;
+}
+
+[data-theme="light"] .psched-card-title {
+  color: #6d28d9;
+}
+
+.card-abbrev {
+  font-size: 0.95rem;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+  transition: color 0.3s ease;
+}
+
+/* Card meta — badge + chevron */
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.card-badge {
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  transition: all 0.3s ease;
+}
+
+[data-theme="light"] .card-badge {
+  color: #6d28d9;
+  background: rgba(147, 51, 234, 0.08);
+  border-color: rgba(147, 51, 234, 0.2);
+}
+
+.card-meta svg {
+  width: 1.375rem;
+  height: 1.375rem;
+  color: #a855f7;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+/* ===== Schedules View ===== */
+.schedules-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+/* Department Header Card */
+.department-header-card {
+  background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  color: white;
+  box-shadow: 0 10px 30px rgba(168, 85, 247, 0.2);
+  transition: all 0.3s ease;
+}
+
+.department-header-content {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.department-logo-wrapper {
+  width: 4rem;
+  height: 4rem;
+  flex-shrink: 0;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.department-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 0.5rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.department-header-card h2 {
+  font-size: 1.9rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.2;
+}
+
+/* Professors List */
+.professors-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.professor-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.professor-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  border-color: rgba(168, 85, 247, 0.5);
+}
+
+.professor-card-unavailable {
+  opacity: 0.75;
+}
+
+.professor-card-unavailable:hover {
+  box-shadow: none;
+  border-color: rgba(168, 85, 247, 0.3);
+}
+
+.professor-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.professor-unavailable-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.professor-available-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--success, #22c55e);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+/* Green/red status dot -- inherits the badge's own colour via currentColor */
+.professor-available-badge .prof-avail-dot,
+.professor-unavailable-badge .prof-avail-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  margin-right: 0.4rem;
+  flex-shrink: 0;
+}
+
+.consultation-unavailable-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.consultation-unavailable-notice svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: #ef4444;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.consultation-unavailable-notice p {
+  margin: 0;
+  font-size: 0.85rem;
+  text-align: left;
+  line-height: 1.4;
+}
+
+.consultation-unavailable-notice .consultation-unavailable-reason {
+  margin-top: 0.35rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.professor-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(168, 85, 247, 0.15);
+}
+
+.professor-avatar {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    rgba(168, 85, 247, 0.2) 0%,
+    rgba(168, 85, 247, 0.1) 100%
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a855f7;
+  flex-shrink: 0;
+  border: 2px solid rgba(168, 85, 247, 0.3);
+}
+
+.professor-avatar svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  stroke-width: 2;
+}
+
+.professor-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.professor-name {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  margin-bottom: 0.25rem;
+  transition: color 0.3s ease;
+  text-align: left;
+}
+
+.professor-position {
+  font-size: 0.875rem;
+  color: #a855f7;
+  font-weight: 600;
+  margin: 0;
+  margin-bottom: 0.25rem;
+  transition: color 0.3s ease;
+  text-transform: capitalize;
+  text-align: left;
+}
+
+[data-theme="light"] .professor-position {
+  color: #9333ea;
+}
+
+.professor-specialization {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0;
+  margin-bottom: 0.375rem;
+  transition: color 0.3s ease;
+  text-align: left;
+}
+
+.professor-email {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  transition: color 0.3s ease;
+  word-break: break-all;
+  text-align: left;
+}
+
+/* Consultation Section */
+.consultation-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.consultation-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: color 0.3s ease;
+  text-align: left;
+}
+
+.schedule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.day-schedule {
+  background: rgba(168, 85, 247, 0.08);
+  border: 1px solid rgba(168, 85, 247, 0.15);
+  border-radius: 1rem;
+  padding: 1rem;
+  transition: all 0.3s ease;
+}
+
+.day-schedule:hover {
+  border-color: rgba(168, 85, 247, 0.25);
+  background: rgba(168, 85, 247, 0.12);
+}
+
+.day-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+  color: #a855f7;
+}
+
+[data-theme="light"] .day-header {
+  color: #9333ea;
+}
+
+.day-header svg {
+  width: 1rem;
+  height: 1rem;
+  stroke-width: 2.5;
+}
+
+.day-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  transition: color 0.3s ease;
+}
+
+.day-date {
+  font-weight: 500;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin-left: 0.25rem;
+}
+
+.day-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-left: 1.5rem;
+}
+
+.schedule-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: var(--card-bg);
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--card-border);
+  transition: all 0.3s ease;
+}
+
+.schedule-slot:hover {
+  border-color: rgba(168, 85, 247, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.time-block,
+.location-block {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.time-block svg,
+.location-block svg {
+  width: 1rem;
+  height: 1rem;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  stroke-width: 2;
+}
+
+.time-range {
+  color: var(--text-primary);
+  font-weight: 600;
+  transition: color 0.3s ease;
+}
+
+.location {
+  color: var(--text-secondary);
+  transition: color 0.3s ease;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 1024px) {
+  .professor-schedule-page {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .professor-schedule-page {
+    padding: 0.75rem;
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 640px) {
+  /* This rule is later in the file than the 768px block above, so it wins
+     the cascade -- keep it explicit or padding grows as the screen shrinks. */
+  .professor-schedule-page {
+    padding: 0.75rem;
+    gap: 0.75rem;
+  }
+
+  .department-card {
+    padding: 1.15rem 1.35rem;
+    gap: 1.15rem;
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+  }
+
+  .card-logo-wrap {
+    width: 3.2rem;
+    height: 3.2rem;
+  }
+
+  .card-meta {
+    gap: 0.5rem;
+    flex-basis: 100%;
+    justify-content: space-between;
+    padding-left: calc(3.2rem + 1.15rem);
+  }
+
+  .professor-card {
+    padding: 1rem;
+  }
+
+  .professor-header {
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  .professor-avatar {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .professor-avatar svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .professor-name {
+    font-size: 1rem;
+  }
+
+  .day-schedule {
+    padding: 0.75rem;
+  }
+
+  .day-slots {
+    margin-left: 1rem;
+    gap: 0.5rem;
+  }
+
+  .schedule-slot {
+    padding: 0.5rem;
+  }
+}

@@ -1,0 +1,494 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
+import api from "../utils/api";
+import { useAuth } from "../context/AuthContext";
+import { connectSocket, disconnectSocket } from "../utils/socket";
+import QueueContext from "./QueueContextBase";
+
+// Live updates are pushed over WebSocket; this is only a safety-net poll
+// in case a socket event is missed or the connection drops silently.
+const FALLBACK_POLL_INTERVAL_MS = 45000;
+
+// Available slots get their own, shorter poll: a student merely *browsing*
+// a cross-college service (not yet joined) isn't in that service's owning
+// department's socket room, so they'd otherwise only see capacity/pause
+// changes via the slower 45s fallback above.
+const AVAILABLE_SLOTS_POLL_INTERVAL_MS = 15000;
+
+export function QueueProvider({ children }) {
+  const { user, token } = useAuth();
+
+  const [queues, setQueues] = useState([]);
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [queueHistory, setQueueHistory] = useState([]);
+  const [metrics, setMetrics] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  // Kept independent (rather than one shared `error`) so a failure in one
+  // fetch can't be silently cleared by the other's unrelated success — both
+  // gate different tabs (Active vs Available) and can be true at once.
+  const [activeQueuesError, setActiveQueuesError] = useState(null);
+  const [availableSlotsError, setAvailableSlotsError] = useState(null);
+  // Separate from the two above (which gate the Active/Available tabs) so a
+  // history/metrics fetch failure doesn't incorrectly hide unrelated,
+  // successfully-loaded queue data.
+  const [historyError, setHistoryError] = useState(null);
+  const [metricsError, setMetricsError] = useState(null);
+
+  // Snapshot of queues from the previous poll, keyed by queueId. Used to
+  // detect transitions (waiting -> serving, slot paused/resumed, etc.) so
+  // we can notify the student even if they're not looking at the queue
+  // status page right now.
+  const prevQueuesRef = useRef(new Map());
+  const hasLoadedOnceRef = useRef(false);
+  const queuesRef = useRef([]);
+  useEffect(() => {
+    queuesRef.current = queues;
+  }, [queues]);
+
+  // Monotonic request ids so an in-flight fetch that resolves *after* a
+  // newer one (e.g. the 45s poll and a socket-triggered refetch landing
+  // close together) can't overwrite fresher state with stale data, and
+  // can't double-run the transition-diffing/toast logic below against the
+  // same prevQueuesRef concurrently.
+  const activeQueuesRequestIdRef = useRef(0);
+  const availableSlotsRequestIdRef = useRef(0);
+
+  // ── Fetch queue history ───────────────────────────────────────────────────
+  const fetchQueueHistory = useCallback(async () => {
+    try {
+      const { data } = await api.get("/student/queues/history");
+      const history = data.history ?? [];
+      setQueueHistory(history);
+      setHistoryError(null);
+      return history;
+    } catch (err) {
+      console.error("fetchQueueHistory error:", err);
+      setHistoryError("Failed to load your queue history.");
+      return [];
+    }
+  }, []);
+
+  // ── Detect status changes since the last poll and notify the student ──────
+  const notifyQueueTransitions = useCallback(async (nextQueues) => {
+    const prevMap = prevQueuesRef.current;
+
+    for (const q of nextQueues) {
+      const prev = prevMap.get(q.queueId);
+      if (!prev) continue;
+
+      // Passed to / taken back from a professor by the office. Checked first:
+      // passing someone the office had already called also moves them from
+      // serving back to waiting, and that must NOT read as "the queue was
+      // paused" below.
+      const justPassed = q.passedTo && q.passedTo.facultyId !== prev.passedTo?.facultyId;
+      const justReturned = !q.passedTo && prev.passedTo;
+      if (justPassed) {
+        toast.info(
+          `You've been passed to ${q.passedTo.name} for ${q.serviceName}. Please wait to be called — you kept your place in line.`,
+          { duration: 8000 },
+        );
+      } else if (justReturned) {
+        toast.info(`You've been moved back to the office line for ${q.serviceName}. You kept your place.`);
+      }
+
+      if (prev.status === "waiting" && q.status === "serving") {
+        toast.success(
+          q.passedTo
+            ? `${q.passedTo.name} is ready for you for ${q.serviceName}! Please proceed${q.location ? ` to ${q.location}` : ""}.`
+            : `It's your turn for ${q.serviceName}! Please proceed to the designated location.`,
+          { duration: 8000 },
+        );
+      }
+      if (!prev.arrivedAt && q.arrivedAt) {
+        toast.success(`You are now being served for ${q.serviceName}.`, { duration: 6000 });
+      }
+      if (prev.status === "serving" && q.status === "waiting" && !justPassed && !justReturned) {
+        toast.warning(
+          `Your call for ${q.serviceName} was reverted because the queue was paused. You're still in line.`,
+        );
+      }
+      // A completed entry stays in the active list for a short grace period
+      // (see GET /student/queues/active) so the satisfaction-survey prompt
+      // has somewhere to show -- so this transition is caught here in-place,
+      // rather than only via the "vanished from the list" detection below,
+      // which a still-present completed entry will never trigger.
+      if (prev.status === "serving" && q.status === "completed") {
+        toast.success(`You've been served for ${q.serviceName}. Thank you!`);
+      }
+      // "You're almost up" -- fires once, only on the crossing into the top 3
+      // (the >3 -> <=3 guard stops it re-firing every poll). The server sends
+      // the real push; this is just the in-app nudge while the tab is open.
+      if (
+        q.status === "waiting" &&
+        typeof prev.position === "number" &&
+        typeof q.position === "number" &&
+        prev.position > 3 &&
+        q.position <= 3
+      ) {
+        toast.message(
+          `You're almost up — you're #${q.position} in line for ${q.serviceName}.`,
+        );
+      }
+      if (prev.slotStatus !== "paused" && q.slotStatus === "paused") {
+        toast.warning(
+          q.slotPauseReason
+            ? `The queue for ${q.serviceName} has been paused by the admin. Reason: ${q.slotPauseReason}`
+            : `The queue for ${q.serviceName} has been paused by the admin. Please wait.`,
+        );
+      }
+      if (prev.slotStatus === "paused" && q.slotStatus === "open") {
+        toast.success(`The queue for ${q.serviceName} has resumed.`);
+      }
+      if (prev.slotStatus !== "full" && q.slotStatus === "full") {
+        toast.message(
+          `The queue for ${q.serviceName} is now full. New students can no longer join, but you'll still be served.`,
+        );
+      }
+      if (prev.slotStatus !== "expired" && q.slotStatus === "expired") {
+        toast.message(
+          `The queue for ${q.serviceName} is closed for new joins (hours ended), but you'll still be served.`,
+        );
+      }
+    }
+
+    // A queue that was "serving" and is no longer in the active list was
+    // either served by the admin or auto-voided as a no-show — check its
+    // resolved status in history so we don't tell a no-show student "thank
+    // you, you've been served."
+    const nextIds = new Set(nextQueues.map((q) => q.queueId));
+    const vanishedServing = [...prevMap.entries()].filter(
+      ([queueId, prev]) => prev.status === "serving" && !nextIds.has(queueId),
+    );
+
+    // Advance the snapshot immediately -- before the async history lookup
+    // below -- rather than at the end of this function. "Served"/"no-show"
+    // events are broadcast to multiple rooms this student belongs to, so the
+    // same event can arrive more than once; updating the snapshot now means
+    // a concurrent duplicate call sees the already-updated state and won't
+    // re-detect the same vanished entry and double-toast for it.
+    prevMap.clear();
+    for (const q of nextQueues) prevMap.set(q.queueId, q);
+
+    if (vanishedServing.length > 0) {
+      const history = await fetchQueueHistory();
+      for (const [queueId, prev] of vanishedServing) {
+        const resolved = history.find((h) => h.id === queueId);
+        if (resolved?.status === "no_show") {
+          toast.warning(
+            `You were marked as a no-show for ${prev.serviceName} and your line was voided.`,
+          );
+        } else if (resolved?.status === "cancelled") {
+          // The student left voluntarily -- leaveQueue() already shows its
+          // own "You have left the queue" toast, so stay silent here rather
+          // than contradicting it with a false "you've been served."
+        } else {
+          toast.success(`You've been served for ${prev.serviceName}. Thank you!`);
+        }
+      }
+    }
+  }, [fetchQueueHistory]);
+
+  // ── Fetch active queues ───────────────────────────────────────────────────
+  const fetchActiveQueues = useCallback(async () => {
+    const requestId = ++activeQueuesRequestIdRef.current;
+    setActiveQueuesError(null);
+    try {
+      const { data } = await api.get("/student/queues/active");
+      // A newer fetch was kicked off while this one was in flight — its
+      // result (and the transition-diffing/toast side effects below) would
+      // be stale, so discard it rather than clobbering fresher state.
+      if (requestId !== activeQueuesRequestIdRef.current) return;
+      const next = data.queues ?? [];
+      if (hasLoadedOnceRef.current) {
+        notifyQueueTransitions(next);
+      } else {
+        prevQueuesRef.current = new Map(next.map((q) => [q.queueId, q]));
+        hasLoadedOnceRef.current = true;
+      }
+      setQueues(next);
+    } catch (err) {
+      if (requestId !== activeQueuesRequestIdRef.current) return;
+      console.error("fetchActiveQueues error:", err);
+      setActiveQueuesError("Failed to load your active queues.");
+    }
+  }, [notifyQueueTransitions]);
+
+  // ── Fetch available slots ─────────────────────────────────────────────────
+  const fetchAvailableSlots = useCallback(async () => {
+    const requestId = ++availableSlotsRequestIdRef.current;
+    setAvailableSlotsError(null);
+    try {
+      const { data } = await api.get("/student/queues/available");
+      if (requestId !== availableSlotsRequestIdRef.current) return;
+      setAvailableSlots(data.slots ?? []);
+    } catch (err) {
+      if (requestId !== availableSlotsRequestIdRef.current) return;
+      console.error("fetchAvailableSlots error:", err);
+      setAvailableSlotsError("Failed to load available queues.");
+    }
+  }, []);
+
+  // ── Fetch metrics ─────────────────────────────────────────────────────────
+  const fetchMetrics = useCallback(async () => {
+    try {
+      const { data } = await api.get("/student/queues/metrics");
+      setMetrics(data);
+      setMetricsError(null);
+    } catch (err) {
+      console.error("fetchMetrics error:", err);
+      setMetricsError("Failed to load your queue analytics.");
+    }
+  }, []);
+
+  // ── Reset on user change ──────────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    const init = async () => {
+      setQueues([]);
+      setAvailableSlots([]);
+      setQueueHistory([]);
+      setMetrics(null);
+      setActiveQueuesError(null);
+      setAvailableSlotsError(null);
+      setHistoryError(null);
+      setMetricsError(null);
+      prevQueuesRef.current = new Map();
+      hasLoadedOnceRef.current = false;
+
+      if (!user?.userId || user.role !== "student") {
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      await Promise.all([
+        fetchActiveQueues(),
+        fetchAvailableSlots(),
+        fetchQueueHistory(),
+        fetchMetrics(),
+      ]);
+      if (!cancelled) setIsLoading(false);
+    };
+    init();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.userId]);
+
+  // ── Re-fetch on tab focus ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!user?.userId || user.role !== "student") return;
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        fetchActiveQueues();
+        fetchAvailableSlots();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [user?.userId, fetchActiveQueues, fetchAvailableSlots]);
+
+  // ── Fallback poll (safety net only — sockets drive live updates) ──────────
+  useEffect(() => {
+    if (!user?.userId || user.role !== "student") return;
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchActiveQueues();
+      }
+    }, FALLBACK_POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [user?.userId, fetchActiveQueues]);
+
+  // ── Available-slots poll (shorter interval — see constant comment above) ──
+  useEffect(() => {
+    if (!user?.userId || user.role !== "student") return;
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchAvailableSlots();
+      }
+    }, AVAILABLE_SLOTS_POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [user?.userId, fetchAvailableSlots]);
+
+  // ── WebSocket: live queue updates ─────────────────────────────────────────
+  useEffect(() => {
+    if (!user?.userId || user.role !== "student" || !token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const refetch = () => {
+      fetchActiveQueues();
+      fetchAvailableSlots();
+    };
+
+    const events = [
+      "queue:called",
+      "queue:arrived",
+      "queue:served",
+      "queue:no-show",
+      "queue:slot-status",
+      "queue:student-joined",
+      "queue:student-left",
+      "queue:notes-updated",
+      "queue:service-updated",
+      // The office passed this student to a professor (or took them back) --
+      // their line and position change, so the ticket has to be refetched.
+      "queue:passed",
+      "queue:returned",
+    ];
+    events.forEach((event) => socket.on(event, refetch));
+
+    // This student's ticket ended before they were served -- the office
+    // stopped the queue, the queue's day ended, or they were handed back to a
+    // queue that had already been stopped. Their entry was cancelled (with a
+    // priority credit) server-side. Tell them directly, with the reason,
+    // instead of relying on the generic diff logic, which only ever notices
+    // "serving" entries vanishing, not "waiting" ones. Wording is neutral on
+    // purpose: it isn't always the admin who ended it.
+    const onQueueStopped = (payload) => {
+      if (payload.studentId !== user.userId) return;
+      const stoppedQueue = queuesRef.current.find(
+        (q) => q.queueId === payload.queueId,
+      );
+      toast.error(
+        `Your queue${stoppedQueue ? ` for ${stoppedQueue.serviceName}` : ""} ended before you were served. Reason: ${payload.reason}. You'll be placed at the front of the line next time you scan in for it.`,
+        { duration: 10000 },
+      );
+      refetch();
+    };
+    socket.on("queue:queue-stopped", onQueueStopped);
+
+    // Reconcile any events missed while disconnected.
+    const onReconnect = () => {
+      socket.emit("queue:rejoin-rooms");
+      refetch();
+    };
+    socket.on("connect", onReconnect);
+
+    return () => {
+      events.forEach((event) => socket.off(event, refetch));
+      socket.off("queue:queue-stopped", onQueueStopped);
+      socket.off("connect", onReconnect);
+    };
+  }, [user?.userId, user?.role, token, fetchActiveQueues, fetchAvailableSlots]);
+
+  // ── Disconnect socket on logout ───────────────────────────────────────────
+  useEffect(() => {
+    if (!token) disconnectSocket();
+  }, [token]);
+
+  // ── Join a queue ──────────────────────────────────────────────────────────
+  // Takes the scanned QR token, not a slotId: since the 2026-09-30 panel
+  // review the server resolves the queue from the code itself, so the client
+  // can no longer name which queue it wants to join. A student has to be
+  // standing in front of the host's screen.
+  const joinQueue = useCallback(
+    async (qrToken, notes, serviceId = null) => {
+      try {
+        const { data } = await api.post("/student/queues/join", { qrToken, notes, serviceId });
+        // The socket only joins slot rooms on connect, so without this a
+        // student who just joined would miss that queue's live events until
+        // their next reconnect.
+        connectSocket(token)?.emit("queue:rejoin-rooms");
+        setQueues((prev) => [...prev, data.queue]);
+        await fetchAvailableSlots();
+        await fetchActiveQueues();
+        return data.queue;
+      } catch (err) {
+        const msg =
+          err?.response?.data?.error ??
+          "Failed to join the queue. Please try again.";
+        throw new Error(msg);
+      }
+    },
+    [fetchAvailableSlots, fetchActiveQueues, token],
+  );
+
+  // ── Leave a queue ─────────────────────────────────────────────────────────
+  const leaveQueue = useCallback(
+    async (queueId) => {
+      try {
+        await api.post(`/student/queues/${queueId}/leave`);
+        setQueues((prev) => prev.filter((q) => q.queueId !== queueId));
+        await fetchAvailableSlots();
+        await fetchQueueHistory();
+      } catch (err) {
+        const msg =
+          err?.response?.data?.error ??
+          "Failed to leave the queue. Please try again.";
+        throw new Error(msg);
+      }
+    },
+    [fetchAvailableSlots, fetchQueueHistory],
+  );
+
+  // ── Update queue notes (concern) ──────────────────────────────────────────
+  const updateQueueNotes = useCallback(async (queueId, notes) => {
+    try {
+      await api.patch(`/student/queues/${queueId}/notes`, { notes });
+      setQueues((prev) =>
+        prev.map((q) => (q.queueId === queueId ? { ...q, notes } : q)),
+      );
+    } catch (err) {
+      const msg = err?.response?.data?.error ?? "Failed to update notes.";
+      throw new Error(msg);
+    }
+  }, []);
+
+  // ── Derived helpers ───────────────────────────────────────────────────────
+  const isAlreadyInQueue = useCallback(
+    (slotId) => queues.some((q) => q.slotId === slotId),
+    [queues],
+  );
+
+  const getActiveQueues = useCallback(() => queues, [queues]);
+
+  const value = useMemo(
+    () => ({
+      queues,
+      availableSlots,
+      queueHistory,
+      metrics,
+      isLoading,
+      activeQueuesError,
+      availableSlotsError,
+      historyError,
+      metricsError,
+      fetchActiveQueues,
+      fetchAvailableSlots,
+      fetchQueueHistory,
+      fetchMetrics,
+      joinQueue,
+      leaveQueue,
+      updateQueueNotes,
+      isAlreadyInQueue,
+      getActiveQueues,
+    }),
+    [
+      queues,
+      availableSlots,
+      queueHistory,
+      metrics,
+      isLoading,
+      activeQueuesError,
+      availableSlotsError,
+      historyError,
+      metricsError,
+      fetchActiveQueues,
+      fetchAvailableSlots,
+      fetchQueueHistory,
+      fetchMetrics,
+      joinQueue,
+      leaveQueue,
+      updateQueueNotes,
+      isAlreadyInQueue,
+      getActiveQueues,
+    ],
+  );
+
+  return (
+    <QueueContext.Provider value={value}>{children}</QueueContext.Provider>
+  );
+}

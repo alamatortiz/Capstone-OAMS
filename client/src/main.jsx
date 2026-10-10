@@ -1,10 +1,488 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.jsx'
+import React, { Suspense, useEffect } from "react";
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from "react-router-dom";
 
-createRoot(document.getElementById('root')).render(
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
+import "./index.css";
+import App from "./App.jsx";
+import Login from "./pages/Login.jsx";
+const PrivacyPolicy = React.lazy(
+  () => import("./pages/legal/PrivacyPolicy.jsx"),
+);
+import LoadingOverlay from "./components/LoadingOverlay.jsx";
+import OfflineBanner from "./components/OfflineBanner.jsx";
+import ErrorPage from "./components/ErrorPage.jsx";
+import ErrorPageRoute from "./components/ErrorPageRoute.jsx";
+import { AuthProvider } from "./context/AuthContext.tsx";
+import StudentDashboard from "./pages/student/stud-dashboard.jsx";
+import QueuePage from "./pages/student/stud-queue.jsx";
+
+// ─── Lazy-loaded routes for better performance ───────────────────────────
+const QueueStatusPage = React.lazy(
+  () => import("./pages/student/stud-queue-status.jsx"),
+);
+const DocumentStatusPage = React.lazy(
+  () => import("./pages/student/stud-document-status.jsx"),
+);
+const AppointmentStatusPage = React.lazy(
+  () => import("./pages/student/stud-appointment-status.jsx"),
+);
+const AnnouncementsPage = React.lazy(
+  () => import("./pages/student/stud-announcements.jsx"),
+);
+const StudentFaqs = React.lazy(
+  () => import("./pages/student/stud-faqs.jsx"),
+);
+const ProfessorSchedulePage = React.lazy(
+  () => import("./pages/student/stud-professor-schedules.jsx"),
+);
+
+const AdminQueueHosting = React.lazy(
+  () => import("./pages/admin/adm-queue-hosting.jsx"),
+);
+const AdminDocumentProcessing = React.lazy(
+  () => import("./pages/admin/adm-document-processing.jsx"),
+);
+const AdminProfessorAvailability = React.lazy(
+  () => import("./pages/admin/adm-professor-availability.jsx"),
+);
+const AdminScanDocument = React.lazy(
+  () => import("./pages/admin/adm-scan-document.jsx"),
+);
+const AdminQueueAnalytics = React.lazy(
+  () => import("./pages/admin/adm-queue-analytics.jsx"),
+);
+const AdminAnnouncements = React.lazy(
+  () => import("./pages/admin/adm-announcements.jsx"),
+);
+const AdminFaqs = React.lazy(
+  () => import("./pages/admin/adm-faqs.jsx"),
+);
+const AdminDataManagement = React.lazy(
+  () => import("./pages/admin/adm-data-management.jsx"),
+);
+
+// Superadmin -- system-wide role, separate from department-scoped admin.
+const SuperadminDashboard = React.lazy(
+  () => import("./internal/sa/sa-dashboard.jsx"),
+);
+const SuperadminUserManagement = React.lazy(
+  () => import("./internal/sa/sa-user-management.jsx"),
+);
+const SuperadminPinnacleSync = React.lazy(
+  () => import("./internal/sa/sa-pinnacle-sync.jsx"),
+);
+const SuperadminSatisfactionSurvey = React.lazy(
+  () => import("./internal/sa/sa-satisfaction-survey.jsx"),
+);
+const SuperadminAnalytics = React.lazy(
+  () => import("./internal/sa/sa-analytics.jsx"),
+);
+
+import AppointmentsPage from "./pages/student/stud-appointments.jsx";
+import DocumentsPage from "./pages/student/stud-documents.jsx";
+import TransactionsPage from "./pages/student/stud-transactions.jsx";
+import StudentNotifications from "./pages/student/stud-notifications.jsx";
+import ProfessorDashboard from "./pages/professor/prof-dashboard.jsx";
+
+const ProfessorAppointmentsPage = React.lazy(
+  () => import("./pages/professor/prof-appointments.jsx"),
+);
+const ProfessorTransactionsPage = React.lazy(
+  () => import("./pages/professor/prof-transactions.jsx"),
+);
+const ProfessorDocumentRequestPage = React.lazy(
+  () => import("./pages/professor/prof-documents.jsx"),
+);
+const ProfessorDocumentStatusPage = React.lazy(
+  () => import("./pages/professor/prof-document-status.jsx"),
+);
+const ProfessorScheduleManagerPage = React.lazy(
+  () => import("./pages/professor/prof-schedule-manager.jsx"),
+);
+const ProfessorQueuePage = React.lazy(
+  () => import("./pages/professor/prof-queue.jsx"),
+);
+const ProfessorNotifications = React.lazy(
+  () => import("./pages/professor/prof-notifications.jsx"),
+);
+const ProfessorAnnouncementsPage = React.lazy(
+  () => import("./pages/professor/prof-announcements.jsx"),
+);
+
+import AdminDashboard from "./pages/admin/adm-dashboard.jsx";
+import AdminAppointment from "./pages/admin/adm-appointment.jsx";
+import AdminTransaction from "./pages/admin/adm-transactions.jsx";
+import AdminNotifications from "./pages/admin/adm-notifications.jsx";
+import AdminQueue from "./pages/admin/adm-queue.jsx";
+import { QueueProvider } from "./contexts/QueueProvider.jsx";
+import { FacultyProvider } from "./contexts/FacultyProvider.jsx";
+import ProtectedRoute from "./components/ProtectedRoute.tsx";
+import { Toaster } from "sonner";
+
+const LoadingFallback = () => <LoadingOverlay />;
+
+createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <App />
+    <AuthProvider>
+      <Toaster richColors position="top-right" />
+      <OfflineBanner />
+      <QueueProvider>
+      <FacultyProvider>
+        <BrowserRouter>
+          <ScrollToTop />
+          <Routes>
+            {/* ─── Public Routes ─────────────────────────────────────────────── */}
+            {/* Root URL is the student-facing entry point -- its Sign In
+                buttons scope straight to /login/student. Faculty/admin have
+                no link anywhere on this page; they're only reachable by
+                typing their own URL directly. */}
+            <Route path="/" element={<App loginAudience="student" />} />
+            <Route
+              path="/landingpage/student"
+              element={<App loginAudience="student" />}
+            />
+            <Route
+              path="/landingpage/faculty"
+              element={<App loginAudience="faculty" />}
+            />
+            {/* Bare /login is no longer a sign-in page for every role: it just
+                forwards to the student portal. Faculty, admin and superadmin
+                each have their own URL below. */}
+            <Route path="/login" element={<Navigate to="/login/student" replace />} />
+            <Route
+              path="/login/student"
+              element={<Login expectedRole="student" />}
+            />
+            <Route
+              path="/login/faculty"
+              element={<Login expectedRole="faculty" />}
+            />
+            <Route
+              path="/login/admin"
+              element={<Login expectedRole="admin" />}
+            />
+            <Route
+              path="/login/system"
+              element={<Login expectedRole="superadmin" />}
+            />
+            <Route
+              path="/privacy-policy"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <PrivacyPolicy />
+                </Suspense>
+              }
+            />
+            <Route path="/unauthorized" element={<div>Unauthorized</div>} />
+
+            {/* ─── Protected Student Routes ──────────────────────────────────── */}
+            <Route element={<ProtectedRoute allowedRoles={["student"]} />}>
+              <Route path="/student/dashboard" element={<StudentDashboard />} />
+              <Route path="/student/queue" element={<QueuePage />} />
+              <Route
+                path="/student/queue-status"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <QueueStatusPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/student/announcements"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AnnouncementsPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/student/faqs"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <StudentFaqs />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/student/professor-schedules"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ProfessorSchedulePage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/student/appointments"
+                element={<AppointmentsPage />}
+              />
+              <Route
+                path="/student/appointment-status"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AppointmentStatusPage />
+                  </Suspense>
+                }
+              />
+              <Route path="/student/documents" element={<DocumentsPage />} />
+              <Route
+                path="/student/document-status"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <DocumentStatusPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/student/transactions"
+                element={<TransactionsPage />}
+              />
+              <Route
+                path="/student/notifications"
+                element={<StudentNotifications />}
+              />
+            </Route>
+
+            {/* ─── Protected Faculty Routes ──────────────────────────────────── */}
+            <Route element={<ProtectedRoute allowedRoles={["faculty"]} />}>
+              <Route
+                path="/professor/dashboard"
+                element={<ProfessorDashboard />}
+              />
+              {/* ★ Announcements page */}
+              <Route
+                path="/professor/announcements"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ProfessorAnnouncementsPage />
+                  </Suspense>
+                }
+              />
+              {/* ★ Appointments page */}
+              <Route
+                path="/professor/appointments"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ProfessorAppointmentsPage />
+                  </Suspense>
+                }
+              />
+              {/* ★ Document request submission form */}
+              <Route
+                path="/professor/document-request"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ProfessorDocumentRequestPage />
+                  </Suspense>
+                }
+              />
+              {/* ★ Document request status + detail view */}
+              <Route
+                path="/professor/document-status"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ProfessorDocumentStatusPage />
+                  </Suspense>
+                }
+              />
+              {/* ★ Transactions page */}
+              <Route
+                path="/professor/transactions"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ProfessorTransactionsPage />
+                  </Suspense>
+                }
+              />
+              {/* ★ Schedule Manager page */}
+              <Route
+                path="/professor/schedule-manager"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ProfessorScheduleManagerPage />
+                  </Suspense>
+                }
+              />
+              {/* ★ Queue — students the college office passed to this
+                  professor for the services it assigned them */}
+              <Route
+                path="/professor/queue"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ProfessorQueuePage />
+                  </Suspense>
+                }
+              />
+              {/* Old address (professors used to host their own queues) */}
+              <Route
+                path="/professor/queue-hosting"
+                element={<Navigate to="/professor/queue" replace />}
+              />
+              {/* ★ Notifications page */}
+              <Route
+                path="/professor/notifications"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ProfessorNotifications />
+                  </Suspense>
+                }
+              />
+            </Route>
+
+            {/* ─── Protected Admin Routes ────────────────────────────────────── */}
+            <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route
+                path="/admin/appointments"
+                element={<AdminAppointment />}
+              />
+              <Route
+                path="/admin/transactions"
+                element={<AdminTransaction />}
+              />
+              <Route
+                path="/admin/notifications"
+                element={<AdminNotifications />}
+              />
+              <Route path="/admin/queue" element={<AdminQueue />} />
+              <Route
+                path="/admin/queue-hosting"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminQueueHosting />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/admin/document-processing"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminDocumentProcessing />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/admin/professor-availability"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminProfessorAvailability />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/admin/scan-document"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminScanDocument />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/admin/queue-analytics"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminQueueAnalytics />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/admin/announcements"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminAnnouncements />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/admin/faqs"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminFaqs />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/admin/data-management"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminDataManagement />
+                  </Suspense>
+                }
+              />
+            </Route>
+
+            {/* ─── Protected Superadmin Routes ───────────────────────────────────
+                System-wide role, deliberately kept separate from /admin/* --
+                never shown in any admin nav/tool-card, provisioned by direct
+                SQL only. ─────────────────────────────────────────────────── */}
+            {/* URLs deliberately say "system", not the internal role name. */}
+            <Route element={<ProtectedRoute allowedRoles={["superadmin"]} />}>
+              <Route
+                path="/system/dashboard"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <SuperadminDashboard />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/system/users"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <SuperadminUserManagement />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/system/analytics"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <SuperadminAnalytics />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/system/sync"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <SuperadminPinnacleSync />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/system/survey"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <SuperadminSatisfactionSurvey />
+                  </Suspense>
+                }
+              />
+            </Route>
+
+            {/* ─── Real backend/network failures -- api.js's response
+                interceptor hard-navigates here on a 502/503/504 or an
+                unreachable backend, with the actual status in the URL. ─── */}
+            <Route path="/error/:code" element={<ErrorPageRoute />} />
+
+            {/* ─── Catch-all: unmatched routes ───────────────────────────────── */}
+            <Route path="*" element={<ErrorPage code={404} />} />
+          </Routes>
+        </BrowserRouter>
+      </FacultyProvider>
+      </QueueProvider>
+    </AuthProvider>
   </StrictMode>,
-)
+);
