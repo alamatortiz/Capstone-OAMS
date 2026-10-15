@@ -29,6 +29,7 @@ export default function QueuePage() {
     availableSlotsError,
     joinQueue,
     leaveQueue,
+    updateQueueNotes,
     isAlreadyInQueue,
   } = useQueue();
 
@@ -49,6 +50,11 @@ export default function QueuePage() {
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [servicesData, setServicesData] = useState([]);
   const [concernModal, setConcernModal] = useState(null); // { slotId, serviceName }
+  // A regular (non-universal) queue joins the instant the code is scanned, so
+  // its optional concern is asked for AFTER the join, on the ticket just made.
+  const [postJoinConcern, setPostJoinConcern] = useState(null); // { queueId, serviceName, queueNumberBadge }
+  const [savingConcern, setSavingConcern] = useState(false);
+  const savingConcernRef = useRef(false);
 
 
   // ── Filters ───────────────────────────────────────────────────────────────
@@ -247,12 +253,22 @@ export default function QueuePage() {
       joiningRef.current = true;
       setJoiningSlotId('scanning');
       setScanError('');
+      // No serviceId = the regular-queue path, which skipped the pre-scan
+      // concern popup -- offer it once the join lands instead.
+      const askConcernAfter = !scanTarget?.serviceId;
       try {
-        await joinQueue(qrToken, scanTarget?.notes, scanTarget?.serviceId ?? null);
+        const joined = await joinQueue(qrToken, scanTarget?.notes, scanTarget?.serviceId ?? null);
         toast.success('Successfully joined the queue!');
         setScanTarget(null);
         setSelectedSlot(null);
         setConcernModal(null);
+        if (askConcernAfter && joined?.queueId) {
+          setPostJoinConcern({
+            queueId: joined.queueId,
+            serviceName: joined.serviceName,
+            queueNumberBadge: joined.queueNumberBadge,
+          });
+        }
       } catch (err) {
         // Shown inside the scanner sheet (not just a toast) so the student
         // can read it while still holding the phone up to the code.
@@ -266,6 +282,31 @@ export default function QueuePage() {
       }
     },
     [joinQueue, scanTarget, refreshBlockStatus],
+  );
+
+  // Empty text just closes (same as Skip). A failed save keeps the popup open
+  // with the typed text intact so the student can retry or skip.
+  const handleSavePostJoinConcern = useCallback(
+    async (notes) => {
+      if (!postJoinConcern || savingConcernRef.current) return;
+      if (!notes) {
+        setPostJoinConcern(null);
+        return;
+      }
+      savingConcernRef.current = true;
+      setSavingConcern(true);
+      try {
+        await updateQueueNotes(postJoinConcern.queueId, notes);
+        toast.success('Concern added.');
+        setPostJoinConcern(null);
+      } catch (err) {
+        toast.error(err.message);
+      } finally {
+        savingConcernRef.current = false;
+        setSavingConcern(false);
+      }
+    },
+    [postJoinConcern, updateQueueNotes],
   );
 
   const handleLeaveQueue = useCallback(
@@ -353,9 +394,10 @@ export default function QueuePage() {
             confirmDisabled={leavingQueueId === leaveConfirmQueue?.queueId}
             accentTheme="blue"
           />
-          {/* Only shown for a Universal Service Queue now, where picking the
+          {/* Only shown for a Universal Service Queue, where picking the
               specific service is mandatory before the scan. A normal queue
-              goes straight to the camera -- see openScanner. */}
+              goes straight to the camera and asks for its concern after the
+              join instead -- see the post-join popup below. */}
           <QueueConcernModal
             show={concernModal !== null}
             onCancel={() => setConcernModal(null)}
@@ -366,17 +408,11 @@ export default function QueuePage() {
             universalServices={concernModal?.isUniversal ? (concernModal?.universalServices ?? null) : null}
             title="What's your concern?"
             message={
-              concernModal?.isUniversal ? (
-                <>
-                  Joining the <strong>Universal Service Queue</strong>. Pick the specific service
-                  you need, then let the staff know why you're here. You'll scan the office's QR
-                  code next.
-                </>
-              ) : (
-                <>
-                  Joining the queue for <strong>{concernModal?.serviceName}</strong>. Let the staff know why you're here — this step is optional.
-                </>
-              )
+              <>
+                Joining the <strong>Universal Service Queue</strong>. Pick the specific service
+                you need, then let the staff know why you're here. You'll scan the office's QR
+                code next.
+              </>
             }
             confirmText="Continue to Scan"
             submitting={false}
@@ -387,6 +423,28 @@ export default function QueuePage() {
             onScanned={performJoin}
             submitting={joiningSlotId === 'scanning'}
             errorMessage={scanError}
+          />
+          {/* Regular queue: the scan already joined, so this only attaches an
+              optional concern to the new ticket (editable later from its
+              queue details). */}
+          <QueueConcernModal
+            show={postJoinConcern !== null}
+            onCancel={() => setPostJoinConcern(null)}
+            onConfirm={(notes) => handleSavePostJoinConcern(notes)}
+            universalServices={null}
+            title="What's your concern?"
+            message={
+              <>
+                You've joined the queue for <strong>{postJoinConcern?.serviceName}</strong>
+                {postJoinConcern?.queueNumberBadge ? ` (${postJoinConcern.queueNumberBadge})` : ''}.
+                Let the staff know why you're here — this step is optional. You can still change it
+                later from your queue's details.
+              </>
+            }
+            confirmText="Save Concern"
+            cancelText="Skip"
+            submitting={savingConcern}
+            submittingText="Saving…"
           />
         </>
       }
