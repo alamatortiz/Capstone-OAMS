@@ -4,6 +4,25 @@ Capstone project for Pamantasan ng Cabuyao (University of Cabuyao).
 
 A centralized digital platform for college offices handling queue management, appointment scheduling, document processing, and information dissemination across CBAA, COED, COE, CCS, CAS, and CHAS.
 
+**Live website:** https://capstone-oams-ucpnc.onrender.com
+**Live API:** https://capstone-oams-uc.onrender.com/api
+
+> The apps above run on Render's free tier and spin down after inactivity — the first request after a while can take 30-60s to wake up.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Web Frontend | React 19, Vite, React Router, Axios, Socket.IO client |
+| Mobile App | React Native + Expo (Expo Router), 3 role-locked builds (Student / Faculty / Admin) |
+| Backend | Node.js, Express 5, Socket.IO |
+| Database | MySQL 8 (local dev) / TiDB Cloud Serverless (production) |
+| Auth | JWT (jsonwebtoken) + bcryptjs |
+| Push Notifications | web-push (VAPID) + Expo push (mobile) |
+| Testing | Jest (server), Vitest (client) |
+
 ---
 
 ## Prerequisites
@@ -12,17 +31,16 @@ Install these on your machine before starting:
 
 | Tool | Download Link | Purpose |
 |------|--------------|---------|
-| **Node.js** (LTS) | [nodejs.org](https://nodejs.org) | JavaScript runtime |
+| **Node.js** (LTS, v20+) | [nodejs.org](https://nodejs.org) | JavaScript runtime |
 | **Git** | [git-scm.com](https://git-scm.com) | Version control |
-| **MySQL** | [mysql.com](https://mysql.com) or use **XAMPP** | Database server |
+| **Docker Desktop** | [docker.com](https://www.docker.com/products/docker-desktop) | Easiest way to run the local database |
 | **VS Code** | [code.visualstudio.com](https://code.visualstudio.com) | Code editor |
 
 Verify installations:
 ```bash
 node -v       # Should show v20.x.x or higher
-npm -v        # Should show 10.x.x or higher
+npm -v
 git --version
-mysql --version
 ```
 
 ---
@@ -30,33 +48,50 @@ mysql --version
 ## 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-org/Capstone-OAMS.git
+git clone https://github.com/alamatortiz/Capstone-OAMS.git
 cd Capstone-OAMS
 ```
 
 ---
 
-## 2. Database Setup
+## Quick Start (Docker)
+
+The fastest way to get the web app + database running locally. This spins up MySQL, the backend, and the web frontend together, already wired to talk to each other.
+
+```bash
+docker compose up
+```
+
+- Web app: `http://localhost:5173`
+- API: `http://localhost:5000/api`
+- MySQL: `localhost:3306` (schema and mock data load automatically on first run)
+
+On Windows, if Docker refuses to bind port 5000 ("ports are not available"), it's usually `winnat` reserving that range — remap the port locally (see `docker-compose.override.yml`, which is gitignored) instead of changing the committed file.
+
+The sections below cover running each piece manually instead, and setting up the mobile app (which isn't part of the Docker stack).
+
+---
+
+## 2. Database Setup (manual, if not using Docker)
 
 1. Start MySQL (or XAMPP MySQL service).
 2. Open your MySQL client (MySQL Workbench, phpMyAdmin, or terminal).
 3. Run the schema file:
 
-```sql
--- In MySQL Workbench or terminal
-SOURCE server/oams_db.sql;
-```
-
-Or via command line:
 ```bash
 mysql -u root -p < server/oams_db.sql
 ```
 
-4. Verify the database exists:
+4. Optionally load the CCS mock data (sample accounts, services, documents):
+```bash
+mysql -u root -p oams_db < server/db/mock/ccs_mock_data.sql
+```
+
+5. Verify:
 ```sql
 SHOW DATABASES;  -- Should show "oams_db"
 USE oams_db;
-SHOW TABLES;     -- Should show all OAMS tables
+SHOW TABLES;
 ```
 
 ---
@@ -65,59 +100,63 @@ SHOW TABLES;     -- Should show all OAMS tables
 
 ```bash
 cd server
-
-# Install dependencies
 npm install
-
-# Create environment file
-cp .env.example .env
-
-# Edit .env with your MySQL credentials
-# Windows: notepad .env
-# Mac/Linux: nano .env
 ```
 
-**Example `.env`:**
+Create a `.env` file in `server/` (there's no `.env.example` committed — copy these keys):
+
 ```env
 PORT=5000
 DB_HOST=localhost
 DB_USER=root
 DB_PASSWORD=your_mysql_password_here
 DB_NAME=oams_db
+JWT_SECRET=some_long_random_string
+JWT_EXPIRES_IN=24h
+CLIENT_ORIGINS=http://localhost:5173
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:you@example.com
 ```
+
+`VAPID_*` keys are only needed for web push notifications — generate a pair with `npx web-push generate-vapid-keys` if you want that feature working locally.
 
 **Start the server:**
 ```bash
-# Development (auto-restart on file changes)
-npm run dev
-
-# OR production mode
-npm start
+npm run dev     # same as npm start -- there's no file-watcher, restart manually after changes
 ```
 
-Server runs at `http://localhost:5000`
+Server runs at `http://localhost:5000`.
 
-Test it: open browser to `http://localhost:5000/api/health`
+**Run the server test suite:**
+```bash
+npm test
+```
 
 ---
 
 ## 4. Web Frontend Setup
 
-Open a **new terminal** (keep the server running):
+Open a **new terminal**:
 
 ```bash
 cd client
-
-# Install dependencies
 npm install
+```
 
-# Start development server
+Create a `.env` file in `client/`:
+```env
+VITE_API_URL=http://localhost:5000/api
+VITE_VAPID_PUBLIC_KEY=
+```
+
+(`VITE_VAPID_PUBLIC_KEY` should match the server's `VAPID_PUBLIC_KEY` if you set one up.)
+
+```bash
 npm run dev
 ```
 
-Web app runs at `http://localhost:5173`
-
-The Vite dev server automatically proxies `/api` calls to `http://localhost:5000`.
+Web app runs at `http://localhost:5173`.
 
 ---
 
@@ -127,33 +166,28 @@ Open a **new terminal**:
 
 ```bash
 cd client-mobile
-
-# Install dependencies
 npm install
-
-# Install Expo CLI globally (if not already)
-npm install -g expo-cli
-
-# Start Expo development server
-npx expo start
 ```
 
-**Run on your phone:**
-1. Install **Expo Go** app from Play Store / App Store.
-2. Scan the QR code shown in terminal with your phone camera.
-3. The app loads on your device.
-
-**Important:** Your phone and computer must be on the **same WiFi network**.
-
-**Update the API IP:** In `client-mobile/App.js`, replace the IP with your computer's local IP:
-```javascript
-const API = 'http://192.168.1.100:5000/api';  // Your actual IP here
+Copy `.env.example` to `.env` and set your machine's **LAN IP** (not `localhost` — a physical phone can't reach that):
+```env
+EXPO_PUBLIC_API_URL=http://192.168.1.20:5000/api
 ```
 
 Find your IP:
-- Windows: `ipconfig` → look for `IPv4 Address`
+- Windows: `ipconfig` → `IPv4 Address`
 - Mac: `ifconfig | grep inet`
 - Linux: `ip addr`
+
+```bash
+npx expo start
+```
+
+1. Install **Expo Go** on your phone.
+2. Scan the QR code shown in the terminal.
+3. Phone and computer must be on the **same WiFi network**.
+
+Run this way (no `APP_VARIANT` set), the app opens as the combined build with every role — fine for local development. Production ships as three separate installs (`OAMS Student`, `OAMS Faculty`, `OAMS Admin`) built via EAS with `APP_VARIANT=student|faculty|admin`, each locked to its own role and Android package name.
 
 ---
 
@@ -162,26 +196,31 @@ Find your IP:
 ```
 Capstone-OAMS/
 ├── client/                 # React web frontend (Vite)
-│   ├── src/
-│   │   ├── components/     # Reusable UI components
-│   │   ├── pages/          # Route-level pages
-│   │   └── App.jsx         # Root component
-│   ├── .env                # API URL config
-│   └── package.json
+│   └── src/
+│       ├── components/
+│       ├── context/        # Auth, theme, etc.
+│       ├── pages/           # admin/ professor/ student/
+│       └── utils/
 │
-├── client-mobile/          # React Native mobile app (Expo)
-│   ├── App.js              # Root component
-│   └── package.json
+├── client-mobile/          # React Native app (Expo Router), 3 role-locked variants
+│   └── app/
 │
 ├── server/                 # Express.js backend API
-│   ├── server.js           # Main server entry
-│   ├── db.js               # MySQL connection pool
-│   ├── oams_db.sql         # Database schema
-│   ├── .env                # Environment variables
-│   └── package.json
+│   ├── controllers/
+│   ├── routes/
+│   ├── jobs/                # automated sweepers (reminders, no-show voiding, etc.)
+│   ├── middleware/
+│   ├── utils/
+│   ├── db/
+│   │   ├── migrations/
+│   │   └── mock/             # CCS-scoped sample data
+│   ├── server.js
+│   ├── db.js
+│   └── oams_db.sql           # full schema
 │
-├── .gitignore              # Git exclusions
-└── README.md               # This file
+├── docker-compose.yml
+├── .gitignore
+└── README.md
 ```
 
 ---
@@ -190,24 +229,23 @@ Capstone-OAMS/
 
 ### `npm install` fails with permission errors
 ```bash
-# Windows: Run terminal as Administrator
+# Windows: run the terminal as Administrator
 # Mac/Linux:
-sudo npm install -g expo-cli
+sudo npm install
 ```
 
 ### MySQL connection refused
-- Make sure MySQL service is running.
+- Make sure MySQL (or the Docker `db` service) is running.
 - Check `.env` credentials match your MySQL setup.
 - Default XAMPP MySQL has no password (leave `DB_PASSWORD` empty).
 
 ### Mobile app shows "Network Error"
-- Phone and computer must be on **same WiFi**.
-- Check firewall isn't blocking port 5000.
-- Verify the IP address in `App.js` matches your computer's IP.
+- Phone and computer must be on the **same WiFi**.
+- Check your firewall isn't blocking port 5000.
+- Confirm `EXPO_PUBLIC_API_URL` in `client-mobile/.env` is your LAN IP, not `localhost`.
 
 ### Port already in use
 ```bash
-# Kill process on port 5000 (server)
 # Windows:
 netstat -ano | findstr :5000
 taskkill /PID <PID> /F
@@ -239,24 +277,12 @@ git push origin feature/your-feature-name
 
 ---
 
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend (Web) | React 18, Vite, Axios |
-| Frontend (Mobile) | React Native, Expo |
-| Backend | Node.js, Express.js |
-| Database | MySQL 8 |
-| API Style | RESTful JSON |
-
----
-
 ## Team
 
 - Ortiz, Alvin Matthew Q.
 - Recio, Joaquin Aaron P.
 - Rosales, Luiz Gabriel S.
 
-**Institution:** Pamantasan ng Cabuyao (University of Cabuyao)  
-**Program:** Bachelor of Science in Information Technology  
+**Institution:** Pamantasan ng Cabuyao (University of Cabuyao)
+**Program:** Bachelor of Science in Information Technology
 **Year:** 2025-2026
