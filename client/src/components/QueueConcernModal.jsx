@@ -15,6 +15,9 @@ export default function QueueConcernModal({
   confirmText = "Join Queue",
   cancelText = "Cancel",
   submitting = false,
+  // Confirm-button label while `submitting` -- the post-join concern popup
+  // saves notes rather than joining, so it passes "Saving…".
+  submittingText = "Joining…",
   // When present, this is a Universal Service Queue: the student must pick
   // which specific service they're here for before joining.
   universalServices = null,
@@ -148,7 +151,7 @@ export default function QueueConcernModal({
             {cancelText}
           </button>
           <button className="qcm-confirm" onClick={handleConfirm} disabled={!canConfirm}>
-            {submitting ? "Joining…" : confirmText}
+            {submitting ? submittingText : confirmText}
           </button>
         </div>
       </div>
